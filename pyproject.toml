@@ -1,0 +1,62 @@
+[tool.poetry]
+name = "quantms-ms2rescore"
+description = "quantms-ms2rescore: Python scripts and helpers for the quantMS workflow"
+readme = "README.md"
+license = "MIT"
+version = "0.0.1"
+authors = [
+    "Yasset Perez-Riverol <ypriverol@gmail.com>",
+    "Dai Chengxin <chengxin2024@126.com>",
+    "Julianus Pfeuffer <jule.pf@gmail.com>"
+]
+keywords = [
+    "quantms",
+    "proteomics",
+    "mass-spectrometry",
+    "data-analysis",
+    "big data"
+]
+classifiers = [
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Development Status :: 5 - Production/Stable"
+]
+packages = [
+    { include = "qms2rescore" }
+]
+
+[tool.poetry.dependencies]
+python = ">=3.8,<3.11"
+click = "*"
+pyopenms = "*"
+ms2rescore = "3.0.3"
+pandas = "*"
+numpy = "*"
+psm-utils = "0.8.3"
+deepLC = "2.2.38"
+scipy = "1.13.1"
+pygam = "*"
+protobuf= "3.19.6"
+
+[tool.poetry.urls]
+GitHub = "https://github.com/bigbio/quantms-ms2rescore"
+PyPi = "https://pypi.org/project/quantms-ms2rescore/"
+Quantms = "https://quantms.org"
+LICENSE = "https://github.com/bigbio/quantms-ms2rescore/blob/main/LICENSE"
+
+[tool.poetry.scripts]
+quantmsutilsc = "qms2rescore.rescoring:main"
+
+[tool.isort]
+profile = "black"
+
+[tool.black]
+line-length = 99
+target-version = ["py39"]
+
+[build-system]
+requires = ["poetry-core>=1.2.0"]
+build-backend = "poetry.core.masonry.api"
