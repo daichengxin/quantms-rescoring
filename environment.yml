@@ -1,5 +1,5 @@
 # environment.yml
-name: quantmsutils
+name: quantms-rescoring
 channels:
   - bioconda
   - conda-forge
@@ -10,7 +10,6 @@ dependencies:
   - pyopenms>=2.4.0
   - pandas
   - numpy
-  - pyarrow
   - ms2rescore=3.0.3
   - deepLC=2.2.38
   - psm-utils=0.8.3
