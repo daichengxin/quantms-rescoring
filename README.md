@@ -1,5 +1,5 @@
-# quantms-ms2rescore
-quantms-ms2rescore is a Python tool for rescoring peptide-spectrum matches (PSMs) in idXML files. It is part of the quantms ecosystem package and leverages the MS²Rescore framework to improve identification confidence in proteomics data analysis.
+# quantms-rescoring
+quantms-rescoring is a Python tool for rescoring peptide-spectrum matches (PSMs) in idXML files. It is part of the quantms ecosystem package and leverages the MS²Rescore framework to improve identification confidence in proteomics data analysis.
 
 ## Features
 
