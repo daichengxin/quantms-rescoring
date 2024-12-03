@@ -1,6 +1,6 @@
 [tool.poetry]
-name = "quantms-ms2rescore"
-description = "quantms-ms2rescore: Python scripts and helpers for the quantMS workflow"
+name = "quantms-rescoring"
+description = "quantms-rescoring: Python scripts and helpers for the quantMS workflow"
 readme = "README.md"
 license = "MIT"
 version = "0.0.1"
@@ -25,7 +25,7 @@ classifiers = [
     "Development Status :: 5 - Production/Stable"
 ]
 packages = [
-    { include = "qms2rescore" }
+    { include = "quantmsrescore" }
 ]
 
 [tool.poetry.dependencies]
@@ -42,13 +42,13 @@ pygam = "*"
 protobuf= "3.19.6"
 
 [tool.poetry.urls]
-GitHub = "https://github.com/bigbio/quantms-ms2rescore"
-PyPi = "https://pypi.org/project/quantms-ms2rescore/"
+GitHub = "https://github.com/bigbio/quantms-rescoring"
+PyPi = "https://pypi.org/project/quantms-rescoring/"
 Quantms = "https://quantms.org"
-LICENSE = "https://github.com/bigbio/quantms-ms2rescore/blob/main/LICENSE"
+LICENSE = "https://github.com/bigbio/quantms-rescoring/blob/main/LICENSE"
 
 [tool.poetry.scripts]
-quantmsutilsc = "qms2rescore.rescoring:main"
+quantmsutilsc = "quantmsrescore.rescoring:main"
 
 [tool.isort]
 profile = "black"
