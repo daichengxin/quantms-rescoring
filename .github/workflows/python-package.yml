@@ -43,4 +43,4 @@ jobs:
         pytest
     - name: Test commandline tool
       run: |
-        quantmsutilsc --help
+        rescoring --help

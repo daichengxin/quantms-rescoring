@@ -48,7 +48,7 @@ Quantms = "https://quantms.org"
 LICENSE = "https://github.com/bigbio/quantms-rescoring/blob/main/LICENSE"
 
 [tool.poetry.scripts]
-quantmsutilsc = "quantmsrescore.rescoring:main"
+rescoring = "quantmsrescore.rescoring:main"
 
 [tool.isort]
 profile = "black"
