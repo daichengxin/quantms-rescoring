@@ -1,4 +1,10 @@
 # quantms-rescoring
+    
+[![Build Status](https://travis-ci.com/compomics/quantms-rescoring.svg?branch=main)](https://travis-ci.com/compomics/quantms-rescoring)
+[![codecov](https://codecov.io/gh/compomics/quantms-rescoring/branch/main/graph/badge.svg?token=3ZQZQ2ZQ2D)](https://codecov.io/gh/compomics/quantms-rescoring)
+[![PyPI version](https://badge.fury.io/py/quantms-rescoring.svg)](https://badge.fury.io/py/quantms-rescoring)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+
 quantms-rescoring is a Python tool for rescoring peptide-spectrum matches (PSMs) in idXML files. It is part of the quantms ecosystem package and leverages the MS²Rescore framework to improve identification confidence in proteomics data analysis.
 
 ## Features
@@ -10,7 +16,8 @@ quantms-rescoring is a Python tool for rescoring peptide-spectrum matches (PSMs)
 - Seamless Integration: Built to integrate into proteomics workflows.
 
 ## Installation
-To use quantms-ms2rescore, ensure the following dependencies are installed:
+
+To use quantms-rescoring, ensure the following dependencies are installed:
 
 - Python 3.8+
 - click
