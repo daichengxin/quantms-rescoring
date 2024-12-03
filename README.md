@@ -25,3 +25,7 @@ To use quantms-rescoring, ensure the following dependencies are installed:
 - ms2rescore
 - psm_utils
 
+### Issues and Contributions
+
+For any issues or contributions, please open an issue in the [GitHub repository](https://github.com/bigbio/quantms/issues) - we use the quantms repo to control all issues—or PR in the [GitHub repository](https://github.com/bigbio/quantms-rescoring/pulls). 
+
