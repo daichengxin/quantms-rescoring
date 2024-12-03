@@ -22,7 +22,6 @@ requirements:
     - poetry-core >=1.2.0
   run:
     - click
-    - sdrf-pipelines>=0.0.31
     - pyopenms>=2.4.0
     - pandas
     - numpy
@@ -37,6 +36,7 @@ test:
     - quantmsrescore
   commands:
     - rescoring --help
+    - rescoring ms2rescore --help
   requires:
     - pip
 
