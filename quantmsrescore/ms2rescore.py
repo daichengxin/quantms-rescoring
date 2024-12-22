@@ -72,6 +72,7 @@ class IDXMLReaderPatch(IdXMLReader):
                     yield psm
                 else:
                     self.skip_invalid_psm += 1
+            # If it is a valid Peptide Hits then keep it
             if len(new_hits) > 0:
                 peptide_id.setHits(new_hits)
                 self.new_peptide_ids.append(peptide_id)
@@ -245,6 +246,7 @@ def rescore_idxml(input_file, output_file, config) -> None:
         logging.warning(
             f"Removed {reader.skip_invalid_psm} PSMs without search engine features!"
         )
+        # Synchronised acquisition of new peptide IDs after removing invalid PSMs
         peptide_ids = reader.new_peptide_ids
     else:
         peptide_ids = reader.peptide_ids
