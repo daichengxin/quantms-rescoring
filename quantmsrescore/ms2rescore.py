@@ -62,6 +62,10 @@ class IDXMLReaderPatch(IdXMLReader):
 
         psm_list: return [PSM 1]
 
+        The invalid PSM are directly from search engines results (MSGF+). The search engine doesn't report search
+        score features (e.g. MSGF:ScoreRatio) for these invalid PSMs. And we can observe the NumMatchedMainIons of
+        peptide hit is 0. So we should remove these invalid PSMs
+
         """
         for peptide_id in self.peptide_ids:
             new_hits = []
@@ -72,8 +76,10 @@ class IDXMLReaderPatch(IdXMLReader):
                     yield psm
                 else:
                     self.skip_invalid_psm += 1
-            peptide_id.setHits(new_hits)
-            self.new_peptide_ids.append(peptide_id)
+            # If it is a valid Peptide Hits then keep it
+            if len(new_hits) > 0:
+                peptide_id.setHits(new_hits)
+                self.new_peptide_ids.append(peptide_id)
 
     def _parse_psm(
             self,
@@ -244,6 +250,7 @@ def rescore_idxml(input_file, output_file, config) -> None:
         logging.warning(
             f"Removed {reader.skip_invalid_psm} PSMs without search engine features!"
         )
+        # Synchronised acquisition of new peptide IDs after removing invalid PSMs
         peptide_ids = reader.new_peptide_ids
     else:
         peptide_ids = reader.peptide_ids
