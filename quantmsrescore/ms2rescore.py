@@ -72,8 +72,9 @@ class IDXMLReaderPatch(IdXMLReader):
                     yield psm
                 else:
                     self.skip_invalid_psm += 1
-            peptide_id.setHits(new_hits)
-            self.new_peptide_ids.append(peptide_id)
+            if len(new_hits) > 0:
+                peptide_id.setHits(new_hits)
+                self.new_peptide_ids.append(peptide_id)
 
     def _parse_psm(
             self,
