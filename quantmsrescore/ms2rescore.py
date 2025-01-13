@@ -5,7 +5,7 @@
 import importlib.resources
 import json
 import logging
-
+import os
 import click
 import pyopenms as oms
 from ms2rescore import package_data, rescore
@@ -141,24 +141,24 @@ class IDXMLReaderPatch(IdXMLReader):
 
 
 def parse_cli_arguments_to_config(
-    config_file: str = None,
-    feature_generators: str = None,
-    ms2pip_model_dir: str = None,
-    ms2pip_model: str = None,
-    ms2_tolerance: float = None,
-    calibration_set_size: float = None,
-    rescoring_engine: str = None,
-    rng: int = None,
-    test_fdr: float = None,
-    processes: int = None,
-    spectrum_path: str = None,
-    fasta_file: str = None,
-    id_decoy_pattern: str = None,
-    lower_score_is_better: bool = None,
-    output_path: str = None,
-    log_level: str = None,
-    spectrum_id_pattern: str = None,
-    psm_id_pattern: str = None
+        config_file: str = None,
+        feature_generators: str = None,
+        ms2pip_model_dir: str = None,
+        ms2pip_model: str = None,
+        ms2_tolerance: float = None,
+        calibration_set_size: float = None,
+        rescoring_engine: str = None,
+        rng: int = None,
+        test_fdr: float = None,
+        processes: int = None,
+        spectrum_path: str = None,
+        fasta_file: str = None,
+        id_decoy_pattern: str = None,
+        lower_score_is_better: bool = None,
+        output_path: str = None,
+        log_level: str = None,
+        spectrum_id_pattern: str = None,
+        psm_id_pattern: str = None
 ) -> dict:
     if config_file is None:
         config = json.load(
@@ -254,6 +254,33 @@ def rescore_idxml(input_file, output_file, config) -> None:
         peptide_ids = reader.new_peptide_ids
     else:
         peptide_ids = reader.peptide_ids
+
+    # check if any spectrum is empty
+    exp = oms.MSExperiment()
+    oms.MzMLFile().load(config["ms2rescore"]["spectrum_path"], exp)
+    empty_spectra = 0
+    spec = []
+    for spectrum in exp:
+        peaks_tuple = spectrum.get_peaks()
+        if len(peaks_tuple[0]) == 0 and spectrum.getMSLevel() == 2:
+            logging.warning(
+                f"{spectrum.getNativeID()} spectra don't have spectra information!"
+            )
+            empty_spectra += 1
+            continue
+        spec.append(spectrum)
+
+    if empty_spectra != 0:
+        logging.warning(
+            f"Removed {empty_spectra} spectra without spectra information!"
+        )
+        exp.setSpectra(spec)
+        output_dir = os.path.dirname(config["ms2rescore"]["output_path"])
+        mzml_output = os.path.join(output_dir, os.path.splitext(os.path.basename(config["ms2rescore"]["spectrum_path"]))[0] + "_clear.mzML")
+        oms.MzMLFile().store(mzml_output, exp)
+        config["ms2rescore"]["spectrum_path"] = mzml_output
+        # TODO: Add cleanup of temporary file after processing
+
     # Rescore
     rescore(config, psm_list)
 
@@ -266,7 +293,7 @@ def rescore_idxml(input_file, output_file, config) -> None:
 
 
 def filter_out_artifact_psms(
-    psm_list: PSMList, peptide_ids: List[oms.PeptideIdentification]
+        psm_list: PSMList, peptide_ids: List[oms.PeptideIdentification]
 ) -> List[oms.PeptideIdentification]:
     """Filter out PeptideHits that could not be processed by all feature generators"""
     num_mandatory_features = max([len(psm.rescoring_features) for psm in psm_list])
@@ -424,26 +451,26 @@ def filter_out_artifact_psms(
 )
 @click.pass_context
 def ms2rescore(
-    ctx,
-    psm_file: str,
-    spectrum_path,
-    output_path: str,
-    log_level,
-    processes,
-    fasta_file,
-    test_fdr,
-    feature_generators,
-    ms2pip_model_dir,
-    ms2pip_model,
-    ms2_tolerance,
-    calibration_set_size,
-    rescoring_engine,
-    rng,
-    id_decoy_pattern,
-    lower_score_is_better,
-    config_file: str,
-    spectrum_id_pattern: str,
-    psm_id_pattern: str
+        ctx,
+        psm_file: str,
+        spectrum_path,
+        output_path: str,
+        log_level,
+        processes,
+        fasta_file,
+        test_fdr,
+        feature_generators,
+        ms2pip_model_dir,
+        ms2pip_model,
+        ms2_tolerance,
+        calibration_set_size,
+        rescoring_engine,
+        rng,
+        id_decoy_pattern,
+        lower_score_is_better,
+        config_file: str,
+        spectrum_id_pattern: str,
+        psm_id_pattern: str
 ):
     """
     Rescore PSMs in an idXML file and keep other information unchanged.
@@ -505,6 +532,3 @@ def ms2rescore(
     logging.info("MS²Rescore config:")
     logging.info(config)
     rescore_idxml(psm_file, output_path, config)
-
-
-
