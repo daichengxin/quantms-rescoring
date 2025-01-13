@@ -276,8 +276,7 @@ def rescore_idxml(input_file, output_file, config) -> None:
         )
         exp.setSpectra(spec)
         output_dir = os.path.dirname(config["ms2rescore"]["output_path"])
-        mzml_output = os.path.join(output_dir, 
-            os.path.splitext(os.path.basename(config["ms2rescore"]["spectrum_path"]))[0] + "_clear.mzML")
+        mzml_output = os.path.join(output_dir, os.path.splitext(os.path.basename(config["ms2rescore"]["spectrum_path"]))[0] + "_clear.mzML")
         oms.MzMLFile().store(mzml_output, exp)
         config["ms2rescore"]["spectrum_path"] = mzml_output
         # TODO: Add cleanup of temporary file after processing
