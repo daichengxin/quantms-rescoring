@@ -5,8 +5,7 @@
 import importlib.resources
 import json
 import logging
-import os.path
-
+import os
 import click
 import pyopenms as oms
 from ms2rescore import package_data, rescore
