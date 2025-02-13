@@ -1,7 +1,13 @@
 from click.testing import CliRunner
 
 from quantmsrescore.rescoring import cli
+from pathlib import Path
+import logging
 
+TESTS_DIR = Path(__file__).parent
+
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
 
 # test for the rescoring command in cli
 def test_ms2rescore_help():
@@ -18,9 +24,9 @@ def test_ms2rescore():
         [
             "ms2rescore",
             "--psm_file",
-            "tests/test_data/TMT_Erwinia_1uLSike_Top10HCD_isol2_45stepped_60min_01_comet.idXML",
+            "{}/test_data/TMT_Erwinia_1uLSike_Top10HCD_isol2_45stepped_60min_01_comet.idXML".format(TESTS_DIR),
             "--spectrum_path",
-            "tests/test_data/TMT_Erwinia_1uLSike_Top10HCD_isol2_45stepped_60min_01.mzML",
+            "{}/test_data/TMT_Erwinia_1uLSike_Top10HCD_isol2_45stepped_60min_01.mzML".format(TESTS_DIR),
             "--processes",
             "2",
             "--ms2pip_model",
