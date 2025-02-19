@@ -1,0 +1,168 @@
+import logging
+import re
+from typing import List, Union
+
+from psm_utils import PSM
+from pyopenms import PeptideIdentification, ProteinIdentification, SpectrumLookup
+import pyopenms as oms
+from pyopenms._pyopenms_8 import PeptideHit
+
+OPENMS_DECOY_FIELD = "target_decoy"
+SPECTRUM_PATTERN = r"(spectrum|scan)=(\d+)"
+
+
+class OpenMSHelper:
+    """
+    This class should contain methods to help with OpenMS operations on PSM lists
+    Features, parameters.
+    """
+
+    @staticmethod
+    def count_decoys_targets(peptide_list: List[PeptideIdentification | PeptideHit]) -> (int, int):
+        """
+        Count the number of decoy and target PSMs in the given list.
+
+        This method iterates over a list of PSM objects, counting how many
+        are labeled as 'target' or 'decoy' based on their rescoring features
+        and the `is_decoy` attribute. It ensures that the counts from the
+        rescoring features match the counts from the `is_decoy` attribute.
+
+        Parameters
+        ----------
+        peptide_list (List[PSM]): A list of PeptideIdentification objects to be analyzed.
+
+        Returns
+        -------
+        tuple: A tuple containing the count of decoy PSMs and the count of
+        target PSMs.
+
+        Raises
+        -------
+        ValueError: If the counts from the rescoring features do not match
+        the counts from the `is_decoy` attribute.
+        """
+
+        openms_count_target = 0
+        openms_count_decoy = 0
+
+        for pep in peptide_list:
+            if isinstance(pep, PeptideHit):
+                if OpenMSHelper.is_decoy_peptide_hit(pep):
+                    openms_count_decoy += 1
+                else:
+                    openms_count_target += 1
+            else:
+                for psm in pep.getHits():
+                    if psm.metaValueExists(OPENMS_DECOY_FIELD):
+                        if psm.getMetaValue(OPENMS_DECOY_FIELD) == "decoy":
+                            openms_count_decoy += 1
+                        else:
+                            openms_count_target += 1
+
+        percentage_decoy = (openms_count_decoy / (openms_count_decoy + openms_count_target)) * 100
+        logging.info(
+            "Decoy percentage: %s, targets %s and decoys %s",
+            percentage_decoy,
+            openms_count_target,
+            openms_count_decoy,
+        )
+        return openms_count_decoy, openms_count_target
+
+    @staticmethod
+    def get_psm_count(peptide_list: List[PeptideIdentification | PeptideHit]) -> int:
+        """
+        Count the number of PSMs in the given list.
+
+        This method iterates over a list of PSM objects, counting the total
+        number of PSMs.
+
+        Parameters
+        ----------
+        peptide_list (List[PSM]): A list of PeptideIdentification objects to be analyzed.
+
+        Returns
+        -------
+        int: The total number of PSMs in the list.
+        """
+
+        openms_count = 0
+
+        for pep in peptide_list:
+            if isinstance(pep, PeptideHit):
+                openms_count += 1
+            else:
+                openms_count += len(pep.getHits())
+        logging.info("Total PSMs: %s", openms_count)
+        return openms_count
+
+    @staticmethod
+    def is_decoy_peptide_hit(peptide_hit: PeptideHit) -> bool:
+        """
+        Check if a PeptideHit is a decoy.
+
+        This method checks if a PeptideHit is a decoy based on the
+        'target_decoy' field in the PeptideHit.
+
+        Parameters
+        ----------
+        peptide_hit (PeptideIdentification): A PeptideIdentification object to be checked.
+
+        Returns
+        -------
+        bool: True if the PeptideHit is a decoy, False otherwise.
+        """
+
+        if peptide_hit.metaValueExists(OPENMS_DECOY_FIELD):
+            return peptide_hit.getMetaValue(OPENMS_DECOY_FIELD) == "decoy"
+        return False
+
+    @staticmethod
+    def get_spectrum_lookup_indexer(mzml_file: str) -> tuple[oms.MSExperiment, SpectrumLookup]:
+        """
+        Create a SpectrumLookup indexer from an mzML file.
+
+        This method loads an mzML file into an MSExperiment object and
+        initializes a SpectrumLookup object to read spectra using a
+        specified regular expression pattern for scan numbers.
+
+        Parameters
+        ----------
+        mzml_file : str
+        The path to the mzML file to be loaded.
+
+        Returns
+        -------
+        tuple: A tuple containing the MSExperiment object with the loaded
+        """
+
+        exp = oms.MSExperiment()
+        oms.MzMLFile().load(mzml_file, exp)
+
+        lookup = SpectrumLookup()
+        lookup.readSpectra(exp, "scan=(?<SCAN>\\d+)")
+        return exp, lookup
+
+    @staticmethod
+    def get_spectrum_for_psm(
+        psm: Union[PSM | PeptideHit], exp: oms.MSExperiment, lookup: SpectrumLookup
+    ) -> Union[None | oms.MSSpectrum]:
+        spectrum_reference = ""
+        if isinstance(psm, PSM):
+            spectrum_reference = psm.spectrum_id
+        elif isinstance(psm, PeptideHit):
+            spectrum_reference = psm.getMetaValue("spectrum_reference")
+
+        scan_number = int(re.findall(r"(spectrum|scan)=(\d+)", spectrum_reference)[0][1])
+
+        try:
+            index = lookup.findByScanNumber(scan_number)
+            spectrum = exp.getSpectrum(index)
+            return spectrum
+        except Exception as e:
+            logging.error(
+                "Error while retrieving spectrum for PSM %s spectrum_ref %s: %s",
+                psm.provenance_data,
+                spectrum_reference,
+                e,
+            )
+        return None
