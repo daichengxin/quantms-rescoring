@@ -16,14 +16,15 @@ class Annotator:
     def __init__(
         self,
         feature_generators: str,
-        ms2pip_model: str,
-        ms2pip_model_path: str,
-        ms2_tolerance: float,
-        calibration_set_size: float,
-        processes: int,
-        id_decoy_pattern: str,
-        lower_score_is_better: bool,
-        log_level: str,
+        ms2pip_model: str = "HCD2021",
+        ms2pip_model_path: str = "models",
+        ms2_tolerance: float = 0.05,
+        deeplc_calibration_set_size: float = 0.2,
+        deeplc_retrain: bool = False,
+        processes: int = 2,
+        id_decoy_pattern: str = "^DECOY_",
+        lower_score_is_better: bool = True,
+        log_level: str = "INFO",
         spectrum_id_pattern: str = "(.*)",  # default for openms idXML
         psm_id_pattern: str = "(.*)",  # default for openms idXML
     ):
@@ -42,13 +43,14 @@ class Annotator:
         self._ms2pip_model = ms2pip_model
         self._ms2pip_model_path = ms2pip_model_path
         self._ms2_tolerance = ms2_tolerance
-        self._calibration_set_size = calibration_set_size
+        self._calibration_set_size = deeplc_calibration_set_size
         self._processes = processes
         self._id_decoy_pattern = id_decoy_pattern
         self._lower_score_is_better = lower_score_is_better
         self._log_level = log_level
         self._spectrum_id_pattern = spectrum_id_pattern
         self._psm_id_pattern = psm_id_pattern
+        self._deeplc_retrain = deeplc_retrain
 
     def build_idxml_data(self, idxml_file: Union[str | Path], spectrum_path: Union[str | Path]):
 
@@ -80,15 +82,15 @@ class Annotator:
             ms2pip_generator = MS2PIPAnnotator(
                 ms2_tolerance=self._ms2_tolerance,
                 model=self._ms2pip_model,
-                spectrum_path=self._idxml_reader.get_spectrum_path(),
+                spectrum_path=self._idxml_reader.spectrum_path,
                 spectrum_id_pattern=self._spectrum_id_pattern,
                 model_dir=self._ms2pip_model_path,
                 processes=self._processes,
             )
 
-            psm_list = self._idxml_reader.get_psms()
+            psm_list = self._idxml_reader.psms
             ms2pip_generator.add_features(psm_list)
-            self._idxml_reader.set_psms(psm_list)
+            self._idxml_reader.psms = psm_list
 
             logging.info("MS2PIP Annotations added to the PSMs")
 
@@ -100,6 +102,14 @@ class Annotator:
                 calibration_set_size=self._calibration_set_size,
                 processes=self._processes,
             )
-            psm_list = self._idxml_reader.get_psms()
+            psm_list = self._idxml_reader.psms
             deeplc_annotator.add_features(psm_list)
-            self._idxml_reader.set_psms(psm_list)
+            self._idxml_reader.psms = psm_list
+
+    def write_idxml_file(self, filename: Union[str | Path]):
+        OpenMSHelper.write_idxml_file(
+            filename=filename,
+            protein_ids=self._idxml_reader.openms_proteins,
+            peptide_ids=self._idxml_reader.openms_peptides,
+        )
+        logging.info("Annotated idXML file written to %s", filename)

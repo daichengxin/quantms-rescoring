@@ -111,24 +111,33 @@ def test_idxmlreader_help():
     idxml_reader.build_spectrum_lookup(mzml_file)
     missing_count = idxml_reader.validate_psm_spectrum_references()
 
-    assert missing_count == 0
+    assert missing_count.missing_spectra == 0
 
     annotator = Annotator(
-        "ms2pip,deeplc",
-        "HCD2021",
-        "models",
-        0.02,
-        0.15,
-        2,
-        "^DECOY_",
-        idxml_reader.high_score_better != True,
-        "INFO",
-        "(.*)",
-        "(.*)",
+        feature_generators="ms2pip,deeplc",
+        ms2pip_model="HCD2021",
+        ms2pip_model_path="models",
+        ms2_tolerance=0.05,
+        deeplc_calibration_set_size=0.15,
+        deeplc_retrain=False,
+        processes=2,
+        id_decoy_pattern="^DECOY_",
+        lower_score_is_better=idxml_reader.high_score_better != True,
+        log_level="INFO",
+        spectrum_id_pattern="(.*)",
+        psm_id_pattern="(.*)",
     )
 
     annotator.build_idxml_data(idxml_file, mzml_file)
     annotator.annotate()
+
+    output_file = (
+        TESTS_DIR
+        / "test_data"
+        / "TMT_Erwinia_1uLSike_Top10HCD_isol2_45stepped_60min_01_comet_rescored.idXML"
+    )
+
+    annotator.write_idxml_file(output_file)
 
 
 def test_idxmlreader_failing_help():

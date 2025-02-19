@@ -344,7 +344,7 @@ def annotate(
         ms2pip_model=ms2pip_model,
         ms2pip_model_path=ms2pip_model_dir,
         ms2_tolerance=ms2_tolerance,
-        calibration_set_size=calibration_set_size,
+        deeplc_calibration_set_size=calibration_set_size,
         processes=processes,
         id_decoy_pattern=id_decoy_pattern,
         lower_score_is_better=lower_score_is_better,

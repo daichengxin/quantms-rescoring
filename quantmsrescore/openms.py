@@ -1,5 +1,6 @@
 import logging
 import re
+from pathlib import Path
 from typing import List, Union
 
 from psm_utils import PSM
@@ -166,3 +167,29 @@ class OpenMSHelper:
                 e,
             )
         return None
+
+    @staticmethod
+    def write_idxml_file(
+        filename: Union[str | Path],
+        peptide_ids: List[PeptideIdentification],
+        protein_ids: List[ProteinIdentification],
+    ) -> None:
+        """
+        Write protein and peptide identifications to an idXML file.
+
+        Parameters
+        ----------
+        filename : Union[str, Path]
+            The path to the idXML file to be written.
+        peptide_ids : List[PeptideIdentification]
+            A list of PeptideIdentification objects to be written to the file.
+        protein_ids : List[ProteinIdentification]
+            A list of ProteinIdentification objects to be written to the file.
+
+        """
+
+        if isinstance(filename, Path):
+            filename = str(filename)
+
+        id_data = oms.IdXMLFile()
+        id_data.store(filename, protein_ids, peptide_ids)
