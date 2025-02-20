@@ -1,11 +1,12 @@
+import logging
+from pathlib import Path
+
 from click.testing import CliRunner
 
 from quantmsrescore.annotator import Annotator
 from quantmsrescore.idxmlreader import IdXMLRescoringReader
 from quantmsrescore.openms import OpenMSHelper
 from quantmsrescore.rescoring import cli
-from pathlib import Path
-import logging
 
 TESTS_DIR = Path(__file__).parent
 
@@ -115,11 +116,11 @@ def test_idxmlreader_help():
 
     annotator = Annotator(
         feature_generators="ms2pip,deeplc",
-        ms2pip_model="HCD2021",
+        ms2pip_model="TMT",
         ms2pip_model_path="models",
         ms2_tolerance=0.05,
-        deeplc_calibration_set_size=0.15,
-        deeplc_retrain=False,
+        calibration_set_size=0.15,
+        deeplc_retrain=True,
         processes=2,
         id_decoy_pattern="^DECOY_",
         lower_score_is_better=idxml_reader.high_score_better != True,
@@ -175,3 +176,44 @@ def test_idxmlreader_failing_help():
     missing_count = idexml_reader.validate_psm_spectrum_references()
 
     assert missing_count == 0
+
+def test_sage_feature_file():
+    runner = CliRunner()
+    result = runner.invoke(
+        cli,
+        [
+            "sage2feature",
+            "--idx_file",
+            "tests/test_data/TMT_Erwinia_1uLSike_Top10HCD_isol2_45stepped_60min_01_sage_ms2rescore.idXML",
+            "--output_file",
+            "tests/test_data/TMT_Erwinia_1uLSike_Top10HCD_isol2_45stepped_60min_01_sage_ms2rescore_feat_gen.idXML",
+            "--feat_file",
+            "tests/test_data/tmt_erwinia_1ulsike_top10hcd_isol2_45stepped_60min_01_sage_ms2rescore.idxml.feature_names.tsv",
+        ],
+    )
+
+    assert result.exit_code == 0
+
+def test_spectrum2fature_file():
+    runner = CliRunner()
+    result = runner.invoke(
+        cli,
+        [
+            "spectrum2feature",
+            "--ms_path",
+            "tests/test_data/TMT_Erwinia_1uLSike_Top10HCD_isol2_45stepped_60min_01.mzML",
+            "--idxml",
+            "tests/test_data/TMT_Erwinia_1uLSike_Top10HCD_isol2_45stepped_60min_01_sage_ms2rescore.idXML",
+            "--output",
+            "tests/test_data/TMT_Erwinia_1uLSike_Top10HCD_isol2_45stepped_60min_01_sage_ms2rescore_snr.idXML",
+        ],
+    )
+
+    assert result.exit_code == 0
+
+# test for the add_sage_feature command in cli
+def test_add_sage_feature_help():
+    runner = CliRunner()
+    result = runner.invoke(cli, ["sage2feature", "--help"])
+
+    assert result.exit_code == 0

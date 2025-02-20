@@ -1,8 +1,9 @@
 import click
 
-
 from quantmsrescore import __version__
 from quantmsrescore.ms2rescore import annotate
+from quantmsrescore.sage_feature import add_sage_feature
+from quantmsrescore.snr import spectrum2feature
 
 CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
 
@@ -14,8 +15,9 @@ CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
 def cli():
     pass
 
-
 cli.add_command(annotate)
+cli.add_command(add_sage_feature)
+cli.add_command(spectrum2feature)
 
 
 def main():

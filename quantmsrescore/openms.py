@@ -3,10 +3,9 @@ import re
 from pathlib import Path
 from typing import List, Union
 
-from psm_utils import PSM
-from pyopenms import PeptideIdentification, ProteinIdentification, SpectrumLookup
 import pyopenms as oms
-from pyopenms._pyopenms_8 import PeptideHit
+from psm_utils import PSM
+from pyopenms import PeptideIdentification, ProteinIdentification, SpectrumLookup, PeptideHit
 
 OPENMS_DECOY_FIELD = "target_decoy"
 SPECTRUM_PATTERN = r"(spectrum|scan)=(\d+)"

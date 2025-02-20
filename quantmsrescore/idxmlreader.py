@@ -1,12 +1,11 @@
-from dataclasses import dataclass
 import logging
 from collections import defaultdict
 from pathlib import Path
 from typing import Union, Iterable, List, Optional, Dict, Tuple, DefaultDict
 from warnings import filterwarnings
 
-from psm_utils import PSM, PSMList
 import pyopenms as oms
+from psm_utils import PSM, PSMList
 from psm_utils.io.idxml import IdXMLReader
 
 from quantmsrescore.openms import OpenMSHelper
@@ -25,6 +24,7 @@ filterwarnings(
 
 class ScoreStats:
     """Statistics about score occurrence in peptide hits."""
+
     total_hits: int = 0
     missing_count: int = 0
 
@@ -36,6 +36,7 @@ class ScoreStats:
 
 class SpectrumStats:
     """Statistics about spectrum analysis."""
+
     missing_spectra: int = 0
     empty_spectra: int = 0
     ms_level_counts: DefaultDict[int, int] = defaultdict(int)
@@ -147,16 +148,15 @@ class IdXMLRescoringReader:
 
     @staticmethod
     def _parse_psm(
-            protein_ids: Union[oms.ProteinIdentification, List[oms.ProteinIdentification]],
-            peptide_id: oms.PeptideIdentification,
-            peptide_hit: oms.PeptideHit,
-            is_decoy: bool = False,
+        protein_ids: Union[oms.ProteinIdentification, List[oms.ProteinIdentification]],
+        peptide_id: oms.PeptideIdentification,
+        peptide_hit: oms.PeptideHit,
+        is_decoy: bool = False,
     ) -> Optional[PSM]:
         """Parse OpenMS peptide hit data into a PSM object."""
         try:
             peptidoform = IdXMLReader._parse_peptidoform(
-                peptide_hit.getSequence().toString(),
-                peptide_hit.getCharge()
+                peptide_hit.getSequence().toString(), peptide_hit.getCharge()
             )
 
             spectrum_ref = peptide_id.getMetaValue("spectrum_reference")
@@ -185,7 +185,9 @@ class IdXMLRescoringReader:
             logging.error(f"Failed to parse PSM: {e}")
             return None
 
-    def _parse_idxml(self) -> Tuple[List[oms.ProteinIdentification], List[oms.PeptideIdentification]]:
+    def _parse_idxml(
+        self,
+    ) -> Tuple[List[oms.ProteinIdentification], List[oms.PeptideIdentification]]:
         """Parse the idXML file to extract protein and peptide identifications."""
         idxml_file = oms.IdXMLFile()
         proteins, peptides = [], []

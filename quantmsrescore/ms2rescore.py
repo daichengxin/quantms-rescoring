@@ -2,18 +2,15 @@
 # Contributions by Yasset Perez-Riverol and Dai Chengxin
 # This script is part of the quantmsutils package
 
-import importlib.resources
-import json
 import logging
 import os
-from collections import defaultdict
+from typing import List
 
 import click
 import pyopenms as oms
-from ms2rescore import package_data, rescore
+from ms2rescore import rescore
 from psm_utils import PSMList
-from psm_utils.io.idxml import IdXMLReader, IdXMLWriter
-from typing import Iterable, List, Union
+from psm_utils.io.idxml import IdXMLWriter
 
 from quantmsrescore.annotator import Annotator
 
@@ -344,7 +341,7 @@ def annotate(
         ms2pip_model=ms2pip_model,
         ms2pip_model_path=ms2pip_model_dir,
         ms2_tolerance=ms2_tolerance,
-        deeplc_calibration_set_size=calibration_set_size,
+        calibration_set_size=calibration_set_size,
         processes=processes,
         id_decoy_pattern=id_decoy_pattern,
         lower_score_is_better=lower_score_is_better,
