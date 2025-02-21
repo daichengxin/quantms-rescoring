@@ -31,15 +31,16 @@ packages = [
 [tool.poetry.dependencies]
 python = ">=3.9,<3.12"
 click = "*"
-pyopenms = "*"
+pyopenms = ">=3.0"
 ms2rescore = "3.1.4"
 pandas = "*"
-numpy = ">=2.0"
+numpy = ">=1.25"
 psm-utils = "*"
-deepLC = "*"
+deepLC = ">=3.0"
 scipy = "*"
 pygam = "*"
 protobuf= "*"
+ms2pip = ">=4.0"
 
 [tool.poetry.urls]
 GitHub = "https://github.com/bigbio/quantms-rescoring"

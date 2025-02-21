@@ -25,13 +25,14 @@ requirements:
     - click
     - pyopenms>=2.4.0
     - pandas
-    - numpy>=2.0
+    - numpy>=1.25
     - ms2rescore=3.1.4
-    - deepLC
+    - deepLC>=3.0
     - psm-utils
     - scipy
     - pygam
     - protobuf
+    - ms2pip>=4.0
 test:
   imports:
     - quantmsrescore
