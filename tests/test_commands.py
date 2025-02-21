@@ -1,6 +1,7 @@
 import logging
 from pathlib import Path
 
+import pytest
 from click.testing import CliRunner
 
 from quantmsrescore.annotator import Annotator
@@ -140,7 +141,7 @@ def test_idxmlreader_help():
 
     annotator.write_idxml_file(output_file)
 
-
+@pytest.mark.skip(reason="This is for local test in big datasets, kipping for now")
 def test_idxmlreader_failing_help():
     idxml_file = (
         TESTS_DIR
