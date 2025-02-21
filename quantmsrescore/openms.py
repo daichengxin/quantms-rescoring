@@ -60,6 +60,9 @@ class OpenMSHelper:
                         else:
                             openms_count_target += 1
 
+        if openms_count_decoy + openms_count_target == 0:
+            logging.warning("No PSMs found; decoy percentage cannot be computed.")
+            return 0, 0
         percentage_decoy = (openms_count_decoy / (openms_count_decoy + openms_count_target)) * 100
         logging.info(
             "Decoy percentage: %s, targets %s and decoys %s",
