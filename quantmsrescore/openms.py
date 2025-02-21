@@ -1,8 +1,9 @@
 import logging
 import re
 from pathlib import Path
-from typing import List, Union
+from typing import List, Union, Optional, Tuple
 
+import numpy as np
 import pyopenms as oms
 from psm_utils import PSM
 from pyopenms import PeptideIdentification, ProteinIdentification, SpectrumLookup, PeptideHit
@@ -117,7 +118,9 @@ class OpenMSHelper:
         return False
 
     @staticmethod
-    def get_spectrum_lookup_indexer(mzml_file: str) -> tuple[oms.MSExperiment, SpectrumLookup]:
+    def get_spectrum_lookup_indexer(
+        mzml_file: Union[str | Path],
+    ) -> tuple[oms.MSExperiment, SpectrumLookup]:
         """
         Create a SpectrumLookup indexer from an mzML file.
 
@@ -134,6 +137,9 @@ class OpenMSHelper:
         -------
         tuple: A tuple containing the MSExperiment object with the loaded
         """
+
+        if isinstance(mzml_file, Path):
+            mzml_file = str(mzml_file)
 
         exp = oms.MSExperiment()
         oms.MzMLFile().load(mzml_file, exp)
@@ -192,3 +198,28 @@ class OpenMSHelper:
 
         id_data = oms.IdXMLFile()
         id_data.store(filename, protein_ids, peptide_ids)
+
+    @staticmethod
+    def get_peaks_by_scan(
+        scan_number: int, exp: oms.MSExperiment, lookup: SpectrumLookup
+    ) -> Optional[Tuple[np.ndarray, np.ndarray]]:
+        """
+        Get spectrum data for a given scan number
+
+        Parameters
+        ----------
+            scan_number: The scan number to look up
+            exp: The MSExperiment object containing the spectra
+            lookup: The SpectrumLookup object to find the spectrum
+
+        Returns
+        -------
+            Tuple of (mz_array, intensity_array) if found, None if not found
+        """
+        try:
+            index = lookup.findByScanNumber(scan_number)
+            spectrum = exp.getSpectrum(index)
+            return spectrum.get_peaks()
+        except IndexError:
+            logging.warning(f"Scan number {scan_number} not found")
+            return None

@@ -177,6 +177,7 @@ def test_idxmlreader_failing_help():
 
     assert missing_count == 0
 
+
 def test_sage_feature_file():
     runner = CliRunner()
     result = runner.invoke(
@@ -194,22 +195,37 @@ def test_sage_feature_file():
 
     assert result.exit_code == 0
 
+
 def test_spectrum2fature_file():
+    idxml_file = (
+        TESTS_DIR
+        / "test_data"
+        / "TMT_Erwinia_1uLSike_Top10HCD_isol2_45stepped_60min_01_sage_ms2rescore.idXML"
+    )
+    mzml_file = (
+        TESTS_DIR / "test_data" / "TMT_Erwinia_1uLSike_Top10HCD_isol2_45stepped_60min_01.mzML"
+    )
+    output_file = (
+        TESTS_DIR
+        / "test_data"
+        / "TMT_Erwinia_1uLSike_Top10HCD_isol2_45stepped_60min_01_sage_ms2rescore_snr.idXML"
+    )
     runner = CliRunner()
     result = runner.invoke(
         cli,
         [
             "spectrum2feature",
-            "--ms_path",
-            "tests/test_data/TMT_Erwinia_1uLSike_Top10HCD_isol2_45stepped_60min_01.mzML",
+            "--mzml",
+            mzml_file,
             "--idxml",
-            "tests/test_data/TMT_Erwinia_1uLSike_Top10HCD_isol2_45stepped_60min_01_sage_ms2rescore.idXML",
+            idxml_file,
             "--output",
-            "tests/test_data/TMT_Erwinia_1uLSike_Top10HCD_isol2_45stepped_60min_01_sage_ms2rescore_snr.idXML",
+            output_file,
         ],
     )
 
     assert result.exit_code == 0
+
 
 # test for the add_sage_feature command in cli
 def test_add_sage_feature_help():

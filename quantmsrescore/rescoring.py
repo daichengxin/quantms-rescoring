@@ -15,6 +15,7 @@ CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
 def cli():
     pass
 
+
 cli.add_command(annotate)
 cli.add_command(add_sage_feature)
 cli.add_command(spectrum2feature)
