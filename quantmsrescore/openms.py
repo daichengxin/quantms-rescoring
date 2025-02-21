@@ -73,7 +73,7 @@ class OpenMSHelper:
         return openms_count_decoy, openms_count_target
 
     @staticmethod
-    def get_psm_count(peptide_list: List[PeptideIdentification | PeptideHit]) -> int:
+    def get_psm_count(peptide_list: List[Union[PeptideIdentification | PeptideHit]]) -> int:
         """
         Count the number of PSMs in the given list.
 
