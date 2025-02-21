@@ -128,54 +128,54 @@ OPTIONAL_FEATURES = [
 #     return config
 
 
-def rescore_idxml(input_file, output_file, config) -> None:
-    """Rescore PSMs in an idXML file and keep other information unchanged."""
-    # Read PSMs
-    reader = IDXMLReaderPatch(input_file)
-    psm_list = reader.read_file()
-
-    if reader.skip_invalid_psm != 0:
-        logging.warning(f"Removed {reader.skip_invalid_psm} PSMs without search engine features!")
-        # Synchronised acquisition of new peptide IDs after removing invalid PSMs
-        peptide_ids = reader.new_peptide_ids
-    else:
-        peptide_ids = reader.oms_peptides
-
-    # check if any spectrum is empty
-    exp = oms.MSExperiment()
-    oms.MzMLFile().load(config["ms2rescore"]["spectrum_path"], exp)
-    empty_spectra = 0
-    spec = []
-    for spectrum in exp:
-        peaks_tuple = spectrum.get_peaks()
-        if len(peaks_tuple[0]) == 0 and spectrum.getMSLevel() == 2:
-            logging.warning(f"{spectrum.getNativeID()} spectra don't have spectra information!")
-            empty_spectra += 1
-            continue
-        spec.append(spectrum)
-
-    if empty_spectra != 0:
-        logging.warning(f"Removed {empty_spectra} spectra without spectra information!")
-        exp.setSpectra(spec)
-        output_dir = os.path.dirname(config["ms2rescore"]["output_path"])
-        mzml_output = os.path.join(
-            output_dir,
-            os.path.splitext(os.path.basename(config["ms2rescore"]["spectrum_path"]))[0]
-            + "_clear.mzML",
-        )
-        oms.MzMLFile().store(mzml_output, exp)
-        config["ms2rescore"]["spectrum_path"] = mzml_output
-        # TODO: Add cleanup of temporary file after processing
-
-    # Rescore
-    rescore(config, psm_list)
-
-    # Filter out PeptideHits within PeptideIdentification(s) that could not be processed by all feature generators
-    peptide_ids_filtered = filter_out_artifact_psms(psm_list, peptide_ids)
-
-    # Write
-    writer = IdXMLWriter(output_file, reader.oms_proteins, peptide_ids_filtered)
-    writer.write_file(psm_list)
+# def rescore_idxml(input_file, output_file, config) -> None:
+#     """Rescore PSMs in an idXML file and keep other information unchanged."""
+#     # Read PSMs
+#     reader = IDXMLReaderPatch(input_file)
+#     psm_list = reader.read_file()
+#
+#     if reader.skip_invalid_psm != 0:
+#         logging.warning(f"Removed {reader.skip_invalid_psm} PSMs without search engine features!")
+#         # Synchronised acquisition of new peptide IDs after removing invalid PSMs
+#         peptide_ids = reader.new_peptide_ids
+#     else:
+#         peptide_ids = reader.oms_peptides
+#
+#     # check if any spectrum is empty
+#     exp = oms.MSExperiment()
+#     oms.MzMLFile().load(config["ms2rescore"]["spectrum_path"], exp)
+#     empty_spectra = 0
+#     spec = []
+#     for spectrum in exp:
+#         peaks_tuple = spectrum.get_peaks()
+#         if len(peaks_tuple[0]) == 0 and spectrum.getMSLevel() == 2:
+#             logging.warning(f"{spectrum.getNativeID()} spectra don't have spectra information!")
+#             empty_spectra += 1
+#             continue
+#         spec.append(spectrum)
+#
+#     if empty_spectra != 0:
+#         logging.warning(f"Removed {empty_spectra} spectra without spectra information!")
+#         exp.setSpectra(spec)
+#         output_dir = os.path.dirname(config["ms2rescore"]["output_path"])
+#         mzml_output = os.path.join(
+#             output_dir,
+#             os.path.splitext(os.path.basename(config["ms2rescore"]["spectrum_path"]))[0]
+#             + "_clear.mzML",
+#         )
+#         oms.MzMLFile().store(mzml_output, exp)
+#         config["ms2rescore"]["spectrum_path"] = mzml_output
+#         # TODO: Add cleanup of temporary file after processing
+#
+#     # Rescore
+#     rescore(config, psm_list)
+#
+#     # Filter out PeptideHits within PeptideIdentification(s) that could not be processed by all feature generators
+#     peptide_ids_filtered = filter_out_artifact_psms(psm_list, peptide_ids)
+#
+#     # Write
+#     writer = IdXMLWriter(output_file, reader.oms_proteins, peptide_ids_filtered)
+#     writer.write_file(psm_list)
 
 
 def filter_out_artifact_psms(
