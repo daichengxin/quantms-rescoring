@@ -14,7 +14,7 @@ TESTS_DIR = Path(__file__).parent
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
-@pytest.skip(reason="This is for local test in big datasets, kipping for now")
+@pytest.mark.skip(reason="This is for local test in big datasets, kipping for now")
 def test_ms2rescore():
     runner = CliRunner()
     result = runner.invoke(
@@ -41,7 +41,7 @@ def test_ms2rescore():
     )
     assert result.exit_code == 0
 
-@pytest.skip(reason="This is for local test in big datasets, kipping for now")
+@pytest.mark.skip(reason="This is for local test in big datasets, kipping for now")
 def test_ms2rescore_failing():
     runner = CliRunner()
     result = runner.invoke(
@@ -170,7 +170,7 @@ def test_idxmlreader_failing_help():
 
     assert missing_count == 0
 
-@pytest.skip(reason="This is for local test in big datasets, kipping for now")
+@pytest.mark.skip(reason="This is for local test in big datasets, kipping for now")
 def test_sage_feature_file():
     runner = CliRunner()
     result = runner.invoke(
