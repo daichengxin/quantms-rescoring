@@ -19,7 +19,7 @@ class OpenMSHelper:
     """
 
     @staticmethod
-    def count_decoys_targets(peptide_list: List[PeptideIdentification | PeptideHit]) -> (int, int):
+    def count_decoys_targets(peptide_list: List[Union[PeptideIdentification, PeptideHit]]) -> (int, int):
         """
         Count the number of decoy and target PSMs in the given list.
 
