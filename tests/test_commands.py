@@ -14,6 +14,7 @@ TESTS_DIR = Path(__file__).parent
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
+
 @pytest.mark.skip(reason="This is for local test in big datasets, kipping for now")
 def test_ms2rescore():
     runner = CliRunner()
@@ -40,6 +41,7 @@ def test_ms2rescore():
         ],
     )
     assert result.exit_code == 0
+
 
 @pytest.mark.skip(reason="This is for local test in big datasets, kipping for now")
 def test_ms2rescore_failing():
@@ -133,6 +135,7 @@ def test_idxmlreader_help():
 
     annotator.write_idxml_file(output_file)
 
+
 @pytest.mark.skip(reason="This is for local test in big datasets, kipping for now")
 def test_idxmlreader_failing_help():
     idxml_file = (
@@ -170,6 +173,7 @@ def test_idxmlreader_failing_help():
 
     assert missing_count == 0
 
+
 @pytest.mark.skip(reason="This is for local test in big datasets, kipping for now")
 def test_sage_feature_file():
     runner = CliRunner()
@@ -187,6 +191,7 @@ def test_sage_feature_file():
     )
 
     assert result.exit_code == 0
+
 
 def test_spectrum2feature_file():
     idxml_file = (
