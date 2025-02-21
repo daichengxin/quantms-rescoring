@@ -161,7 +161,14 @@ class OpenMSHelper:
         elif isinstance(psm, PeptideHit):
             spectrum_reference = psm.getMetaValue("spectrum_reference")
 
-        scan_number = int(re.findall(r"(spectrum|scan)=(\d+)", spectrum_reference)[0][1])
+        matches = re.findall(r"(spectrum|scan)=(\d+)", spectrum_reference)
+        if not matches:
+            logging.warning(
+                f"Missing or invalid spectrum reference for PSM {psm.provenance_data}, "
+                f"skipping spectrum retrieval."
+            )
+            return None
+        scan_number = int(matches[0][1])
 
         try:
             index = lookup.findByScanNumber(scan_number)
