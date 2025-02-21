@@ -116,7 +116,7 @@ def test_idxmlreader_help():
         deeplc_retrain=True,
         processes=2,
         id_decoy_pattern="^DECOY_",
-        lower_score_is_better=idxml_reader.high_score_better != True,
+        lower_score_is_better=not idxml_reader.high_score_better,
         log_level="INFO",
         spectrum_id_pattern="(.*)",
         psm_id_pattern="(.*)",
