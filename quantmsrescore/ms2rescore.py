@@ -350,5 +350,3 @@ def annotate(
         psm_id_pattern=psm_id_pattern,
     )
     logging.info("MS²Rescore config:")
-    logging.info(config)
-    rescore_idxml(psm_file, output_path, config)
