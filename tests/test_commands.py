@@ -188,7 +188,7 @@ def test_sage_feature_file():
 
     assert result.exit_code == 0
 
-def test_spectrum2fature_file():
+def test_spectrum2feature_file():
     idxml_file = (
         TESTS_DIR
         / "test_data"
