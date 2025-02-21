@@ -1,10 +1,10 @@
 click
 pyopenms
-ms2rescore==3.0.3
+ms2rescore==3.1.4
 pandas
 numpy>=2.0
-deepLC==2.2.38
-psm-utils==0.8.3
-scipy==1.13.1
+deepLC
+psm-utils
+scipy
 pygam
-protobuf==3.19.6
+protobuf
