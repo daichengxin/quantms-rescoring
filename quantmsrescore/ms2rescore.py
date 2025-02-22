@@ -3,14 +3,11 @@
 # This script is part of the quantmsutils package
 
 import logging
-import os
 from typing import List
 
 import click
 import pyopenms as oms
-from ms2rescore import rescore
 from psm_utils import PSMList
-from psm_utils.io.idxml import IdXMLWriter
 
 from quantmsrescore.annotator import Annotator
 
