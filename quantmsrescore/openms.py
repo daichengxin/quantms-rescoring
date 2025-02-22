@@ -123,9 +123,8 @@ class OpenMSHelper:
         return False
 
     @staticmethod
-    def get_spectrum_lookup_indexer(
-            mzml_file: Union[str | Path],
-    ) -> tuple[oms.MSExperiment, SpectrumLookup]:
+    def get_spectrum_lookup_indexer(mzml_file: Union[str, Path],
+                                    ) -> tuple[oms.MSExperiment, SpectrumLookup]:
         """
         Create a SpectrumLookup indexer from an mzML file.
 
@@ -155,8 +154,8 @@ class OpenMSHelper:
 
     @staticmethod
     def get_spectrum_for_psm(
-            psm: Union[PSM | PeptideHit], exp: oms.MSExperiment, lookup: SpectrumLookup
-    ) -> Union[None | oms.MSSpectrum]:
+            psm: Union[PSM, PeptideHit], exp: oms.MSExperiment, lookup: SpectrumLookup
+    ) -> Union[None, oms.MSSpectrum]:
         spectrum_reference = ""
         if isinstance(psm, PSM):
             spectrum_reference = psm.spectrum_id
@@ -187,7 +186,7 @@ class OpenMSHelper:
 
     @staticmethod
     def write_idxml_file(
-            filename: Union[str | Path],
+            filename: Union[str, Path],
             peptide_ids: List[PeptideIdentification],
             protein_ids: List[ProteinIdentification],
     ) -> None:

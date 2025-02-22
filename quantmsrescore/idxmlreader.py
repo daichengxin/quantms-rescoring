@@ -72,7 +72,7 @@ class IdXMLRescoringReader:
         self.oms_proteins, self.oms_peptides = self._parse_idxml()
 
     @property
-    def spectrum_path(self) -> Union[str | Path]:
+    def spectrum_path(self) -> Union[str, Path]:
         """Get the path to the spectrum file."""
         return self._mzml_path
 

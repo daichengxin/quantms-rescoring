@@ -73,7 +73,7 @@ class Annotator:
         self._psm_id_pattern = psm_id_pattern
         self._deeplc_retrain = deeplc_retrain
 
-    def build_idxml_data(self, idxml_file: Union[str | Path], spectrum_path: Union[str | Path]):
+    def build_idxml_data(self, idxml_file: Union[str, Path], spectrum_path: Union[str | Path]):
 
         logging.info("Running the Annotator on file: %s", idxml_file)
 
@@ -130,7 +130,7 @@ class Annotator:
             deeplc_annotator.add_features(psm_list)
             self._idxml_reader.psms = psm_list
 
-    def write_idxml_file(self, filename: Union[str | Path]):
+    def write_idxml_file(self, filename: Union[str, Path]):
         OpenMSHelper.write_idxml_file(
             filename=filename,
             protein_ids=self._idxml_reader.openms_proteins,
