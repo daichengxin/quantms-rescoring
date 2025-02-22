@@ -73,7 +73,7 @@ class Annotator:
         self._psm_id_pattern = psm_id_pattern
         self._deeplc_retrain = deeplc_retrain
 
-    def build_idxml_data(self, idxml_file: Union[str, Path], spectrum_path: Union[str | Path]):
+    def build_idxml_data(self, idxml_file: Union[str, Path], spectrum_path: Union[str, Path]):
 
         logging.info("Running the Annotator on file: %s", idxml_file)
 
