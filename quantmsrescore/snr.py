@@ -175,9 +175,6 @@ def spectrum2feature(ctx, mzml: str, idxml: str, output: str) -> None:
     logging.info(f"Processing mzML file: {mzml}")
     exp, lookup = OpenMSHelper.get_spectrum_lookup_indexer(mzml)
 
-    # Load identification results
-    protein_ids = []
-    peptide_ids = []
     idxml_reader = IdXMLRescoringReader(filename=idxml)
     protein_ids = idxml_reader.oms_proteins
     peptide_ids = idxml_reader.oms_peptides

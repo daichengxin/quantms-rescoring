@@ -1,13 +1,14 @@
 import logging
 from collections import defaultdict
 from pathlib import Path
-from typing import Union, Iterable, List, Optional, Dict, Tuple, DefaultDict
+from typing import Union, Iterable, List, Optional, Dict, Tuple, DefaultDict, Set
 from warnings import filterwarnings
 
 import pyopenms as oms
 from psm_utils import PSM, PSMList
 from psm_utils.io.idxml import IdXMLReader
 
+from quantmsrescore.constants import OPENMS_DISSOCIATION_METHODS_PATCH
 from quantmsrescore.openms import OpenMSHelper
 
 # Configure logging
@@ -40,6 +41,7 @@ class SpectrumStats:
     missing_spectra: int = 0
     empty_spectra: int = 0
     ms_level_counts: DefaultDict[int, int] = defaultdict(int)
+    ms_level_dissociation_method = {}
 
 
 class IdXMLRescoringReader:
@@ -188,14 +190,32 @@ class IdXMLRescoringReader:
     def _parse_idxml(
         self,
     ) -> Tuple[List[oms.ProteinIdentification], List[oms.PeptideIdentification]]:
-        """Parse the idXML file to extract protein and peptide identifications."""
+        """
+        Parse the idXML file to extract protein and peptide identifications.
+
+        Returns
+        -------
+            Tuple[List[oms.ProteinIdentification], List[oms.PeptideIdentification]]:
+            A tuple containing lists of protein and peptide identifications.
+        """
         idxml_file = oms.IdXMLFile()
         proteins, peptides = [], []
         idxml_file.load(str(self.filename), proteins, peptides)
         return proteins, peptides
 
     def read_file(self) -> PSMList:
-        """Read and parse all PSMs from the idXML file."""
+        """
+        Read and parse the idXML file to extract PSMs.
+
+        This method processes peptide identifications from the idXML file,
+        determines the score direction if not already set, and parses each
+        peptide hit into a PSM object. It logs warnings for inconsistent
+        score directions and returns a list of valid PSMs.
+
+        Returns
+        -------
+            PSMList: A list of parsed PSM objects.
+        """
         psm_list = []
 
         for peptide_id in self.oms_peptides:
@@ -228,10 +248,12 @@ class IdXMLRescoringReader:
         """
         Validate PSM spectrum references and collect spectrum statistics.
 
-        Returns:
+        Returns
+        -------
             SpectrumStats object containing validation results
 
-        Raises:
+        Raises
+        ------
             ValueError: If spectrum lookup or PSMs are not initialized
         """
         if self._spec_lookup is None or self._exp is None or not self._psms:
@@ -255,8 +277,23 @@ class IdXMLRescoringReader:
             ms_level = spectrum.getMSLevel()
             stats.ms_level_counts[ms_level] += 1
 
+            for precursor in spectrum.getPrecursors():
+                for method_index in precursor.getActivationMethods():
+                    if len(OPENMS_DISSOCIATION_METHODS_PATCH) > method_index >= 0:
+                        method = (ms_level, list(OPENMS_DISSOCIATION_METHODS_PATCH[method_index].keys())[0])
+                        if method in stats.ms_level_dissociation_method:
+                            stats.ms_level_dissociation_method[method] += 1
+                        else:
+                            stats.ms_level_dissociation_method[method] = 1
+                    else:
+                        logging.warning(f"Unknown dissociation method index {method_index}")
+
+            print("MS Level ", ms_level, "Disassociation Method ", stats.ms_level_dissociation_method)
+
             if ms_level == 3:
-                logging.info(f"MS level 3 spectrum found for PSM {psm}")
+                logging.info(
+                    f"MS level 3 spectrum found for PSM {psm}, please be aware, ms2pip models are not trained on MS3 spectra"
+                )
 
         if stats.missing_spectra or stats.empty_spectra:
             logging.error(

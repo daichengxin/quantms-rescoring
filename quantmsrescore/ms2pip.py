@@ -95,7 +95,7 @@ class MS2PIPAnnotator(MS2PIPFeatureGenerator):
                         "Invalid correlation found. Please try a different model or adjust the correlation threshold."
                     )
                     raise FeatureGeneratorException(
-                        f"Invalid correlation found. Please try a different model or adjust the correlation threshold."
+                        "Invalid correlation found. Please try a different model or adjust the correlation threshold."
                     )
 
                 self._calculate_features(psm_list_run, ms2pip_results)
