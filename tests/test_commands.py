@@ -87,27 +87,23 @@ def test_idxmlreader_help():
         TESTS_DIR / "test_data" / "TMT_Erwinia_1uLSike_Top10HCD_isol2_45stepped_60min_01.mzML"
     )
 
-    idxml_reader = IdXMLRescoringReader(idexml_filename=idxml_file)
-    peptide_list = idxml_reader.build_psm_index()
-    logging.info("Loaded %s PSMs from %s", len(peptide_list))
-    assert len(peptide_list) == 5350
+    idxml_reader = IdXMLRescoringReader(idexml_filename=idxml_file, mzml_file=mzml_file)
+    logging.info("Loaded %s PSMs from %s", len(idxml_reader.psms), idxml_file)
+    assert len(idxml_reader.psms) == 5350
 
     openms_helper = OpenMSHelper()
     decoys, targets = openms_helper.count_decoys_targets(idxml_reader.oms_peptides)
     logging.info(
         "Loaded %s PSMs from %s, %s decoys and %s targets",
-        len(peptide_list),
+        len(idxml_reader.psms),
         idxml_file,
         decoys,
         targets,
     )
     assert decoys == 1923
     assert targets == 3427
-
-    idxml_reader.build_spectrum_lookup(mzml_file)
-    missing_count = idxml_reader.validate_psm_spectrum_references()
-
-    assert missing_count.missing_spectra == 0
+    stats = idxml_reader.stats
+    assert stats.missing_spectra == 0
 
     annotator = Annotator(
         feature_generators="ms2pip,deeplc",
@@ -123,7 +119,6 @@ def test_idxmlreader_help():
         spectrum_id_pattern="(.*)",
         psm_id_pattern="(.*)",
     )
-
     annotator.build_idxml_data(idxml_file, mzml_file)
     annotator.annotate()
 
@@ -153,7 +148,7 @@ def test_idxmlreader_failing_help():
     )
 
     idexml_reader = IdXMLRescoringReader(idexml_filename=idxml_file)
-    peptide_list = idexml_reader.build_psm_index()
+    peptide_list = idexml_reader._build_psm_index()
 
     psm_count = OpenMSHelper.get_psm_count(idexml_reader.oms_peptides)
 
@@ -168,7 +163,7 @@ def test_idxmlreader_failing_help():
     assert decoys == 25171
     assert targets == 41599
 
-    idexml_reader.build_spectrum_lookup(mzml_file)
+    idexml_reader._build_spectrum_lookup(mzml_file)
     missing_count = idexml_reader.validate_psm_spectrum_references()
 
     assert missing_count == 0

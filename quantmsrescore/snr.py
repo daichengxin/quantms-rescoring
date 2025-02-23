@@ -7,7 +7,7 @@ import click
 import numpy as np
 from scipy.stats import entropy
 
-from quantmsrescore.idxmlreader import IdXMLRescoringReader
+from quantmsrescore.idxmlreader import IdXMLRescoringReader, IdXMLReader
 from quantmsrescore.openms import OpenMSHelper
 
 # Configure logging
@@ -175,7 +175,7 @@ def spectrum2feature(ctx, mzml: str, idxml: str, output: str) -> None:
     logging.info(f"Processing mzML file: {mzml}")
     exp, lookup = OpenMSHelper.get_spectrum_lookup_indexer(mzml)
 
-    idxml_reader = IdXMLRescoringReader(idexml_filename=idxml)
+    idxml_reader = IdXMLReader(idexml_filename=idxml)
     protein_ids = idxml_reader.oms_proteins
     peptide_ids = idxml_reader.oms_peptides
 

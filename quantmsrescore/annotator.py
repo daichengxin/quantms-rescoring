@@ -25,6 +25,8 @@ class Annotator:
         log_level: str = "INFO",
         spectrum_id_pattern: str = "(.*)",  # default for openms idXML
         psm_id_pattern: str = "(.*)",  # default for openms idXML
+        remove_missing_spectra: bool = True,
+        ms2_only: bool = True,
     ):
         """
         Initializes the Annotator class with configuration parameters for feature generation
@@ -72,6 +74,8 @@ class Annotator:
         self._spectrum_id_pattern = spectrum_id_pattern
         self._psm_id_pattern = psm_id_pattern
         self._deeplc_retrain = deeplc_retrain
+        self._remove_missing_spectra = remove_missing_spectra
+        self._ms2_only = ms2_only
 
     def build_idxml_data(self, idxml_file: Union[str, Path], spectrum_path: Union[str, Path]):
 
@@ -80,8 +84,13 @@ class Annotator:
         openms_helper = OpenMSHelper()
 
         # Load the idXML file and the corresponding mzML file
-        self._idxml_reader = IdXMLRescoringReader(idexml_filename=idxml_file)
-        psm_list = self._idxml_reader.build_psm_index()
+        self._idxml_reader = IdXMLRescoringReader(
+            idexml_filename=idxml_file,
+            mzml_file=spectrum_path,
+            only_ms2=self._ms2_only,
+            remove_missing_spectrum=self._remove_missing_spectra,
+        )
+        psm_list = self._idxml_reader.psms
         decoys, targets = openms_helper.count_decoys_targets(self._idxml_reader.oms_peptides)
         logging.info(
             "Loaded %s PSMs from %s, %s decoys and %s targets",
@@ -90,8 +99,6 @@ class Annotator:
             decoys,
             targets,
         )
-        self._idxml_reader.build_spectrum_lookup(spectrum_path)
-        self._idxml_reader.validate_psm_spectrum_references()
 
     def annotate(self):
 

@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Union, Iterable, List, Optional, Dict, Tuple, DefaultDict, Set
 from warnings import filterwarnings
 
+import psm_utils
 import pyopenms as oms
 from psm_utils import PSM, PSMList
 from psm_utils.io.idxml import IdXMLReader
@@ -31,7 +32,6 @@ class ScoreStats:
 
     @property
     def missing_percentage(self) -> float:
-        """Calculate percentage of hits missing this score."""
         return (self.missing_count / self.total_hits * 100) if self.total_hits else 0
 
 
@@ -44,7 +44,87 @@ class SpectrumStats:
     ms_level_dissociation_method = {}
 
 
-class IdXMLRescoringReader:
+class IdXMLReader:
+    """
+    A class to read and parse idXML files for protein and peptide identifications.
+
+    Attributes
+    ----------
+    filename : Path
+        The path to the idXML file.
+    oms_proteins : List[oms.ProteinIdentification]
+        List of protein identifications parsed from the idXML file.
+    oms_peptides : List[oms.PeptideIdentification]
+        List of peptide identifications parsed from the idXML file.
+
+    Methods
+    -------
+    _parse_idxml() -> Tuple[List[oms.ProteinIdentification], List[oms.PeptideIdentification]]
+        Parses the idXML file to extract protein and peptide identifications.
+    """
+
+    def __init__(self, idexml_filename: Union[Path, str]) -> None:
+
+        self.filename = Path(idexml_filename)
+        self.oms_proteins, self.oms_peptides = self._parse_idxml()
+
+        # Private properties if mzML iand spectrum lookup is build @build_spectrum_lookup
+        self._spec_lookup = None
+        self._exp = None
+        self._mzml_path = None
+        self._stats = None  # IdXML stats
+
+    def _parse_idxml(
+        self,
+    ) -> Tuple[List[oms.ProteinIdentification], List[oms.PeptideIdentification]]:
+        """
+        Parse the idXML file to extract protein and peptide identifications.
+
+        Returns
+        -------
+            Tuple[List[oms.ProteinIdentification], List[oms.PeptideIdentification]]:
+            A tuple containing lists of protein and peptide identifications.
+        """
+        idxml_file = oms.IdXMLFile()
+        proteins, peptides = [], []
+        idxml_file.load(str(self.filename), proteins, peptides)
+        return proteins, peptides
+
+    @property
+    def openms_proteins(self) -> List[oms.ProteinIdentification]:
+        return self.oms_proteins
+
+    @property
+    def openms_peptides(self) -> List[oms.PeptideIdentification]:
+        return self.oms_peptides
+
+    @property
+    def stats(self) -> SpectrumStats:
+        return self._stats
+
+    @property
+    def spectrum_path(self) -> Union[str, Path]:
+        return self._mzml_path
+
+    def _build_spectrum_lookup(self, mzml_file: Union[str, Path]) -> None:
+        """
+        Build a SpectrumLookup indexer from an mzML file.
+
+        This method initializes the spectrum lookup and MS experiment data
+        from the specified mzML file, storing them as class attributes for
+        further processing and analysis.
+
+        Parameters
+        ----------
+        mzml_file : Union[str, Path]
+            The path to the mzML file to be processed.
+        """
+        self._mzml_path = str(mzml_file) if isinstance(mzml_file, Path) else mzml_file
+        self._exp, self._spec_lookup = OpenMSHelper.get_spectrum_lookup_indexer(self._mzml_path)
+        logging.info(f"Built SpectrumLookup from {self._mzml_path}")
+
+
+class IdXMLRescoringReader(IdXMLReader):
     """
     Reader class for processing and rescoring idXML files containing peptide identifications.
 
@@ -58,7 +138,11 @@ class IdXMLRescoringReader:
     """
 
     def __init__(
-        self, idexml_filename: Union[Path, str], mzml_file: Union[str, Path] = None
+        self,
+        idexml_filename: Union[Path, str],
+        mzml_file: Union[str, Path],
+        only_ms2: bool = True,
+        remove_missing_spectrum: bool = True,
     ) -> None:
         """
         Initialize the IdXMLRescoringReader with the specified idXML file.
@@ -67,6 +151,10 @@ class IdXMLRescoringReader:
         ----------
         idexml_filename : Union[Path, str]
             The path to the idXML file to be processed.
+        mzml_file : Union[str, Path]
+            The path to the mzML file corresponding to the idXML file.
+        only_ms2 : bool, optional
+            Flag to filter for MS2 spectra only, by default True.
 
         Attributes
         ----------
@@ -91,27 +179,18 @@ class IdXMLRescoringReader:
         oms_peptides : List[oms.PeptideIdentification]
             List of peptide identifications from the idXML file.
         """
+        super().__init__(idexml_filename)
         self.filename = Path(idexml_filename)
         self.high_score_better: Optional[bool] = None
         self.skip_invalid_psm: int = 0
-        self.new_peptide_ids: List[oms.PeptideIdentification] = []
 
         # Private attributes
-        self._mzml_path: Optional[str] = None
         self._psms: Optional[PSMList] = None
-        self._spec_lookup: Optional[oms.SpectrumLookup] = None
-        self._exp: Optional[oms.MSExperiment] = None
-
-        # Parse input file
-        self.oms_proteins, self.oms_peptides = self._parse_idxml()
-
-        # If mzML file is provided, build SpectrumLookup
-        if mzml_file:
-            self.build_spectrum_lookup(mzml_file)
-
-    @property
-    def spectrum_path(self) -> Union[str, Path]:
-        return self._mzml_path
+        self._build_spectrum_lookup(mzml_file)
+        self._build_psm_index(only_ms2=only_ms2)
+        self._validate_psm_spectrum_references(
+            only_ms2=only_ms2, remove_missing_spectrum=remove_missing_spectrum
+        )
 
     @property
     def psms(self) -> Optional[PSMList]:
@@ -122,14 +201,6 @@ class IdXMLRescoringReader:
         if not isinstance(psm_list, PSMList):
             raise TypeError("psm_list must be an instance of PSMList")
         self._psms = psm_list
-
-    @property
-    def openms_proteins(self) -> List[oms.ProteinIdentification]:
-        return self.oms_proteins
-
-    @property
-    def openms_peptides(self) -> List[oms.PeptideIdentification]:
-        return self.oms_peptides
 
     def __iter__(self) -> Iterable[PSM]:
         score_stats = self._analyze_score_coverage()
@@ -221,7 +292,7 @@ class IdXMLRescoringReader:
             A PSM object if parsing is successful, otherwise None.
         """
         try:
-            peptidoform = IdXMLReader._parse_peptidoform(
+            peptidoform = psm_utils.io.idxml.IdXMLReader._parse_peptidoform(
                 peptide_hit.getSequence().toString(), peptide_hit.getCharge()
             )
 
@@ -238,7 +309,7 @@ class IdXMLRescoringReader:
             return PSM(
                 peptidoform=peptidoform,
                 spectrum_id=spectrum_ref,
-                run=IdXMLReader._get_run(protein_ids, peptide_id),
+                run=psm_utils.io.idxml.IdXMLReader._get_run(protein_ids, peptide_id),
                 is_decoy=is_decoy,
                 score=peptide_hit.getScore(),
                 precursor_mz=peptide_id.getMZ(),
@@ -251,23 +322,7 @@ class IdXMLRescoringReader:
             logging.error(f"Failed to parse PSM: {e}")
             return None
 
-    def _parse_idxml(
-        self,
-    ) -> Tuple[List[oms.ProteinIdentification], List[oms.PeptideIdentification]]:
-        """
-        Parse the idXML file to extract protein and peptide identifications.
-
-        Returns
-        -------
-            Tuple[List[oms.ProteinIdentification], List[oms.PeptideIdentification]]:
-            A tuple containing lists of protein and peptide identifications.
-        """
-        idxml_file = oms.IdXMLFile()
-        proteins, peptides = [], []
-        idxml_file.load(str(self.filename), proteins, peptides)
-        return proteins, peptides
-
-    def build_psm_index(self, only_ms2: bool = True) -> PSMList:
+    def _build_psm_index(self, only_ms2: bool = True) -> PSMList:
         """
         Read and parse the idXML file to extract PSMs.
 
@@ -302,7 +357,7 @@ class IdXMLRescoringReader:
             for psm_hit in peptide_id.getHits():
                 if (
                     only_ms2
-                    and OpenMSHelper.get_ms_level(psm_hit, self._spec_lookup, self._exp) != 2
+                    and OpenMSHelper.get_ms_level(peptide_id, self._spec_lookup, self._exp) != 2
                 ):
                     continue
                 psm = self._parse_psm(
@@ -318,24 +373,7 @@ class IdXMLRescoringReader:
         logging.info(f"Loaded {len(self._psms)} PSMs from {self.filename}")
         return self._psms
 
-    def build_spectrum_lookup(self, mzml_file: Union[str, Path]) -> None:
-        """
-        Build a SpectrumLookup indexer from an mzML file.
-
-        This method initializes the spectrum lookup and MS experiment data
-        from the specified mzML file, storing them as class attributes for
-        further processing and analysis.
-
-        Parameters
-        ----------
-        mzml_file : Union[str, Path]
-            The path to the mzML file to be processed.
-        """
-        self._mzml_path = str(mzml_file) if isinstance(mzml_file, Path) else mzml_file
-        self._exp, self._spec_lookup = OpenMSHelper.get_spectrum_lookup_indexer(self._mzml_path)
-        logging.info(f"Built SpectrumLookup from {self._mzml_path}")
-
-    def validate_psm_spectrum_references(
+    def _validate_psm_spectrum_references(
         self, remove_missing_spectrum: bool = True, only_ms2: bool = True
     ) -> SpectrumStats:
         """
@@ -366,7 +404,9 @@ class IdXMLRescoringReader:
         if self._spec_lookup is None or self._exp is None or not self._psms:
             raise ValueError("Spectrum lookup or PSMs not initialized")
 
-        stats = SpectrumStats()
+        self._stats = SpectrumStats()
+
+        new_psm_list = []
 
         for psm in self._psms[:]:  # Iterate over a copy to allow safe removal
             spectrum = OpenMSHelper.get_spectrum_for_psm(psm, self._exp, self._spec_lookup)
@@ -375,17 +415,17 @@ class IdXMLRescoringReader:
 
             if spectrum is None:
                 logging.error(f"Spectrum not found for PSM {psm}")
-                stats.missing_spectra += 1
+                self._stats.missing_spectra += 1
                 missing_spectra = True
             else:
                 peaks = spectrum.get_peaks()[0]
-                if not peaks:
+                if peaks is None or len(peaks) == 0:
                     logging.warning(f"Empty spectrum found for PSM {psm}")
                     empty_spectra = True
-                    stats.empty_spectra += 1
+                    self._stats.empty_spectra += 1
 
                 ms_level = spectrum.getMSLevel()
-                stats.ms_level_counts[ms_level] += 1
+                self._stats.ms_level_counts[ms_level] += 1
 
                 for precursor in spectrum.getPrecursors():
                     for method_index in precursor.getActivationMethods():
@@ -394,8 +434,8 @@ class IdXMLRescoringReader:
                                 ms_level,
                                 list(OPENMS_DISSOCIATION_METHODS_PATCH[method_index].keys())[0],
                             )
-                            stats.ms_level_dissociation_method[method] = (
-                                stats.ms_level_dissociation_method.get(method, 0) + 1
+                            self._stats.ms_level_dissociation_method[method] = (
+                                self._stats.ms_level_dissociation_method.get(method, 0) + 1
                             )
                         else:
                             logging.warning(f"Unknown dissociation method index {method_index}")
@@ -409,14 +449,18 @@ class IdXMLRescoringReader:
             if (remove_missing_spectrum and (missing_spectra or empty_spectra)) or (
                 only_ms2 and ms_level != 2
             ):
-                self._psms.remove(psm)
+                logging.debug(f"Removing PSM {psm}")
+            else:
+                new_psm_list.append(psm)
 
-        if stats.missing_spectra or stats.empty_spectra:
+        self._psms = PSMList(psm_list=new_psm_list)
+
+        if self._stats.missing_spectra or self._stats.empty_spectra:
             logging.error(
-                f"Found {stats.missing_spectra} PSMs with missing spectra and "
-                f"{stats.empty_spectra} PSMs with empty spectra"
+                f"Found {self._stats.missing_spectra} PSMs with missing spectra and "
+                f"{self._stats.empty_spectra} PSMs with empty spectra"
             )
 
-        logging.info(f"MS level distribution: {dict(stats.ms_level_counts)}")
-        print("Dissociation Method Distribution", stats.ms_level_dissociation_method)
-        return stats
+        logging.info(f"MS level distribution: {dict(self._stats.ms_level_counts)}")
+        print("Dissociation Method Distribution", self._stats.ms_level_dissociation_method)
+        return self._stats

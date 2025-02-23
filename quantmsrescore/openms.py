@@ -155,12 +155,12 @@ class OpenMSHelper:
 
     @staticmethod
     def get_spectrum_for_psm(
-        psm: Union[PSM, PeptideHit], exp: oms.MSExperiment, lookup: SpectrumLookup
+        psm: Union[PSM, PeptideIdentification], exp: oms.MSExperiment, lookup: SpectrumLookup
     ) -> Union[None, oms.MSSpectrum]:
         spectrum_reference = ""
         if isinstance(psm, PSM):
             spectrum_reference = psm.spectrum_id
-        elif isinstance(psm, PeptideHit):
+        elif isinstance(psm, PeptideIdentification):
             spectrum_reference = psm.getMetaValue("spectrum_reference")
 
         matches = re.findall(r"(spectrum|scan)=(\d+)", spectrum_reference)
@@ -238,7 +238,7 @@ class OpenMSHelper:
 
     @staticmethod
     def get_ms_level(
-        psm_hit: PeptideHit, spec_lookup: oms.SpectrumLookup, exp: oms.MSExperiment
+        psm_hit: PeptideIdentification, spec_lookup: oms.SpectrumLookup, exp: oms.MSExperiment
     ) -> int:
         spectrum = OpenMSHelper.get_spectrum_for_psm(psm_hit, exp, spec_lookup)
         if spectrum is None:
