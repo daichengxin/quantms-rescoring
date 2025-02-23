@@ -87,8 +87,8 @@ def test_idxmlreader_help():
         TESTS_DIR / "test_data" / "TMT_Erwinia_1uLSike_Top10HCD_isol2_45stepped_60min_01.mzML"
     )
 
-    idxml_reader = IdXMLRescoringReader(filename=idxml_file)
-    peptide_list = idxml_reader.read_file()
+    idxml_reader = IdXMLRescoringReader(idexml_filename=idxml_file)
+    peptide_list = idxml_reader.build_psm_index()
     logging.info("Loaded %s PSMs from %s", len(peptide_list))
     assert len(peptide_list) == 5350
 
@@ -152,8 +152,8 @@ def test_idxmlreader_failing_help():
         / "Instrument1_sample14_S1R10_042116_Fr12.mzML"
     )
 
-    idexml_reader = IdXMLRescoringReader(filename=idxml_file)
-    peptide_list = idexml_reader.read_file()
+    idexml_reader = IdXMLRescoringReader(idexml_filename=idxml_file)
+    peptide_list = idexml_reader.build_psm_index()
 
     psm_count = OpenMSHelper.get_psm_count(idexml_reader.oms_peptides)
 

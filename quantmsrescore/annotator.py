@@ -80,8 +80,8 @@ class Annotator:
         openms_helper = OpenMSHelper()
 
         # Load the idXML file and the corresponding mzML file
-        self._idxml_reader = IdXMLRescoringReader(filename=idxml_file)
-        psm_list = self._idxml_reader.read_file()
+        self._idxml_reader = IdXMLRescoringReader(idexml_filename=idxml_file)
+        psm_list = self._idxml_reader.build_psm_index()
         decoys, targets = openms_helper.count_decoys_targets(self._idxml_reader.oms_peptides)
         logging.info(
             "Loaded %s PSMs from %s, %s decoys and %s targets",

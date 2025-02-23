@@ -235,3 +235,12 @@ class OpenMSHelper:
         except IndexError:
             logging.warning(f"Scan number {scan_number} not found")
             return None
+
+    @staticmethod
+    def get_ms_level(
+        psm_hit: PeptideHit, spec_lookup: oms.SpectrumLookup, exp: oms.MSExperiment
+    ) -> int:
+        spectrum = OpenMSHelper.get_spectrum_for_psm(psm_hit, exp, spec_lookup)
+        if spectrum is None:
+            return -1
+        return spectrum.getMSLevel()

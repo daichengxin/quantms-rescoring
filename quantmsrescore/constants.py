@@ -33,7 +33,9 @@ SUPPORTED_MODELS_MS2PIP = [
 # This is the list of disassociation methods that are supported by OPENMS.
 # This list is a path for release 3.3.0 of OpenMS.
 OPENMS_DISSOCIATION_METHODS_PATCH = [
-    {"CID": "Collision-induced dissociation (MS:1000133) (also CAD; parent term, but unless otherwise stated often used as synonym for trap-type CID)"},
+    {
+        "CID": "Collision-induced dissociation (MS:1000133) (also CAD; parent term, but unless otherwise stated often used as synonym for trap-type CID)"
+    },
     {"PSD": "Post-source decay."},
     {"PD": "Plasma desorption."},
     {"SID": "Surface-induced dissociation."},
@@ -51,5 +53,5 @@ OPENMS_DISSOCIATION_METHODS_PATCH = [
     {"TRAP": "trap-type collision-induced dissociation (MS:1002472)"},
     {"HCD": "beam-type collision-induced dissociation (MS:1000422)"},
     {"INSOURCE": "in-source collision-induced dissociation (MS:1001880)"},
-    {"LIFT": "Bruker proprietary method (MS:1002000)"}
+    {"LIFT": "Bruker proprietary method (MS:1002000)"},
 ]
