@@ -169,14 +169,13 @@ def test_idxmlreader_failing_help():
     assert missing_count == 0
 
 
-@pytest.mark.skip(reason="This is for local test in big datasets, kipping for now")
 def test_sage_feature_file():
     runner = CliRunner()
     result = runner.invoke(
         cli,
         [
             "sage2feature",
-            "--idx_file",
+            "--idxml",
             f"{TESTS_DIR}/test_data/TMT_Erwinia_1uLSike_Top10HCD_isol2_45stepped_60min_01_sage_ms2rescore.idXML",
             "--output_file",
             f"{TESTS_DIR}/test_data/TMT_Erwinia_1uLSike_Top10HCD_isol2_45stepped_60min_01_sage_ms2rescore_feat_gen.idXML",
