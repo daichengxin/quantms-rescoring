@@ -104,13 +104,18 @@ class Annotator:
 
         openms_helper = OpenMSHelper()
 
-        # Load the idXML file and the corresponding mzML file
-        self._idxml_reader = IdXMLRescoringReader(
-            idexml_filename=idxml_file,
-            mzml_file=spectrum_path,
-            only_ms2=self._ms2_only,
-            remove_missing_spectrum=self._remove_missing_spectra,
-        )
+        try:
+            # Load the idXML file and the corresponding mzML file
+            self._idxml_reader = IdXMLRescoringReader(
+                idexml_filename=idxml_file,
+                mzml_file=spectrum_path,
+                only_ms2=self._ms2_only,
+                remove_missing_spectrum=self._remove_missing_spectra,
+            )
+        except Exception as e:
+            logging.error(f"Failed to load input files: {str(e)}")
+            raise
+
         psm_list = self._idxml_reader.psms
         decoys, targets = openms_helper.count_decoys_targets(self._idxml_reader.oms_peptides)
         logging.info(
@@ -120,7 +125,6 @@ class Annotator:
             decoys,
             targets,
         )
-
     def annotate(self):
 
         logging.debug(f"Running Annotations with following configurations: {self.__dict__}")
