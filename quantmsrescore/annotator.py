@@ -128,24 +128,27 @@ class Annotator:
         if self._ms2pip:
             logging.info("Running MS2PIP on the PSMs")
 
-            ms2pip_generator = MS2PIPAnnotator(
-                ms2_tolerance=self._ms2_tolerance,
-                model=self._ms2pip_model,
-                spectrum_path=self._idxml_reader.spectrum_path,
-                spectrum_id_pattern=self._spectrum_id_pattern,
-                model_dir=self._ms2pip_model_path,
-                calibration_set_size=self._calibration_set_size,
-                correlation_threshold=0.7,
-                lower_score_is_better=self._lower_score_is_better,
-                processes=self._processes,
-            )
+            try:
+                ms2pip_generator = MS2PIPAnnotator(
+                    ms2_tolerance=self._ms2_tolerance,
+                    model=self._ms2pip_model,
+                    spectrum_path=self._idxml_reader.spectrum_path,
+                    spectrum_id_pattern=self._spectrum_id_pattern,
+                    model_dir=self._ms2pip_model_path,
+                    calibration_set_size=self._calibration_set_size,
+                    correlation_threshold=0.7,
+                    lower_score_is_better=self._lower_score_is_better,
+                    processes=self._processes,
+                )
+            except Exception as e:
+                logging.error(f"Failed to initialize MS2PIP: {str(e)}")
+                raise
 
             psm_list = self._idxml_reader.psms
             ms2pip_generator.add_features(psm_list)
             self._idxml_reader.psms = psm_list
 
             logging.info("MS2PIP Annotations added to the PSMs")
-
         if self._deepLC:
             logging.info("Running deepLC on the PSMs")
 
