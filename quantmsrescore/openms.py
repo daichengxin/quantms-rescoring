@@ -186,6 +186,7 @@ class OpenMSHelper:
                 e,
             )
         return None
+
     @staticmethod
     def write_idxml_file(
         filename: Union[str, Path],
@@ -261,6 +262,9 @@ class OpenMSHelper:
             The PeptideIdentification object containing metadata for the PSM.
         psm_hit : PeptideHit
             The PeptideHit object representing the PSM.
+        spectrum_file : str
+            The path to the spectrum file containing the PSM. This is needed in case multiple files are
+            provided in the same run.
 
         Returns
         -------
@@ -269,7 +273,9 @@ class OpenMSHelper:
         """
 
         spectrum_ref = peptide_hit.getMetaValue("spectrum_reference")
+        rank = peptide_hit.getRank()
         rt = peptide_hit.getRT()
         sequence = psm_hit.getSequence().toString()
-        unique_hash = f"{sequence}/{psm_hit.getCharge()}/{rt}/{spectrum_ref}"
+        charge = psm_hit.getCharge()
+        unique_hash = f"{spectrum_ref}_{sequence}_{rt}_{charge}_{rank}"
         return unique_hash

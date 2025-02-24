@@ -33,6 +33,7 @@ class SpectrumMetrics:
 
     def as_dict(self) -> dict:
         """Convert metrics to a dictionary with proper prefixes"""
+
         def _format_float(value: float) -> str:
             if np.isnan(value) or np.isinf(value):
                 return "0.0"

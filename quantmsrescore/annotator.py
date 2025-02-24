@@ -125,6 +125,7 @@ class Annotator:
             decoys,
             targets,
         )
+
     def annotate(self):
 
         logging.debug(f"Running Annotations with following configurations: {self.__dict__}")
@@ -174,6 +175,7 @@ class Annotator:
             self._convert_features_psms_to_oms_peptides()
 
         logging.info("Annotations added to the PSMs, starting to modified OMS peptides")
+
     def write_idxml_file(self, filename: Union[str, Path]):
         try:
             OpenMSHelper.write_idxml_file(

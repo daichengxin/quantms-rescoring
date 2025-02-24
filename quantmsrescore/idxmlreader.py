@@ -87,6 +87,7 @@ class IdXMLReader(psm_utils.io.idxml.IdXMLReader):
         proteins, peptides = [], []
         idxml_file.load(str(self.filename), proteins, peptides)
         return proteins, peptides
+
     @property
     def openms_proteins(self) -> List[oms.ProteinIdentification]:
         return self.oms_proteins
@@ -297,7 +298,9 @@ class IdXMLRescoringReader(IdXMLReader):
             rt = peptide_id.getRT()
 
             # Create provenance tracking data
-            provenance_key = OpenMSHelper.get_psm_hash_unique_id(peptide_id, peptide_hit)
+            provenance_key = OpenMSHelper.get_psm_hash_unique_id(
+                peptide_hit=peptide_id, psm_hit=peptide_hit
+            )
             provenance_value = f"{peptidoform}/{rt}/{spectrum_ref}"
 
             return PSM(
