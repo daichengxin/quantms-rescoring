@@ -167,12 +167,16 @@ class Annotator:
         logging.info("Annotations added to the PSMs, starting to modified OMS peptides")
 
     def write_idxml_file(self, filename: Union[str, Path]):
-        OpenMSHelper.write_idxml_file(
-            filename=filename,
-            protein_ids=self._idxml_reader.openms_proteins,
-            peptide_ids=self._idxml_reader.openms_peptides,
-        )
-        logging.info("Annotated idXML file written to %s", filename)
+        try:
+            OpenMSHelper.write_idxml_file(
+                filename=filename,
+                protein_ids=self._idxml_reader.openms_proteins,
+                peptide_ids=self._idxml_reader.openms_peptides,
+            )
+            logging.info("Annotated idXML file written to %s", filename)
+        except Exception as e:
+            logging.error(f"Failed to write annotated idXML file: {str(e)}")
+            raise
 
     def _convert_features_psms_to_oms_peptides(self):
         """
