@@ -152,11 +152,16 @@ class Annotator:
         if self._deepLC:
             logging.info("Running deepLC on the PSMs")
 
-            deeplc_annotator = DeepLCAnnotator(
-                self._lower_score_is_better,
-                calibration_set_size=self._calibration_set_size,
-                processes=self._processes,
-            )
+            try:
+                deeplc_annotator = DeepLCAnnotator(
+                    self._lower_score_is_better,
+                    calibration_set_size=self._calibration_set_size,
+                    processes=self._processes,
+                )
+            except Exception as e:
+                logging.error(f"Failed to initialize DeepLC: {str(e)}")
+                raise
+
             psm_list = self._idxml_reader.psms
             deeplc_annotator.add_features(psm_list)
             self._idxml_reader.psms = psm_list
@@ -165,7 +170,6 @@ class Annotator:
             self._convert_features_psms_to_oms_peptides()
 
         logging.info("Annotations added to the PSMs, starting to modified OMS peptides")
-
     def write_idxml_file(self, filename: Union[str, Path]):
         try:
             OpenMSHelper.write_idxml_file(
