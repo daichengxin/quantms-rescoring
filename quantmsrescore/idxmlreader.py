@@ -43,7 +43,7 @@ class SpectrumStats:
     ms_level_dissociation_method = {}
 
 
-class IdXMLReader:
+class IdXMLReader(psm_utils.io.idxml.IdXMLReader):
     """
     A class to read and parse idXML files for protein and peptide identifications.
 
@@ -63,7 +63,6 @@ class IdXMLReader:
     """
 
     def __init__(self, idexml_filename: Union[Path, str]) -> None:
-
         self.filename = Path(idexml_filename)
         self.oms_proteins, self.oms_peptides = self._parse_idxml()
 
@@ -88,7 +87,6 @@ class IdXMLReader:
         proteins, peptides = [], []
         idxml_file.load(str(self.filename), proteins, peptides)
         return proteins, peptides
-
     @property
     def openms_proteins(self) -> List[oms.ProteinIdentification]:
         return self.oms_proteins
