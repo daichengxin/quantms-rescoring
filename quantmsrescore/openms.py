@@ -165,24 +165,27 @@ class OpenMSHelper:
 
         matches = re.findall(r"(spectrum|scan)=(\d+)", spectrum_reference)
         if not matches:
-            logging.warning(
-                f"Missing or invalid spectrum reference for PSM {psm.provenance_data}, "
-                f"skipping spectrum retrieval."
-            )
-            return None
-        scan_number = int(matches[0][1])
+            if not matches:
+                psm_info = psm.provenance_data if hasattr(psm, "provenance_data") else "N/A"
+                logging.warning(
+                    f"Missing or invalid spectrum reference for PSM {psm_info}, "
+                    f"skipping spectrum retrieval."
+                )
+                return None
+            scan_number = int(matches[0][1])
 
-        try:
-            index = lookup.findByScanNumber(scan_number)
-            spectrum = exp.getSpectrum(index)
-            return spectrum
-        except Exception as e:
-            logging.error(
-                "Error while retrieving spectrum for PSM %s spectrum_ref %s: %s",
-                psm.provenance_data,
-                spectrum_reference,
-                e,
-            )
+            try:
+                index = lookup.findByScanNumber(scan_number)
+                spectrum = exp.getSpectrum(index)
+                return spectrum
+            except Exception as e:
+                psm_info = psm.provenance_data if hasattr(psm, "provenance_data") else "N/A"
+                logging.error(
+                    "Error while retrieving spectrum for PSM %s spectrum_ref %s: %s",
+                    psm_info,
+                    spectrum_reference,
+                    e,
+                )
         return None
 
     @staticmethod
