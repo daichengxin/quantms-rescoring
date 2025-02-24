@@ -1,8 +1,6 @@
 MS2PIP_FEATURES = [
     {"MS2PIP:SpecPearsonNorm": "spec_pearson"},
     {"MS2PIP:SpecCosineNorm": "cos_norm"},
-    {"MS2PIP:IonbPersonNorm": "ionb_pearson_norm"},
-    {"MS2PIP:IonyPersonNorm": "iony_pearson_norm"},
 ]
 
 DEEPLC_FEATURES = [

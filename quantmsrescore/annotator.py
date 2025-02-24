@@ -1,5 +1,4 @@
 import logging
-from collections import defaultdict
 from pathlib import Path
 from typing import Union
 
@@ -184,7 +183,9 @@ class Annotator:
         for oms_peptide in self._idxml_reader.oms_peptides:
             hits = []
             for oms_psm in oms_peptide.getHits():
-                psm_hash = OpenMSHelper.get_psm_hash_unique_id(peptide_hit=oms_peptide, psm_hit=oms_psm)
+                psm_hash = OpenMSHelper.get_psm_hash_unique_id(
+                    peptide_hit=oms_peptide, psm_hit=oms_psm
+                )
                 psm = psm_dict.get(psm_hash)
                 if psm is None:
                     logging.warning(f"PSM not found for peptide {oms_peptide.getMetaValue('id')}")

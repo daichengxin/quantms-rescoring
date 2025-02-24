@@ -7,7 +7,6 @@ from warnings import filterwarnings
 import psm_utils
 import pyopenms as oms
 from psm_utils import PSM, PSMList
-from psm_utils.io.idxml import IdXMLReader
 
 from quantmsrescore.constants import OPENMS_DISSOCIATION_METHODS_PATCH
 from quantmsrescore.openms import OpenMSHelper
@@ -456,6 +455,11 @@ class IdXMLRescoringReader(IdXMLReader):
             logging.error(
                 f"Found {self._stats.missing_spectra} PSMs with missing spectra and "
                 f"{self._stats.empty_spectra} PSMs with empty spectra"
+            )
+
+        if len({k[1] for k in self.stats.ms_level_dissociation_method}) > 1:
+            logging.error(
+                "Found multiple dissociation methods in the same MS level, please be aware, ms2pip models are not trained multiple models"  # noqa
             )
 
         logging.info(f"MS level distribution: {dict(self._stats.ms_level_counts)}")
