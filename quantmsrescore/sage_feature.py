@@ -54,8 +54,11 @@ def add_sage_feature(ctx, idxml: str, output_file: str, feat_file: str):
 
     logging.info("Adding extra feature to idXML file")
     search_parameters = protein_ids[0].getSearchParameters()
-    features = search_parameters.getMetaValue("extra_features")
-    extra_features = features + "," + ",".join(extra_feat)
+    try:
+        features = search_parameters.getMetaValue("extra_features")
+    except Exception:
+        features = ""
+    extra_features = (features + "," if features else "") + ",".join(extra_feat)
     search_parameters.setMetaValue("extra_features", extra_features)
     protein_ids[0].setSearchParameters(search_parameters)
 
