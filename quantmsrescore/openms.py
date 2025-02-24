@@ -244,3 +244,31 @@ class OpenMSHelper:
         if spectrum is None:
             return -1
         return spectrum.getMSLevel()
+
+    @staticmethod
+    def get_psm_hash_unique_id(peptide_hit: PeptideIdentification, psm_hit: PeptideHit) -> str:
+        """
+        Generate a unique hash identifier for a PSM.
+
+        This method constructs a unique hash string for a given PSM by
+        combining the peptide sequence, charge, retention time, and
+        spectrum reference.
+
+        Parameters
+        ----------
+        peptide_hit : PeptideIdentification
+            The PeptideIdentification object containing metadata for the PSM.
+        psm_hit : PeptideHit
+            The PeptideHit object representing the PSM.
+
+        Returns
+        -------
+        str
+            A unique hash string for the PSM.
+        """
+
+        spectrum_ref = peptide_hit.getMetaValue("spectrum_reference")
+        rt = peptide_hit.getRT()
+        sequence = psm_hit.getSequence().toString()
+        unique_hash = f"{sequence}/{psm_hit.getCharge()}/{rt}/{spectrum_ref}"
+        return unique_hash

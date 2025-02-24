@@ -1,4 +1,5 @@
 import logging
+from collections import defaultdict
 from pathlib import Path
 from typing import Union
 
@@ -54,6 +55,9 @@ class Annotator:
         self._idxml_reader = None
         if not feature_generators:
             raise ValueError("feature_annotators must be provided.")
+        if "deeplc" not in feature_generators and "ms2pip" not in feature_generators:
+            raise ValueError("At least one of deeplc or ms2pip must be provided.")
+
         feature_annotators = feature_generators.split(",")
         if "deeplc" in feature_annotators:
             self._deepLC = True
@@ -63,6 +67,7 @@ class Annotator:
             self._ms2pip = True
         else:
             self._ms2pip = False
+
         self._ms2pip_model = ms2pip_model
         self._ms2pip_model_path = ms2pip_model_path
         self._ms2_tolerance = ms2_tolerance
@@ -78,6 +83,23 @@ class Annotator:
         self._ms2_only = ms2_only
 
     def build_idxml_data(self, idxml_file: Union[str, Path], spectrum_path: Union[str, Path]):
+        """
+        Build and load data from an idXML file for annotation.
+
+        This method initializes the IdXMLRescoringReader with the specified
+        idXML and mzML files, and counts the number of decoy and target PSMs.
+
+        Parameters
+        ----------
+        idxml_file : Union[str, Path]
+            The path to the idXML file to be processed.
+        spectrum_path : Union[str, Path]
+            The path to the corresponding mzML file.
+
+        Logs
+        ----
+        Logs the number of PSMs, decoys, and targets loaded from the idXML file.
+        """
 
         logging.info("Running the Annotator on file: %s", idxml_file)
 
@@ -137,6 +159,11 @@ class Annotator:
             deeplc_annotator.add_features(psm_list)
             self._idxml_reader.psms = psm_list
 
+        if self._ms2pip or self._deepLC:
+            self._convert_features_psms_to_oms_peptides()
+
+        logging.info("Annotations added to the PSMs, starting to modified OMS peptides")
+
     def write_idxml_file(self, filename: Union[str, Path]):
         OpenMSHelper.write_idxml_file(
             filename=filename,
@@ -144,3 +171,29 @@ class Annotator:
             peptide_ids=self._idxml_reader.openms_peptides,
         )
         logging.info("Annotated idXML file written to %s", filename)
+
+    def _convert_features_psms_to_oms_peptides(self):
+        """
+        This method converts features from PSMs to OMS peptides features. This is required as OpenMS
+        uses OMS peptides for storing features.
+        """
+        psm_dict = {next(iter(psm.provenance_data)): psm for psm in self._idxml_reader.psms}
+
+        oms_peptides = []
+
+        for oms_peptide in self._idxml_reader.oms_peptides:
+            hits = []
+            for oms_psm in oms_peptide.getHits():
+                psm_hash = OpenMSHelper.get_psm_hash_unique_id(peptide_hit=oms_peptide, psm_hit=oms_psm)
+                psm = psm_dict.get(psm_hash)
+                if psm is None:
+                    logging.warning(f"PSM not found for peptide {oms_peptide.getMetaValue('id')}")
+                else:
+                    for feature, value in psm.rescoring_features.items():
+                        # Round to 4 decimal str for OpenMS
+                        value_str = "{:.4f}".format(value)
+                        oms_psm.setMetaValue(feature, value_str)
+                hits.append(oms_psm)
+            oms_peptide.setHits(hits)
+            oms_peptides.append(oms_peptide)
+        self._idxml_reader.oms_peptides = oms_peptides

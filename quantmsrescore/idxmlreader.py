@@ -300,11 +300,8 @@ class IdXMLRescoringReader(IdXMLReader):
             rt = peptide_id.getRT()
 
             # Create provenance tracking data
-            provenance_key = f"{peptidoform}/{rt}/{spectrum_ref}"
-            provenance_value = (
-                f"{peptide_hit.getSequence().toString()}/"
-                f"{peptide_hit.getCharge()}/{rt}/{spectrum_ref}"
-            )
+            provenance_key = OpenMSHelper.get_psm_hash_unique_id(peptide_id, peptide_hit)
+            provenance_value = f"{peptidoform}/{rt}/{spectrum_ref}"
 
             return PSM(
                 peptidoform=peptidoform,
