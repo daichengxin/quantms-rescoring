@@ -48,10 +48,12 @@ def add_sage_feature(ctx, idxml: str, output_file: str, feat_file: str):
 
     logging.info("Reading idXML file")
 
-    idxml_reader = IdXMLReader(idexml_filename=idxml)
-    protein_ids = idxml_reader.oms_proteins
-    peptide_ids = idxml_reader.oms_peptides
-
+    try:
+        idxml_reader = IdXMLReader(idexml_filename=idxml)
+        protein_ids = idxml_reader.oms_proteins
+        peptide_ids = idxml_reader.oms_peptides
+    except Exception as e:
+        raise click.ClickException(f"Failed to read idXML file: {str(e)}")
     logging.info("Adding extra feature to idXML file")
     search_parameters = protein_ids[0].getSearchParameters()
     try:
