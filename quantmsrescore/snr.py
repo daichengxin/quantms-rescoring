@@ -7,7 +7,7 @@ import click
 import numpy as np
 from scipy.stats import entropy
 
-from quantmsrescore.idxmlreader import IdXMLRescoringReader, IdXMLReader
+from quantmsrescore.idxmlreader import IdXMLReader
 from quantmsrescore.openms import OpenMSHelper
 
 # Configure logging

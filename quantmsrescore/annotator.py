@@ -12,22 +12,22 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 
 class Annotator:
     def __init__(
-            self,
-            feature_generators: str,
-            only_features: str = None,
-            ms2pip_model: str = "HCD2021",
-            ms2pip_model_path: str = "models",
-            ms2_tolerance: float = 0.05,
-            calibration_set_size: float = 0.2,
-            deeplc_retrain: bool = False,
-            processes: int = 2,
-            id_decoy_pattern: str = "^DECOY_",
-            lower_score_is_better: bool = True,
-            log_level: str = "INFO",
-            spectrum_id_pattern: str = "(.*)",  # default for openms idXML
-            psm_id_pattern: str = "(.*)",  # default for openms idXML
-            remove_missing_spectra: bool = True,
-            ms2_only: bool = True,
+        self,
+        feature_generators: str,
+        only_features: str = None,
+        ms2pip_model: str = "HCD2021",
+        ms2pip_model_path: str = "models",
+        ms2_tolerance: float = 0.05,
+        calibration_set_size: float = 0.2,
+        deeplc_retrain: bool = False,
+        processes: int = 2,
+        id_decoy_pattern: str = "^DECOY_",
+        lower_score_is_better: bool = True,
+        log_level: str = "INFO",
+        spectrum_id_pattern: str = "(.*)",  # default for openms idXML
+        psm_id_pattern: str = "(.*)",  # default for openms idXML
+        remove_missing_spectra: bool = True,
+        ms2_only: bool = True,
     ):
         """
         Initializes the Annotator class with configuration parameters for feature generation
@@ -100,10 +100,6 @@ class Annotator:
             The path to the idXML file to be processed.
         spectrum_path : Union[str, Path]
             The path to the corresponding mzML file.
-
-        Logs
-        ----
-        Logs the number of PSMs, decoys, and targets loaded from the idXML file.
         """
 
         logging.info("Running the Annotator on file: %s", idxml_file)
@@ -212,7 +208,9 @@ class Annotator:
                 else:
                     for feature, value in psm.rescoring_features.items():
                         canonical_feature = OpenMSHelper.get_canonical_feature(feature)
-                        if canonical_feature is not None and (self._only_features is None or canonical_feature in self._only_features):
+                        if canonical_feature is not None and (
+                            self._only_features is None or canonical_feature in self._only_features
+                        ):
                             oms_psm.setMetaValue(
                                 feature, OpenMSHelper.get_str_metavalue_round(value)
                             )

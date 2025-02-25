@@ -264,9 +264,6 @@ class OpenMSHelper:
             The PeptideIdentification object containing metadata for the PSM.
         psm_hit : PeptideHit
             The PeptideHit object representing the PSM.
-        spectrum_file : str
-            The path to the spectrum file containing the PSM. This is needed in case multiple files are
-            provided in the same run.
 
         Returns
         -------
@@ -352,7 +349,7 @@ class OpenMSHelper:
 
         validated_features = []
         for feature in original_features:
-            feature = feature.strip() # Remove leading and trailing whitespaces
+            feature = feature.strip()  # Remove leading and trailing whitespaces
             if feature in DEEPLC_FEATURES.values() or feature in MS2PIP_FEATURES.values():
                 validated_features.append(feature)
             else:
