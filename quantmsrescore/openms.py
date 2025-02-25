@@ -8,6 +8,8 @@ import pyopenms as oms
 from psm_utils import PSM
 from pyopenms import PeptideIdentification, ProteinIdentification, SpectrumLookup, PeptideHit
 
+from quantmsrescore.constants import DEEPLC_FEATURES, MS2PIP_FEATURES
+
 OPENMS_DECOY_FIELD = "target_decoy"
 SPECTRUM_PATTERN = r"(spectrum|scan)=(\d+)"
 
@@ -298,3 +300,33 @@ class OpenMSHelper:
         if np.isnan(metavalue) or np.isinf(metavalue):
             return "0.0"
         return "{:.4f}".format(metavalue)
+
+    @staticmethod
+    def get_canonical_feature(feature: str) -> str:
+        """
+        Retrieve the canonical feature name for a given feature.
+
+        This method searches through predefined feature mappings to find
+        the canonical name corresponding to the provided feature string.
+        It first checks the DEEPLC_FEATURES mapping, followed by the
+        MS2PIP_FEATURES mapping.
+
+        Parameters
+        ----------
+        feature : str
+            The feature name to be converted to its canonical form.
+
+        Returns
+        -------
+        str
+            The canonical feature name if found, otherwise None.
+        """
+        if feature is None:
+            return None
+
+        canonical_feature = next((k for k, v in DEEPLC_FEATURES.items() if v == feature), None)
+        if canonical_feature is not None:
+            return canonical_feature
+
+        canonical_feature = next((k for k, v in MS2PIP_FEATURES.items() if v == feature), None)
+        return canonical_feature

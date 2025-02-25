@@ -313,7 +313,7 @@ class IdXMLRescoringReader(IdXMLReader):
                 retention_time=rt,
                 rank=peptide_hit.getRank() + 1,
                 source="idXML",
-                provenance_data={provenance_key: provenance_value},
+                provenance_data={provenance_key: ""},  # We use only the key for provenance
             )
         except Exception as e:
             logging.error(f"Failed to parse PSM: {e}")

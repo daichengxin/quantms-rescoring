@@ -189,10 +189,7 @@ class Annotator:
             raise
 
     def _convert_features_psms_to_oms_peptides(self):
-        """
-        This method converts features from PSMs to OMS peptides features. This is required as OpenMS
-        uses OMS peptides for storing features.
-        """
+
         psm_dict = {next(iter(psm.provenance_data)): psm for psm in self._idxml_reader.psms}
 
         oms_peptides = []
@@ -208,7 +205,11 @@ class Annotator:
                     logging.warning(f"PSM not found for peptide {oms_peptide.getMetaValue('id')}")
                 else:
                     for feature, value in psm.rescoring_features.items():
-                        oms_psm.setMetaValue(feature, OpenMSHelper.get_str_metavalue_round(value))
+                        canonical_feature = OpenMSHelper.get_canonical_feature(feature)
+                        if canonical_feature is not None:
+                            oms_psm.setMetaValue(feature, OpenMSHelper.get_str_metavalue_round(value))
+                        else:
+                            logging.warning(f"Feature {feature} not supported by quantms rescoring")
                 hits.append(oms_psm)
             oms_peptide.setHits(hits)
             oms_peptides.append(oms_peptide)
