@@ -1,13 +1,17 @@
 import logging
 from itertools import chain
-from typing import Optional
+from typing import Optional, Tuple, List
 
 from ms2pip import correlate
 from ms2pip.exceptions import NoMatchingSpectraFound
+from ms2pip.result import ProcessingResult
 from ms2rescore.feature_generators import MS2PIPFeatureGenerator
 from ms2rescore.feature_generators.base import FeatureGeneratorException
 from ms2rescore.utils import infer_spectrum_path
 from psm_utils import PSMList
+
+from quantmsrescore.constants import SUPPORTED_MODELS_MS2PIP
+from quantmsrescore.exceptions import Ms2pipIncorrectModelException
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
@@ -94,12 +98,11 @@ class MS2PIPAnnotator(MS2PIPFeatureGenerator):
                     logging.error(
                         "Invalid correlation found. Please try a different model or adjust the correlation threshold."
                     )
-                    raise FeatureGeneratorException(
-                        "Invalid correlation found. Please try a different model or adjust the correlation threshold."
+                    raise Ms2pipIncorrectModelException(
+                        message="Invalid correlation found. Please try a different model or adjust the correlation threshold.",
+                        model=self.model,
                     )
-
                 self._calculate_features(psm_list_run, ms2pip_results)
-
                 current_run += 1
 
     def _validate_scores(
@@ -158,3 +161,63 @@ class MS2PIPAnnotator(MS2PIPFeatureGenerator):
             return False
 
         return True
+
+    def _find_best_ms2pip_model(self, batch_psms: PSMList) -> Tuple[str, float]:
+        """
+        Find the best MS²PIP model for a batch of PSMs.
+
+        This method finds the best MS²PIP model for a batch of PSMs by
+        comparing the correlation of the PSMs with the different models.
+
+        Parameters
+        ----------
+        batch_psms : list
+            List of PSMs to find the best model for.
+
+        Returns
+        -------
+        Tuple
+            Tuple containing the best model and the correlation value.
+        """
+        best_model = None
+        best_correlation = 0
+
+        for fragment_types in SUPPORTED_MODELS_MS2PIP:
+            for model in SUPPORTED_MODELS_MS2PIP[fragment_types]:
+                logging.info(f"Running MS²PIP for model `{model}`...")
+                ms2pip_results = correlate(
+                    psms=batch_psms,
+                    spectrum_file=self.spectrum_path,
+                    spectrum_id_pattern=self.spectrum_id_pattern,
+                    model=model,
+                    ms2_tolerance=self.ms2_tolerance,
+                    compute_correlations=True,
+                    model_dir=self.model_dir,
+                    processes=self.processes,
+                )
+                correlation = self._calculate_correlation(ms2pip_results)
+                if correlation > best_correlation and correlation >= 0.4:
+                    best_model = model
+                    best_correlation = correlation
+
+        return best_model, best_correlation
+
+    def _calculate_correlation(self, ms2pip_results: List[ProcessingResult]) -> float:
+        """
+        Calculate the average correlation from MS²PIP results.
+
+        This method computes the average correlation score from a list of
+        MS²PIP results, where each result contains a correlation attribute.
+
+        Parameters
+        ----------
+        ms2pip_results : list
+            List of MS²PIP results, each containing a correlation score.
+
+        Returns
+        -------
+        float
+            The average correlation score of the provided MS²PIP results.
+        """
+        total_correlation = sum([psm.correlation for psm in ms2pip_results])
+        return total_correlation / len(ms2pip_results)

@@ -2,7 +2,10 @@ import logging
 from pathlib import Path
 from typing import Union
 
+from psm_utils import PSMList
+
 from quantmsrescore.deeplc import DeepLCAnnotator
+from quantmsrescore.exceptions import Ms2pipIncorrectModelException
 from quantmsrescore.idxmlreader import IdXMLRescoringReader
 from quantmsrescore.ms2pip import MS2PIPAnnotator
 from quantmsrescore.openms import OpenMSHelper
@@ -28,6 +31,7 @@ class Annotator:
         psm_id_pattern: str = "(.*)",  # default for openms idXML
         remove_missing_spectra: bool = True,
         ms2_only: bool = True,
+        find_best_ms2pip_model: bool = False,
     ):
         """
         Initializes the Annotator class with configuration parameters for feature generation
@@ -86,6 +90,7 @@ class Annotator:
         self._deeplc_retrain = deeplc_retrain
         self._remove_missing_spectra = remove_missing_spectra
         self._ms2_only = ms2_only
+        self._find_best_ms2pip_model = find_best_ms2pip_model
 
     def build_idxml_data(self, idxml_file: Union[str, Path], spectrum_path: Union[str, Path]):
         """
@@ -152,10 +157,38 @@ class Annotator:
                 raise
 
             psm_list = self._idxml_reader.psms
-            ms2pip_generator.add_features(psm_list)
-            self._idxml_reader.psms = psm_list
+            try:
+                ms2pip_generator.add_features(psm_list)
+                self._idxml_reader.psms = psm_list
+                logging.info("MS2PIP Annotations added to the PSMs")
+            except Ms2pipIncorrectModelException as e:
+                if self._find_best_ms2pip_model:
+                    logging.info(
+                        "Finding best MS2PIP model - for now is a brute force search on the top calibrarion set"
+                    )
+                    batch_psms = self._get_top_batch_psms(psm_list)
+                    model, corr = ms2pip_generator._find_best_ms2pip_model(batch_psms=batch_psms)
+                    if model is not None:
+                        logging.info(f"Best model found: {model} with average correlation {corr}")
+                        ms2pip_generator = MS2PIPAnnotator(
+                            ms2_tolerance=self._ms2_tolerance,
+                            model=model,
+                            spectrum_path=self._idxml_reader.spectrum_path,
+                            spectrum_id_pattern=self._spectrum_id_pattern,
+                            model_dir=self._ms2pip_model_path,
+                            calibration_set_size=self._calibration_set_size,
+                            correlation_threshold=0.7,
+                            lower_score_is_better=self._lower_score_is_better,
+                            processes=self._processes,
+                        )
+                        ms2pip_generator.add_features(psm_list)
+                        self._idxml_reader.psms = psm_list
+                        logging.info("MS2PIP Annotations added to the PSMs")
+                    else:
+                        logging.error("Not good model found for this data please review parameters")
+            except Exception as e:
+                logging.error(f"Failed to add MS2PIP features: {str(e)}")
 
-            logging.info("MS2PIP Annotations added to the PSMs")
         if self._deepLC:
             logging.info("Running deepLC on the PSMs")
 
@@ -222,3 +255,41 @@ class Annotator:
             oms_peptide.setHits(hits)
             oms_peptides.append(oms_peptide)
         self._idxml_reader.oms_peptides = oms_peptides
+
+    def _get_top_batch_psms(self, psm_list: PSMList) -> PSMList:
+        """
+        Retrieve the top batch of PSMs for calibration based on their scores.
+
+        This method sorts the provided PSMList by PSM score, taking into account
+        whether a lower score is considered better. It then selects a subset of
+        the sorted list to be used as a calibration set, determined by the
+        `calibration_set_size` attribute.
+
+        Parameters
+        ----------
+        psm_list : PSMList
+            A list of peptide-spectrum matches to be sorted and filtered.
+
+        Returns
+        -------
+        PSMList
+            A subset of the input PSMList representing the top batch for calibration.
+        """
+        logging.info("Getting top calibration set from PSMs.")
+
+        # Sort ms2pip results by PSM score and lower score is better
+        ms2pip_results_copy = psm_list.psm_list.copy()
+
+        ms2pip_results_copy = [result for result in ms2pip_results_copy if not result.is_decoy]
+        ms2pip_results_copy.sort(
+            key=lambda x: x.score, reverse=not self._lower_score_is_better
+        )
+
+        # Get a calibration set, the % of psms to be used for calibrarion is defined by calibration_set_size
+        calibration_set = PSMList(
+            psm_list=ms2pip_results_copy[
+                : int(len(ms2pip_results_copy) * 0.6) # Select the 60 of the PSMS.
+            ]
+        )
+
+        return PSMList(psm_list=calibration_set)
