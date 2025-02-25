@@ -273,9 +273,28 @@ class OpenMSHelper:
         """
 
         spectrum_ref = peptide_hit.getMetaValue("spectrum_reference")
-        rank = peptide_hit.getRank()
+        rank = psm_hit.getRank()
         rt = peptide_hit.getRT()
         sequence = psm_hit.getSequence().toString()
         charge = psm_hit.getCharge()
         unique_hash = f"{spectrum_ref}_{sequence}_{rt}_{charge}_{rank}"
         return unique_hash
+
+    @staticmethod
+    def get_str_metavalue_round(metavalue: float):
+        """
+        Get a string representation of a metadata value, rounded to 4 decimal places.
+
+        Parameters
+        ----------
+        metavalue : float
+            The metadata value to be converted to a string.
+
+        Returns
+        -------
+        str
+            A string representation of the metadata value, rounded to 4 decimal places.
+        """
+        if np.isnan(metavalue) or np.isinf(metavalue):
+            return "0.0"
+        return "{:.4f}".format(metavalue)

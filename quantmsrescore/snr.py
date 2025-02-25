@@ -34,16 +34,13 @@ class SpectrumMetrics:
     def as_dict(self) -> dict:
         """Convert metrics to a dictionary with proper prefixes"""
 
-        def _format_float(value: float) -> str:
-            if np.isnan(value) or np.isinf(value):
-                return "0.0"
-            return str(value)
-
         return {
-            "quantms:SNR": _format_float(self.snr),
-            "quantms:SpectralEntropy": _format_float(self.spectral_entropy),
-            "quantms:FracTICinTop10Peaks": _format_float(self.fraction_tic_top_10),
-            "quantms:WeightedStdMz": _format_float(self.weighted_std_mz),
+            "Quantms:Snr": OpenMSHelper.get_str_metavalue_round(self.snr),
+            "Quantms:SpectralEntropy": OpenMSHelper.get_str_metavalue_round(self.spectral_entropy),
+            "Quantms:FracTICinTop10Peaks": OpenMSHelper.get_str_metavalue_round(
+                self.fraction_tic_top_10
+            ),
+            "Quantms:WeightedStdMz": OpenMSHelper.get_str_metavalue_round(self.weighted_std_mz),
         }
 
 

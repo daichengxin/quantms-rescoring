@@ -208,9 +208,7 @@ class Annotator:
                     logging.warning(f"PSM not found for peptide {oms_peptide.getMetaValue('id')}")
                 else:
                     for feature, value in psm.rescoring_features.items():
-                        # Round to 4 decimal str for OpenMS
-                        value_str = "{:.4f}".format(value)
-                        oms_psm.setMetaValue(feature, value_str)
+                        oms_psm.setMetaValue(feature, OpenMSHelper.get_str_metavalue_round(value))
                 hits.append(oms_psm)
             oms_peptide.setHits(hits)
             oms_peptides.append(oms_peptide)

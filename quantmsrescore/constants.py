@@ -1,6 +1,6 @@
 MS2PIP_FEATURES = [
-    {"MS2PIP:SpecPearsonNorm": "spec_pearson"},
-    {"MS2PIP:SpecCosineNorm": "cos_norm"},
+    {"Ms2pip:SpecPearsonNorm": "spec_pearson"},
+    {"Ms2pip:SpecCosineNorm": "cos_norm"},
 ]
 
 DEEPLC_FEATURES = [
@@ -8,25 +8,31 @@ DEEPLC_FEATURES = [
     {"DeepLC:RtPredictedBest": "predicted_retention_time_best"},
     {"DeepLC:RtDiff": "rt_diff"},  # Different retention time between observed and predicted
     {"DeepLC:RtDiffBest": "rt_diff_best"},  # Best retention time difference
-    {"DeepLC:RtPredictedBest": "predicted_retention_time_best"},
 ]
 
-SUPPORTED_MODELS_MS2PIP = [
-    "HCD2019",  # HCD from 2019
-    "HCD2021",  # Default model
-    "HCD",  # Default model
-    "CID",  # Collision-induced dissociation
-    "iTRAQ",  # iTRAQ
-    "iTRAQphospho",  # iTRAQ phospho
-    "TMT",  # TMT 10-plex
-    "TTOF5600",  # TTOF 5600
-    "HCDch2",  # HCD with charge 2
-    "CIDch2",  # CID with charge 2
-    "Immuno-HCD",  # Immuno-HCD
-    "CID-TMT",  # CID-TMT
-    "timsTOF2023",  # TIMS-TOF 2023
-    "timsTOF2024",  # TIMS-TOF 2024
+QUANTMS_FEATURES = [
+    {"Quantms:Snr": "snr"},
+    {"Quantms:SpectralEntropy": "spectral_entropy"},
+    {"Quantms:FracTICinTop10Peaks": "fraction_tic_top_10"},
+    {"Quantms:WeightedStdMz": "weighted_std_mz"},
 ]
+
+SUPPORTED_MODELS_MS2PIP = {
+    "HCD": [
+        "HCD2019",  # HCD from 2019
+        "HCD2021",  # Default model
+        "Immuno-HCD",  # Immuno-HCD
+        "HCDch2",  # HCD with charge 2
+        "TMT",  # TMT 10-plex
+        "iTRAQ",  # iTRAQ
+        "iTRAQphospho",  # iTRAQ phospho
+    ],
+    "CID": [
+        "CID",  # Collision-induced dissociation
+        "CIDch2",  # CID with charge 2
+        "CID-TMT",  # CID-TMT
+    ],
+}
 
 # This is the list of disassociation methods that are supported by OPENMS.
 # This list is a path for release 3.3.0 of OpenMS.
