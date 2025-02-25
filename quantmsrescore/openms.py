@@ -330,3 +330,30 @@ class OpenMSHelper:
 
         canonical_feature = next((k for k, v in MS2PIP_FEATURES.items() if v == feature), None)
         return canonical_feature
+
+    @staticmethod
+    def validate_features(original_features: List[str]) -> List[str]:
+        """
+        This function make sures that the given features are supported by the tool
+        in DEEPLC_FEATURES and MS2PIP_FEATURES.
+
+        Parameters
+        ----------
+
+        original_features: List[str]
+            The list of features to validate.
+
+        Returns
+        -------
+
+        List[str]
+            The list of validated features.
+        """
+
+        validated_features = []
+        for feature in original_features:
+            if feature in DEEPLC_FEATURES.values() or feature in MS2PIP_FEATURES.values():
+                validated_features.append(feature)
+            else:
+                logging.warning(f"Feature {feature} not supported by quantms rescoring")
+        return validated_features

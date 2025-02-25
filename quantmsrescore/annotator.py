@@ -12,21 +12,22 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 
 class Annotator:
     def __init__(
-        self,
-        feature_generators: str,
-        ms2pip_model: str = "HCD2021",
-        ms2pip_model_path: str = "models",
-        ms2_tolerance: float = 0.05,
-        calibration_set_size: float = 0.2,
-        deeplc_retrain: bool = False,
-        processes: int = 2,
-        id_decoy_pattern: str = "^DECOY_",
-        lower_score_is_better: bool = True,
-        log_level: str = "INFO",
-        spectrum_id_pattern: str = "(.*)",  # default for openms idXML
-        psm_id_pattern: str = "(.*)",  # default for openms idXML
-        remove_missing_spectra: bool = True,
-        ms2_only: bool = True,
+            self,
+            feature_generators: str,
+            only_features: str = None,
+            ms2pip_model: str = "HCD2021",
+            ms2pip_model_path: str = "models",
+            ms2_tolerance: float = 0.05,
+            calibration_set_size: float = 0.2,
+            deeplc_retrain: bool = False,
+            processes: int = 2,
+            id_decoy_pattern: str = "^DECOY_",
+            lower_score_is_better: bool = True,
+            log_level: str = "INFO",
+            spectrum_id_pattern: str = "(.*)",  # default for openms idXML
+            psm_id_pattern: str = "(.*)",  # default for openms idXML
+            remove_missing_spectra: bool = True,
+            ms2_only: bool = True,
     ):
         """
         Initializes the Annotator class with configuration parameters for feature generation
@@ -35,6 +36,7 @@ class Annotator:
         Parameters
         ----------
         feature_generators (str): Comma-separated list of feature generators to use (e.g., "deeplc,ms2pip").
+        only_features (str): Comma-separated list of features to use for annotation. Default is None.
         ms2pip_model (str): The MS2PIP model to use for annotation. Default is "HCD2021".
         ms2pip_model_path (str): Path to the directory containing MS2PIP models. Default is "models".
         ms2_tolerance (float): Tolerance for MS2PIP annotation. Default is 0.05.
@@ -66,6 +68,10 @@ class Annotator:
             self._ms2pip = True
         else:
             self._ms2pip = False
+
+        self._only_features = []
+        if only_features is not None:
+            self._only_features = OpenMSHelper.validate_features(only_features.split(","))
 
         self._ms2pip_model = ms2pip_model
         self._ms2pip_model_path = ms2pip_model_path
@@ -206,10 +212,14 @@ class Annotator:
                 else:
                     for feature, value in psm.rescoring_features.items():
                         canonical_feature = OpenMSHelper.get_canonical_feature(feature)
-                        if canonical_feature is not None:
-                            oms_psm.setMetaValue(feature, OpenMSHelper.get_str_metavalue_round(value))
+                        if canonical_feature is not None and (self._only_features is None or canonical_feature in self._only_features):
+                            oms_psm.setMetaValue(
+                                feature, OpenMSHelper.get_str_metavalue_round(value)
+                            )
                         else:
-                            logging.warning(f"Feature {feature} not supported by quantms rescoring")
+                            logging.warning(
+                                f"Feature {feature} not supported by quantms rescoring or not in only_features"
+                            )
                 hits.append(oms_psm)
             oms_peptide.setHits(hits)
             oms_peptides.append(oms_peptide)
