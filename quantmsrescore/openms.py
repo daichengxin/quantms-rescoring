@@ -352,6 +352,7 @@ class OpenMSHelper:
 
         validated_features = []
         for feature in original_features:
+            feature = feature.strip() # Remove leading and trailing whitespaces
             if feature in DEEPLC_FEATURES.values() or feature in MS2PIP_FEATURES.values():
                 validated_features.append(feature)
             else:

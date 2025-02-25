@@ -130,6 +130,43 @@ def test_idxmlreader_help():
 
     annotator.write_idxml_file(output_file)
 
+def test_idxmlreader_filtering_help():
+
+    idxml_file = (
+        TESTS_DIR
+        / "test_data"
+        / "TMT_Erwinia_1uLSike_Top10HCD_isol2_45stepped_60min_01_comet.idXML"
+    )
+
+    mzml_file = (
+        TESTS_DIR / "test_data" / "TMT_Erwinia_1uLSike_Top10HCD_isol2_45stepped_60min_01.mzML"
+    )
+
+    annotator = Annotator(
+        feature_generators="ms2pip,deeplc",
+        only_features="DeepLC:RtDiff,DeepLC:PredictedRetentionTimeBest,Ms2pip:DotProd",
+        ms2pip_model="TMT",
+        ms2pip_model_path="models",
+        ms2_tolerance=0.05,
+        calibration_set_size=0.15,
+        deeplc_retrain=True,
+        processes=2,
+        id_decoy_pattern="^DECOY_",
+        lower_score_is_better=True,
+        log_level="INFO",
+        spectrum_id_pattern="(.*)",
+        psm_id_pattern="(.*)",
+    )
+    annotator.build_idxml_data(idxml_file, mzml_file)
+    annotator.annotate()
+
+    output_file = (
+        TESTS_DIR
+        / "test_data"
+        / "TMT_Erwinia_1uLSike_Top10HCD_isol2_45stepped_60min_01_comet_rescored.idXML"
+    )
+
+    annotator.write_idxml_file(output_file)
 
 @pytest.mark.skip(reason="This is for local test in big datasets, kipping for now")
 def test_idxmlreader_failing_help():
