@@ -162,7 +162,9 @@ class MS2PIPAnnotator(MS2PIPFeatureGenerator):
 
         return True
 
-    def _find_best_ms2pip_model(self, batch_psms: PSMList) -> Tuple[str, float]:
+    def _find_best_ms2pip_model(
+        self, batch_psms: PSMList, knwon_fragmentation: Optional[str] = None
+    ) -> Tuple[str, float]:
         """
         Find the best MS²PIP model for a batch of PSMs.
 
@@ -182,8 +184,13 @@ class MS2PIPAnnotator(MS2PIPFeatureGenerator):
         best_model = None
         best_correlation = 0
 
-        for fragment_types in SUPPORTED_MODELS_MS2PIP:
-            for model in SUPPORTED_MODELS_MS2PIP[fragment_types]:
+        filtered_models = SUPPORTED_MODELS_MS2PIP
+
+        if knwon_fragmentation:
+            filtered_models = {knwon_fragmentation: SUPPORTED_MODELS_MS2PIP.get(knwon_fragmentation)}
+
+        for fragment_types in filtered_models:
+            for model in filtered_models[fragment_types]:
                 logging.info(f"Running MS²PIP for model `{model}`...")
                 ms2pip_results = correlate(
                     psms=batch_psms,

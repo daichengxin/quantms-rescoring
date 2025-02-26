@@ -105,6 +105,18 @@ def test_idxmlreader():
     stats = idxml_reader.stats
     assert stats.missing_spectra == 0
 
+def test_annotator_train_rt():
+
+    idxml_file = (
+        TESTS_DIR
+        / "test_data"
+        / "TMT_Erwinia_1uLSike_Top10HCD_isol2_45stepped_60min_01_comet.idXML"
+    )
+
+    mzml_file = (
+        TESTS_DIR / "test_data" / "TMT_Erwinia_1uLSike_Top10HCD_isol2_45stepped_60min_01.mzML"
+    )
+
     annotator = Annotator(
         feature_generators="ms2pip,deeplc",
         ms2pip_model="TMT",
@@ -114,7 +126,7 @@ def test_idxmlreader():
         deeplc_retrain=True,
         processes=2,
         id_decoy_pattern="^DECOY_",
-        lower_score_is_better=not idxml_reader.high_score_better,
+        lower_score_is_better=True,
         log_level="INFO",
         spectrum_id_pattern="(.*)",
         psm_id_pattern="(.*)",
@@ -129,6 +141,7 @@ def test_idxmlreader():
     )
 
     annotator.write_idxml_file(output_file)
+
 
 
 def test_idxmlreader_filtering():
@@ -196,7 +209,7 @@ def test_idxmlreader_wrong_model():
         log_level="INFO",
         spectrum_id_pattern="(.*)",
         psm_id_pattern="(.*)",
-        find_best_ms2pip_model=True
+        find_best_ms2pip_model=True,
     )
     annotator.build_idxml_data(idxml_file, mzml_file)
     annotator.annotate()

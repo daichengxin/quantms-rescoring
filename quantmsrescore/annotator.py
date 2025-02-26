@@ -167,7 +167,10 @@ class Annotator:
                         "Finding best MS2PIP model - for now is a brute force search on the top calibrarion set"
                     )
                     batch_psms = self._get_top_batch_psms(psm_list)
-                    model, corr = ms2pip_generator._find_best_ms2pip_model(batch_psms=batch_psms)
+                    model, corr = ms2pip_generator._find_best_ms2pip_model(
+                        batch_psms=batch_psms,
+                        knwon_fragmentation=self._get_highest_fragmentation(),
+                    )
                     if model is not None:
                         logging.info(f"Best model found: {model} with average correlation {corr}")
                         ms2pip_generator = MS2PIPAnnotator(
@@ -185,7 +188,9 @@ class Annotator:
                         self._idxml_reader.psms = psm_list
                         logging.info("MS2PIP Annotations added to the PSMs")
                     else:
-                        logging.error("Not good model found for this data please review parameters")
+                        logging.error(
+                            "Not good model found for this data please review parameters"
+                        )
             except Exception as e:
                 logging.error(f"Failed to add MS2PIP features: {str(e)}")
 
@@ -193,10 +198,14 @@ class Annotator:
             logging.info("Running deepLC on the PSMs")
 
             try:
+                kwargs = {}
+                if self._deeplc_retrain:
+                    kwargs = {"deeplc_retrain": True}
                 deeplc_annotator = DeepLCAnnotator(
                     self._lower_score_is_better,
                     calibration_set_size=self._calibration_set_size,
                     processes=self._processes,
+                    **kwargs,
                 )
             except Exception as e:
                 logging.error(f"Failed to initialize DeepLC: {str(e)}")
@@ -281,15 +290,41 @@ class Annotator:
         ms2pip_results_copy = psm_list.psm_list.copy()
 
         ms2pip_results_copy = [result for result in ms2pip_results_copy if not result.is_decoy]
-        ms2pip_results_copy.sort(
-            key=lambda x: x.score, reverse=not self._lower_score_is_better
-        )
+        ms2pip_results_copy.sort(key=lambda x: x.score, reverse=not self._lower_score_is_better)
 
         # Get a calibration set, the % of psms to be used for calibrarion is defined by calibration_set_size
         calibration_set = PSMList(
             psm_list=ms2pip_results_copy[
-                : int(len(ms2pip_results_copy) * 0.6) # Select the 60 of the PSMS.
+                : int(len(ms2pip_results_copy) * 0.6)  # Select the 60 of the PSMS.
             ]
         )
 
         return PSMList(psm_list=calibration_set)
+
+    def _get_highest_fragmentation(self) -> Union[str, None]:
+        """
+        Determine the highest fragmentation method used in the dataset.
+
+        This method retrieves the fragmentation statistics from the idXML reader
+        and identifies the most frequently used fragmentation method, prioritizing
+        "HCD" over "CID". If no statistics or methods are available, it logs a warning
+        and returns None.
+
+        Returns
+        -------
+        Union[str, None]
+            The highest fragmentation method ("HCD" or "CID") or None if unavailable.
+        """
+        stats = self._idxml_reader.stats
+        if stats is None or stats.ms_level_dissociation_method is None:
+            logging.warning("No stats found or no ms_level_dissociation_methods found")
+            return None
+
+        first_key = max(
+            stats.ms_level_dissociation_method, key=stats.ms_level_dissociation_method.get
+        )
+        if first_key[1] is "HCD":
+            return "HCD"
+        elif first_key[1] is "CID":
+            return "CID"
+        return None
