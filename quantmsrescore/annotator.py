@@ -134,6 +134,9 @@ class Annotator:
         )
 
     def annotate(self):
+        if self._idxml_reader is None:
+            logging.error("No idXML data loaded. Call build_idxml_data() first.")
+            raise ValueError("No idXML data loaded. Call build_idxml_data() first.")
 
         logging.debug(f"Running Annotations with following configurations: {self.__dict__}")
 
