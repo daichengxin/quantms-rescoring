@@ -232,6 +232,3 @@ def spectrum2feature(ctx, mzml: str, idxml: str, output: str) -> None:
     )
     logging.info(f"Results saved to: {output}")
 
-
-if __name__ == "__main__":
-    spectrum2feature()
