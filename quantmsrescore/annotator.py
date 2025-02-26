@@ -238,6 +238,7 @@ class Annotator:
 
         oms_peptides = []
 
+        features = []
         for oms_peptide in self._idxml_reader.oms_peptides:
             hits = []
             for oms_psm in oms_peptide.getHits():
@@ -250,12 +251,16 @@ class Annotator:
                 else:
                     for feature, value in psm.rescoring_features.items():
                         canonical_feature = OpenMSHelper.get_canonical_feature(feature)
-                        if canonical_feature is not None and (
-                            self._only_features is None or canonical_feature in self._only_features
-                        ):
-                            oms_psm.setMetaValue(
-                                feature, OpenMSHelper.get_str_metavalue_round(value)
-                            )
+                        if canonical_feature is not None:
+                            if self._only_features and canonical_feature not in self._only_features:
+                                logging.warning(
+                                    f"Feature {feature} not supported by quantms rescoring or not in only_features"
+                                )
+                            else:
+                                oms_psm.setMetaValue(
+                                    canonical_feature, OpenMSHelper.get_str_metavalue_round(value)
+                                )
+                                features.append(canonical_feature)
                         else:
                             logging.warning(
                                 f"Feature {feature} not supported by quantms rescoring or not in only_features"
@@ -263,6 +268,22 @@ class Annotator:
                 hits.append(oms_psm)
             oms_peptide.setHits(hits)
             oms_peptides.append(oms_peptide)
+        features = set(features)
+        if features:
+            logging.info(f"Features added to the peptides: {features} - adding them as meta value")
+            search_parameters = self._idxml_reader.oms_proteins[0].getSearchParameters()
+            try:
+                features_existing = search_parameters.getMetaValue("extra_features")
+            except Exception:
+                logging.info("No extra features found in the search parameters")
+                features_existing = None
+
+            if features_existing is None:
+                features_existing = ""
+            extra_features = (features_existing + "," if features_existing else "") + ",".join(features)
+            search_parameters.setMetaValue("extra_features", extra_features)
+            self._idxml_reader.oms_proteins[0].setSearchParameters(search_parameters)
+
         self._idxml_reader.oms_peptides = oms_peptides
 
     def _get_top_batch_psms(self, psm_list: PSMList) -> PSMList:
