@@ -302,7 +302,6 @@ class IdXMLRescoringReader(IdXMLReader):
             provenance_key = OpenMSHelper.get_psm_hash_unique_id(
                 peptide_hit=peptide_id, psm_hit=peptide_hit
             )
-            provenance_value = f"{peptidoform}/{rt}/{spectrum_ref}"
 
             return PSM(
                 peptidoform=peptidoform,

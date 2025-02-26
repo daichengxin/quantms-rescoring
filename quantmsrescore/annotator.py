@@ -161,7 +161,7 @@ class Annotator:
                 ms2pip_generator.add_features(psm_list)
                 self._idxml_reader.psms = psm_list
                 logging.info("MS2PIP Annotations added to the PSMs")
-            except Ms2pipIncorrectModelException as e:
+            except Ms2pipIncorrectModelException:
                 if self._find_best_ms2pip_model:
                     logging.info(
                         "Finding best MS2PIP model - for now is a brute force search on the top calibrarion set"
