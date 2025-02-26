@@ -132,7 +132,6 @@ class IdXMLRescoringReader(IdXMLReader):
     Attributes:
         filename (Path): Path to the idXML file
         high_score_better (Optional[bool]): Indicates if higher scores are better
-        skip_invalid_psm (int): Counter for skipped invalid PSMs
     """
 
     def __init__(
@@ -180,7 +179,6 @@ class IdXMLRescoringReader(IdXMLReader):
         super().__init__(idexml_filename)
         self.filename = Path(idexml_filename)
         self.high_score_better: Optional[bool] = None
-        self.skip_invalid_psm: int = 0
 
         # Private attributes
         self._psms: Optional[PSMList] = None
@@ -199,24 +197,6 @@ class IdXMLRescoringReader(IdXMLReader):
         if not isinstance(psm_list, PSMList):
             raise TypeError("psm_list must be an instance of PSMList")
         self._psms = psm_list
-
-    def __iter__(self) -> Iterable[PSM]:
-        score_stats = self._analyze_score_coverage()
-        self._log_score_coverage(score_stats)
-
-        for peptide_id in self.oms_peptides:
-            valid_hits = []
-            for peptide_hit in peptide_id.getHits():
-                psm = self._parse_psm(self.oms_proteins, peptide_id, peptide_hit)
-                if psm is not None:
-                    valid_hits.append(peptide_hit)
-                    yield psm
-                else:
-                    self.skip_invalid_psm += 1
-
-            if valid_hits:
-                peptide_id.setHits(valid_hits)
-                self.new_peptide_ids.append(peptide_id)
 
     def _analyze_score_coverage(self) -> Dict[str, ScoreStats]:
         """
