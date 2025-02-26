@@ -323,8 +323,8 @@ class Annotator:
         first_key = max(
             stats.ms_level_dissociation_method, key=stats.ms_level_dissociation_method.get
         )
-        if first_key[1] is "HCD":
+        if first_key[1] == "HCD":
             return "HCD"
-        elif first_key[1] is "CID":
+        elif first_key[1] == "CID":
             return "CID"
         return None
