@@ -299,7 +299,7 @@ class OpenMSHelper:
         return "{:.4f}".format(metavalue)
 
     @staticmethod
-    def get_canonical_feature(feature: str) -> str:
+    def get_canonical_feature(feature: str) -> Union[str, None]:
         """
         Retrieve the canonical feature name for a given feature.
 

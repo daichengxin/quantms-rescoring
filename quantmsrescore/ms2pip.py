@@ -105,8 +105,9 @@ class MS2PIPAnnotator(MS2PIPFeatureGenerator):
                 self._calculate_features(psm_list_run, ms2pip_results)
                 current_run += 1
 
+    @staticmethod
     def _validate_scores(
-        self, ms2pip_results, calibration_set_size, correlation_threshold, lower_score_is_better
+            ms2pip_results, calibration_set_size, correlation_threshold, lower_score_is_better
     ) -> bool:
         """
         Validate MS²PIP results based on score and correlation criteria.
@@ -209,7 +210,8 @@ class MS2PIPAnnotator(MS2PIPFeatureGenerator):
 
         return best_model, best_correlation
 
-    def _calculate_correlation(self, ms2pip_results: List[ProcessingResult]) -> float:
+    @staticmethod
+    def _calculate_correlation(ms2pip_results: List[ProcessingResult]) -> float:
         """
         Calculate the average correlation from MS²PIP results.
 

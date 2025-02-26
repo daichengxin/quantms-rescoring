@@ -247,7 +247,8 @@ class IdXMLRescoringReader(IdXMLReader):
 
         return scores_stats
 
-    def _log_score_coverage(self, score_stats: Dict[str, ScoreStats]) -> None:
+    @staticmethod
+    def _log_score_coverage() -> None:
         for score, stats in score_stats.items():
             if stats.missing_count > 0:
                 percentage = stats.missing_percentage
