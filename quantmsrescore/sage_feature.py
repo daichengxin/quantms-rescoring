@@ -10,7 +10,7 @@ from quantmsrescore.openms import OpenMSHelper
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
-# Suppress OpenMS warning about a data path
+# Suppress OpenMS warning about a deeplc_models path
 filterwarnings(
     "ignore",
     message="OPENMS_DATA_PATH environment variable already exists",

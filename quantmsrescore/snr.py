@@ -13,7 +13,7 @@ from quantmsrescore.openms import OpenMSHelper
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
-# Suppress OpenMS warning about a data path
+# Suppress OpenMS warning about a deeplc_models path
 filterwarnings(
     "ignore",
     message="OPENMS_DATA_PATH environment variable already exists",
@@ -164,7 +164,7 @@ def spectrum2feature(ctx, mzml: str, idxml: str, output: str) -> None:
     ctx : click.Context
         The Click context object.
     mzml : str
-        Path to the mzML file containing mass spectrometry data.
+        Path to the mzML file containing mass spectrometry deeplc_models.
     idxml : str
         Path to the idXML file with PSMs corresponding to the mzML file.
     output : str
@@ -231,4 +231,3 @@ def spectrum2feature(ctx, mzml: str, idxml: str, output: str) -> None:
         filename=output, protein_ids=protein_ids, peptide_ids=result_peptides
     )
     logging.info(f"Results saved to: {output}")
-

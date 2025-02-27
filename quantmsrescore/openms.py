@@ -156,14 +156,43 @@ class OpenMSHelper:
         return exp, lookup
 
     @staticmethod
+    def get_spectrum_reference(
+        identification: Union[PSM, PeptideIdentification]
+    ) -> Union[str, None]:
+        """
+        Get the spectrum reference for a PSM.
+
+        This method retrieves the spectrum reference from a PSM object,
+        which can be either a PSM or a PeptideIdentification object.
+
+        Parameters
+        ----------
+        identification : Union[PSM, PeptideIdentification]
+            The PSM object containing the spectrum reference.
+
+        Returns
+        -------
+        str
+            The spectrum reference for the PSM.
+        """
+        if isinstance(identification, PSM):
+            return identification.spectrum_id
+        elif isinstance(identification, PeptideIdentification):
+            return identification.getMetaValue("spectrum_reference")
+        return None
+
+    @staticmethod
     def get_spectrum_for_psm(
         psm: Union[PSM, PeptideIdentification], exp: oms.MSExperiment, lookup: SpectrumLookup
     ) -> Union[None, oms.MSSpectrum]:
-        spectrum_reference = ""
-        if isinstance(psm, PSM):
-            spectrum_reference = psm.spectrum_id
-        elif isinstance(psm, PeptideIdentification):
-            spectrum_reference = psm.getMetaValue("spectrum_reference")
+
+        spectrum_reference = OpenMSHelper.get_spectrum_reference(psm)
+        if spectrum_reference is None:
+            psm_info = psm.provenance_data if hasattr(psm, "provenance_data") else "N/A"
+            logging.warning(
+                f"Missing spectrum reference for PSM {psm_info}, skipping spectrum retrieval."
+            )
+            return None
 
         matches = re.findall(r"(spectrum|scan)=(\d+)", spectrum_reference)
         if not matches:
@@ -220,7 +249,7 @@ class OpenMSHelper:
         scan_number: int, exp: oms.MSExperiment, lookup: SpectrumLookup
     ) -> Optional[Tuple[np.ndarray, np.ndarray]]:
         """
-        Get spectrum data for a given scan number
+        Get spectrum deeplc_models for a given scan number
 
         Parameters
         ----------

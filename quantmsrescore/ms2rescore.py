@@ -15,7 +15,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
     short_help="Annotate PSMs in an idXML file using ms2rescore features.",
 )
 @click.option(
-    "-p",
+    "-i",
     "--idxml",
     help="Path to the idxml containing the PSMs from OpenMS",
     required=True,
@@ -33,16 +33,14 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
     "--output_path",
     help="Path the output idxml for the annotated PSMs",
 )
-@click.option("-l", "--log_level", help="Logging level (default: `info`)", default="info")
+@click.option("--log_level", help="Logging level (default: `info`)", default="info")
 @click.option(
-    "-n",
     "--processes",
     help="Number of parallel processes available to MS²Rescore",
     type=int,
     default=16,
 )
 @click.option(
-    "-fg",
     "--feature_generators",
     help="Comma-separated list of feature generators to use (default: `ms2pip,deeplc`). See rescoring doc for further information",
     default="ms2pip,deeplc",
@@ -52,34 +50,34 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
     help="Comma-separated list of features to use for annotation (read docs for default)",
 )
 @click.option(
-    "-pipm",
     "--ms2pip_model",
     help="MS²PIP model (default: `HCD2021`)",
     type=str,
     default="HCD2021",
 )
 @click.option(
-    "-md",
     "--ms2pip_model_dir",
     help="The path of MS²PIP model (default: `./`)",
     type=str,
     default="./",
 )
 @click.option(
-    "-ms2tol",
     "--ms2_tolerance",
     help="Fragment mass tolerance [Da](default: `0.05`)",
     type=float,
     default=0.05,
 )
 @click.option(
-    "-cs",
     "--calibration_set_size",
-    help="Percentage of number of calibration set for DeepLC (default: `0.15`)",
-    default=0.15,
+    help="Percentage of number of psms to use for calibration and retraining (default: `0.20)",
+    default=0.20,
 )
 @click.option(
-    "-d",
+    "--skip_deeplc_retrain",
+    help="Skip retraining of DeepLC model (default: `False`)",
+    is_flag=True,
+)
+@click.option(
     "--id_decoy_pattern",
     help="Regex decoy pattern (default: `DECOY_`)",
     default="^DECOY_",
@@ -116,6 +114,7 @@ def msrescore2feature(
     ms2pip_model,
     ms2_tolerance,
     calibration_set_size,
+    skip_deeplc_retrain,
     id_decoy_pattern,
     lower_score_is_better,
     spectrum_id_pattern: str,
@@ -137,7 +136,7 @@ def msrescore2feature(
     idxml : str
         Path to the idXML file containing the PSMs.
     mzml : str
-        Path to the mzML file containing the mass spectrometry data.
+        Path to the mzML file containing the mass spectrometry deeplc_models.
     output_path : str
         Path to the output idXML file with annotated PSMs.
     log_level : str
@@ -155,7 +154,9 @@ def msrescore2feature(
     ms2_tolerance : float
         The tolerance for MS²PIP annotation.
     calibration_set_size : float
-        The fraction of data used for calibration.
+        The percentage of PSMs to use for calibration and retraining.
+    skip_deeplc_retrain : bool
+        Whether to skip retraining the DeepLC model.
     id_decoy_pattern : str
         The regex pattern to identify decoy IDs.
     lower_score_is_better : bool
@@ -173,7 +174,7 @@ def msrescore2feature(
         ms2pip_model_path=ms2pip_model_dir,
         ms2_tolerance=ms2_tolerance,
         calibration_set_size=calibration_set_size,
-        deeplc_retrain=True,
+        skip_deeplc_retrain=skip_deeplc_retrain,
         processes=processes,
         id_decoy_pattern=id_decoy_pattern,
         lower_score_is_better=lower_score_is_better,

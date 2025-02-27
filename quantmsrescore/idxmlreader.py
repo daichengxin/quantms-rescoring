@@ -1,20 +1,22 @@
 import logging
 from collections import defaultdict
 from pathlib import Path
-from typing import Union, Iterable, List, Optional, Dict, Tuple, DefaultDict
+from typing import Union, List, Optional, Dict, Tuple, DefaultDict
 from warnings import filterwarnings
 
 import psm_utils
 import pyopenms as oms
 from psm_utils import PSM, PSMList
+from pyopenms import IDFilter
 
 from quantmsrescore.constants import OPENMS_DISSOCIATION_METHODS_PATCH
+from quantmsrescore.exceptions import MS3NotSupportedException
 from quantmsrescore.openms import OpenMSHelper
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
-# Suppress OpenMS warning about data path
+# Suppress OpenMS warning about deeplc_models path
 filterwarnings(
     "ignore",
     message="OPENMS_DATA_PATH environment variable already exists",
@@ -26,24 +28,27 @@ filterwarnings(
 class ScoreStats:
     """Statistics about score occurrence in peptide hits."""
 
-    total_hits: int = 0
-    missing_count: int = 0
+    def __init__(self):
+        self.total_hits: int = 0
+        self.missing_count: int = 0
 
     @property
     def missing_percentage(self) -> float:
+        """Calculate percentage of missing scores."""
         return (self.missing_count / self.total_hits * 100) if self.total_hits else 0
 
 
 class SpectrumStats:
     """Statistics about spectrum analysis."""
 
-    missing_spectra: int = 0
-    empty_spectra: int = 0
-    ms_level_counts: DefaultDict[int, int] = defaultdict(int)
-    ms_level_dissociation_method = {}
+    def __init__(self):
+        self.missing_spectra: int = 0
+        self.empty_spectra: int = 0
+        self.ms_level_counts: DefaultDict[int, int] = defaultdict(int)
+        self.ms_level_dissociation_method: Dict[Tuple[int, str], int] = {}
 
 
-class IdXMLReader(psm_utils.io.idxml.IdXMLReader):
+class IdXMLReader:
     """
     A class to read and parse idXML files for protein and peptide identifications.
 
@@ -55,18 +60,21 @@ class IdXMLReader(psm_utils.io.idxml.IdXMLReader):
         List of protein identifications parsed from the idXML file.
     oms_peptides : List[oms.PeptideIdentification]
         List of peptide identifications parsed from the idXML file.
-
-    Methods
-    -------
-    _parse_idxml() -> Tuple[List[oms.ProteinIdentification], List[oms.PeptideIdentification]]
-        Parses the idXML file to extract protein and peptide identifications.
     """
 
     def __init__(self, idexml_filename: Union[Path, str]) -> None:
+        """
+        Initialize IdXMLReader with the specified idXML file.
+
+        Parameters
+        ----------
+        idexml_filename : Union[Path, str]
+            Path to the idXML file to be read and parsed.
+        """
         self.filename = Path(idexml_filename)
         self.oms_proteins, self.oms_peptides = self._parse_idxml()
 
-        # Private properties if mzML iand spectrum lookup is build @build_spectrum_lookup
+        # Private properties for spectrum lookup
         self._spec_lookup = None
         self._exp = None
         self._mzml_path = None
@@ -80,7 +88,7 @@ class IdXMLReader(psm_utils.io.idxml.IdXMLReader):
 
         Returns
         -------
-            Tuple[List[oms.ProteinIdentification], List[oms.PeptideIdentification]]:
+        Tuple[List[oms.ProteinIdentification], List[oms.PeptideIdentification]]
             A tuple containing lists of protein and peptide identifications.
         """
         idxml_file = oms.IdXMLFile()
@@ -90,27 +98,27 @@ class IdXMLReader(psm_utils.io.idxml.IdXMLReader):
 
     @property
     def openms_proteins(self) -> List[oms.ProteinIdentification]:
+        """Get the list of protein identifications."""
         return self.oms_proteins
 
     @property
     def openms_peptides(self) -> List[oms.PeptideIdentification]:
+        """Get the list of peptide identifications."""
         return self.oms_peptides
 
     @property
-    def stats(self) -> SpectrumStats:
+    def stats(self) -> Optional[SpectrumStats]:
+        """Get spectrum statistics."""
         return self._stats
 
     @property
-    def spectrum_path(self) -> Union[str, Path]:
+    def spectrum_path(self) -> Optional[Union[str, Path]]:
+        """Get the path to the mzML file."""
         return self._mzml_path
 
-    def _build_spectrum_lookup(self, mzml_file: Union[str, Path]) -> None:
+    def build_spectrum_lookup(self, mzml_file: Union[str, Path]) -> None:
         """
         Build a SpectrumLookup indexer from an mzML file.
-
-        This method initializes the spectrum lookup and MS experiment data
-        from the specified mzML file, storing them as class attributes for
-        further processing and analysis.
 
         Parameters
         ----------
@@ -129,9 +137,12 @@ class IdXMLRescoringReader(IdXMLReader):
     This class handles reading and parsing idXML files, managing PSMs (Peptide-Spectrum Matches),
     and provides functionality for spectrum validation and scoring analysis.
 
-    Attributes:
-        filename (Path): Path to the idXML file
-        high_score_better (Optional[bool]): Indicates if higher scores are better
+    Attributes
+    ----------
+    filename : Path
+        Path to the idXML file.
+    high_score_better : Optional[bool]
+        Indicates if higher scores are better.
     """
 
     def __init__(
@@ -142,75 +153,50 @@ class IdXMLRescoringReader(IdXMLReader):
         remove_missing_spectrum: bool = True,
     ) -> None:
         """
-        Initialize the IdXMLRescoringReader with the specified idXML file.
+        Initialize the IdXMLRescoringReader with the specified files.
 
         Parameters
         ----------
         idexml_filename : Union[Path, str]
-            The path to the idXML file to be processed.
+            Path to the idXML file to be read and parsed.
         mzml_file : Union[str, Path]
-            The path to the mzML file corresponding to the idXML file.
+            Path to the mzML file for spectrum lookup.
         only_ms2 : bool, optional
             Flag to filter for MS2 spectra only, by default True.
-
-        Attributes
-        ----------
-        filename : Path
-            The path to the idXML file.
-        high_score_better : Optional[bool]
-            Indicates if higher scores are better.
-        skip_invalid_psm : int
-            Counter for skipped invalid PSMs.
-        new_peptide_ids : List[oms.PeptideIdentification]
-            List to store new peptide identifications.
-        _mzml_path : Optional[str]
-            Path to the mzML file, if specified.
-        _psms : Optional[PSMList]
-            List of parsed PSMs.
-        _spec_lookup : Optional[oms.SpectrumLookup]
-            Spectrum lookup index.
-        _exp : Optional[oms.MSExperiment]
-            MS experiment data.
-        oms_proteins : List[oms.ProteinIdentification]
-            List of protein identifications from the idXML file.
-        oms_peptides : List[oms.PeptideIdentification]
-            List of peptide identifications from the idXML file.
+        remove_missing_spectrum : bool, optional
+            Flag to remove PSMs with missing spectra, by default True.
         """
         super().__init__(idexml_filename)
-        self.filename = Path(idexml_filename)
         self.high_score_better: Optional[bool] = None
 
         # Private attributes
         self._psms: Optional[PSMList] = None
-        self._build_spectrum_lookup(mzml_file)
-        self._build_psm_index(only_ms2=only_ms2)
+        self.build_spectrum_lookup(mzml_file)
         self._validate_psm_spectrum_references(
             only_ms2=only_ms2, remove_missing_spectrum=remove_missing_spectrum
         )
+        self._build_psm_index(only_ms2=only_ms2)
 
     @property
     def psms(self) -> Optional[PSMList]:
+        """Get the list of PSMs."""
         return self._psms
 
     @psms.setter
     def psms(self, psm_list: PSMList) -> None:
+        """Set the list of PSMs."""
         if not isinstance(psm_list, PSMList):
             raise TypeError("psm_list must be an instance of PSMList")
         self._psms = psm_list
 
-    def _analyze_score_coverage(self) -> Dict[str, ScoreStats]:
+    def analyze_score_coverage(self) -> Dict[str, ScoreStats]:
         """
         Analyze the coverage of scores across peptide hits.
-
-        This method calculates the total number of hits for each score
-        present in the peptide identifications and determines the number
-        of missing scores by comparing against the total number of hits.
 
         Returns
         -------
         Dict[str, ScoreStats]
-            A dictionary mapping score names to their respective statistics,
-            including total hits and missing counts.
+            A dictionary mapping score names to their respective statistics.
         """
         scores_stats: Dict[str, ScoreStats] = defaultdict(ScoreStats)
         total_hits = sum(len(peptide_id.getHits()) for peptide_id in self.oms_peptides)
@@ -228,7 +214,15 @@ class IdXMLRescoringReader(IdXMLReader):
         return scores_stats
 
     @staticmethod
-    def _log_score_coverage(score_stats) -> None:
+    def log_score_coverage(score_stats: Dict[str, ScoreStats]) -> None:
+        """
+        Log information about score coverage.
+
+        Parameters
+        ----------
+        score_stats : Dict[str, ScoreStats]
+            Dictionary mapping score names to their statistics.
+        """
         for score, stats in score_stats.items():
             if stats.missing_count > 0:
                 percentage = stats.missing_percentage
@@ -247,12 +241,7 @@ class IdXMLRescoringReader(IdXMLReader):
         is_decoy: bool = False,
     ) -> Optional[PSM]:
         """
-        Parse a peptide-spectrum match (PSM) from given protein and peptide data.
-
-        This static method extracts relevant information from the provided
-        protein, peptide, and peptide hit objects to construct a PSM object.
-        It handles the creation of provenance tracking data and logs errors
-        if parsing fails.
+        Parse a peptide-spectrum match (PSM) from given protein and peptide models.
 
         Parameters
         ----------
@@ -278,7 +267,7 @@ class IdXMLRescoringReader(IdXMLReader):
             spectrum_ref = peptide_id.getMetaValue("spectrum_reference")
             rt = peptide_id.getRT()
 
-            # Create provenance tracking data
+            # Create provenance tracking models
             provenance_key = OpenMSHelper.get_psm_hash_unique_id(
                 peptide_hit=peptide_id, psm_hit=peptide_hit
             )
@@ -303,11 +292,6 @@ class IdXMLRescoringReader(IdXMLReader):
         """
         Read and parse the idXML file to extract PSMs.
 
-        This method processes peptide identifications from the idXML file,
-        determines the score direction if not already set, and parses each
-        peptide hit into a PSM object. It logs warnings for inconsistent
-        score directions and returns a list of valid PSMs.
-
         Parameters
         ----------
         only_ms2 : bool, optional
@@ -315,15 +299,14 @@ class IdXMLRescoringReader(IdXMLReader):
 
         Returns
         -------
-            PSMList: A list of parsed PSM objects.
+        PSMList
+            A list of parsed PSM objects.
         """
         psm_list = []
 
         if only_ms2 and self._spec_lookup is None:
             logging.warning("Spectrum lookup not initialized, cannot filter for MS2 spectra")
             only_ms2 = False
-
-        only_ms2 = only_ms2 and self._spec_lookup is not None
 
         for peptide_id in self.oms_peptides:
             if self.high_score_better is None:
@@ -334,6 +317,7 @@ class IdXMLRescoringReader(IdXMLReader):
             for psm_hit in peptide_id.getHits():
                 if (
                     only_ms2
+                    and self._spec_lookup is not None
                     and OpenMSHelper.get_ms_level(peptide_id, self._spec_lookup, self._exp) != 2
                 ):
                     continue
@@ -354,95 +338,142 @@ class IdXMLRescoringReader(IdXMLReader):
         self, remove_missing_spectrum: bool = True, only_ms2: bool = True
     ) -> SpectrumStats:
         """
-        Validate and update PSM spectrum references.
+        Validate spectrum references for peptide identifications and filter based on criteria.
 
-        This method checks the spectrum references for each PSM in the list,
-        updating statistics on missing and empty spectra, MS level counts, and
-        dissociation methods. It optionally removes PSMs with missing or empty
-        spectra and filters for MS2 spectra only.
+        This method validates each peptide identification by checking if its referenced
+        spectrum exists and has peaks. It also tracks MS level statistics and dissociation
+        methods. Optionally removes peptide identifications with missing/empty spectra or
+        those that are not MS2 level.
 
         Parameters
         ----------
         remove_missing_spectrum : bool, optional
-            If True, remove PSMs with missing or empty spectra, by default True.
+            If True, removes peptide identifications with missing or empty spectra,
+            by default True.
         only_ms2 : bool, optional
-            If True, filter for MS2 spectra only, by default True.
+            If True, removes peptide identifications that reference non-MS2 spectra,
+            by default True.
 
         Returns
         -------
         SpectrumStats
-            An object containing statistics about the spectrum validation process.
+            Statistics about spectrum validation including counts of missing spectra,
+            empty spectra, MS level distribution, and dissociation methods.
 
         Raises
         ------
         ValueError
-            If the spectrum lookup or PSMs are not initialized.
+            If spectrum lookup or experiment are not initialized.
+        MS3NotSupportedException
+            If MS3 spectra are found while only_ms2 is True.
+
+        Notes
+        -----
+        This method modifies the internal list of peptide identifications by filtering
+        out entries that don't meet the specified criteria. It also updates protein
+        identifications to remove entries that no longer have associated peptides.
         """
-        if self._spec_lookup is None or self._exp is None or not self._psms:
+
+        if self._spec_lookup is None or self._exp is None:
             raise ValueError("Spectrum lookup or PSMs not initialized")
 
         self._stats = SpectrumStats()
 
-        new_psm_list = []
+        new_peptide_ids = []
+        peptide_removed = 0
 
-        for psm in self._psms[:]:  # Iterate over a copy to allow safe removal
-            spectrum = OpenMSHelper.get_spectrum_for_psm(psm, self._exp, self._spec_lookup)
-            missing_spectra, empty_spectra = False, False
+        for peptide_id in self.oms_peptides:
+            spectrum = OpenMSHelper.get_spectrum_for_psm(peptide_id, self._exp, self._spec_lookup)
+            spectrum_reference = OpenMSHelper.get_spectrum_reference(peptide_id)
+
+            missing_spectrum, empty_spectrum = False, False
             ms_level = 2
 
             if spectrum is None:
-                logging.error(f"Spectrum not found for PSM {psm}")
+
+                logging.error(
+                    f"Spectrum not found for PeptideIdentification with {spectrum_reference}"
+                )
                 self._stats.missing_spectra += 1
-                missing_spectra = True
+                missing_spectrum = True
             else:
                 peaks = spectrum.get_peaks()[0]
                 if peaks is None or len(peaks) == 0:
-                    logging.warning(f"Empty spectrum found for PSM {psm}")
-                    empty_spectra = True
+                    logging.warning(f"Empty spectrum found for PSM {spectrum_reference}")
+                    empty_spectrum = True
                     self._stats.empty_spectra += 1
 
                 ms_level = spectrum.getMSLevel()
                 self._stats.ms_level_counts[ms_level] += 1
 
-                for precursor in spectrum.getPrecursors():
-                    for method_index in precursor.getActivationMethods():
-                        if 0 <= method_index < len(OPENMS_DISSOCIATION_METHODS_PATCH):
-                            method = (
-                                ms_level,
-                                list(OPENMS_DISSOCIATION_METHODS_PATCH[method_index].keys())[0],
-                            )
-                            self._stats.ms_level_dissociation_method[method] = (
-                                self._stats.ms_level_dissociation_method.get(method, 0) + 1
-                            )
-                        else:
-                            logging.warning(f"Unknown dissociation method index {method_index}")
+                self._process_dissociation_methods(spectrum, ms_level)
 
-                if ms_level == 3:
+                if ms_level != 2 and only_ms2:
                     logging.info(
-                        f"MS level 3 spectrum found for PSM {psm}, please be aware, "
-                        "ms2pip models are not trained on MS3 spectra"
+                        f"MS level {ms_level} spectrum found for PSM {spectrum_reference}. "
+                        "MS2pip models are not trained on MS3 spectra"
                     )
 
-            if (remove_missing_spectrum and (missing_spectra or empty_spectra)) or (
+            if (remove_missing_spectrum and (missing_spectrum or empty_spectrum)) or (
                 only_ms2 and ms_level != 2
             ):
-                logging.debug(f"Removing PSM {psm}")
+                logging.debug(f"Removing PSM {spectrum_reference}")
+                peptide_removed += 1
             else:
-                new_psm_list.append(psm)
+                new_peptide_ids.append(peptide_id)
 
-        self._psms = PSMList(psm_list=new_psm_list)
+        if peptide_removed > 0:
+            logging.warning(
+                f"Removed {peptide_removed} PSMs with missing or empty spectra or MS3 spectra"
+            )
+            self.oms_peptides = new_peptide_ids
+            oms_filter = IDFilter()
+            # We only want to have protein accessions with at least one peptide identification
+            oms_filter.removeEmptyIdentifications(self.oms_peptides)
+            oms_filter.removeUnreferencedProteins(self.oms_proteins, self.oms_peptides)
 
+        self._log_spectrum_statistics()
+
+        if only_ms2 and self._stats.ms_level_counts.get(3, 0) > 0:
+            ms2_dissociation_methods = self._stats.ms_level_dissociation_method.get((2, "HCD"), 0)
+            logging.error(
+                "MS3 spectra found in MS2-only mode, please filter your search for MS2 or dissociation method: {}".format(
+                    ms2_dissociation_methods
+                )
+            )
+            raise MS3NotSupportedException("MS3 spectra found in MS2-only mode")
+        return self._stats
+
+    def _process_dissociation_methods(self, spectrum, ms_level):
+        """Process dissociation methods from spectrum precursors."""
+        for precursor in spectrum.getPrecursors():
+            for method_index in precursor.getActivationMethods():
+                if 0 <= method_index < len(OPENMS_DISSOCIATION_METHODS_PATCH):
+                    method = (
+                        ms_level,
+                        list(OPENMS_DISSOCIATION_METHODS_PATCH[method_index].keys())[0],
+                    )
+                    self._stats.ms_level_dissociation_method[method] = (
+                        self._stats.ms_level_dissociation_method.get(method, 0) + 1
+                    )
+                else:
+                    logging.warning(f"Unknown dissociation method index {method_index}")
+
+    def _log_spectrum_statistics(self):
+        """Log statistics about spectrum validation."""
         if self._stats.missing_spectra or self._stats.empty_spectra:
             logging.error(
                 f"Found {self._stats.missing_spectra} PSMs with missing spectra and "
                 f"{self._stats.empty_spectra} PSMs with empty spectra"
             )
 
-        if len({k[1] for k in self.stats.ms_level_dissociation_method}) > 1:
+        if len({k[1] for k in self._stats.ms_level_dissociation_method}) > 1:
             logging.error(
-                "Found multiple dissociation methods in the same MS level, please be aware, ms2pip models are not trained multiple models"  # noqa
+                "Found multiple dissociation methods in the same MS level. "
+                "MS2pip models are not trained for multiple dissociation methods"
             )
 
         logging.info(f"MS level distribution: {dict(self._stats.ms_level_counts)}")
-        print("Dissociation Method Distribution", self._stats.ms_level_dissociation_method)
-        return self._stats
+        logging.info(
+            f"Dissociation Method Distribution: {self._stats.ms_level_dissociation_method}"
+        )
