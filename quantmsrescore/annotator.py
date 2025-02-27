@@ -202,7 +202,9 @@ class Annotator:
                 logging.info("MS2PIP Annotations added to the PSMs")
             except Ms2pipIncorrectModelException:
                 if self._find_best_ms2pip_model:
-                    logging.info("Finding best MS2PIP model - brute force search on the top calibration set")
+                    logging.info(
+                        "Finding best MS2PIP model - brute force search on the top calibration set"
+                    )
                     batch_psms = self._get_top_batch_psms(psm_list)
                     model, corr = ms2pip_generator._find_best_ms2pip_model(
                         batch_psms=batch_psms,
@@ -225,7 +227,9 @@ class Annotator:
                         self._idxml_reader.psms = psm_list
                         logging.info("MS2PIP Annotations added to the PSMs")
                     else:
-                        logging.error("No suitable model found for this deeplc_models, please review parameters")
+                        logging.error(
+                            "No suitable model found for this deeplc_models, please review parameters"
+                        )
             except Exception as e:
                 logging.error(f"Failed to add MS2PIP features: {e}")
 
@@ -259,9 +263,13 @@ class Annotator:
                     mae_model = self._get_mae_from_psm_list(psms)
 
                     if mae_trained < mae_model:
-                        logging.info(f"Retrained DeepLC model has lower MAE, using it. {deeplc_annotator.selected_model}")
+                        logging.info(
+                            f"Retrained DeepLC model has lower MAE, using it. {deeplc_annotator.selected_model}"
+                        )
                     else:
-                        logging.info(f"Retrained DeepLC model has higher MAE, using the original model. {deeplc_annotator_model.selected_model}")
+                        logging.info(
+                            f"Retrained DeepLC model has higher MAE, using the original model. {deeplc_annotator_model.selected_model}"
+                        )
                         deeplc_annotator = deeplc_annotator_model
 
             except Exception as e:
@@ -434,16 +442,15 @@ class Annotator:
         best_scored_psms = self._get_top_batch_psms(retrained_psms)
         if not best_scored_psms:
             logging.warning("No PSMs found for MAE calculation")
-            return float('inf')  # Return infinity for empty list
-            
+            return float("inf")  # Return infinity for empty list
         mae = 0
         for psm in best_scored_psms:
             if "rt_diff" in psm.rescoring_features:
                 mae += abs(psm.rescoring_features["rt_diff"])
             else:
                 logging.warning("PSM missing rt_diff feature, skipping for MAE calculation")
-                return float('inf')  # Return infinity if any PSM is missing the feature
-                
+                return float("inf")  # Return infinity if any PSM is missing the feature
+
         if len(best_scored_psms) == 0:
-            return float('inf')  # Safeguard against division by zero
+            return float("inf")  # Safeguard against division by zero
         return mae / len(best_scored_psms)

@@ -1,7 +1,7 @@
 import logging
 from collections import defaultdict
 from pathlib import Path
-from typing import Union, Iterable, List, Optional, Dict, Tuple, DefaultDict
+from typing import Union, List, Optional, Dict, Tuple, DefaultDict
 from warnings import filterwarnings
 
 import psm_utils
