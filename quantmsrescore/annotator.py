@@ -1,3 +1,4 @@
+import copy
 import logging
 from pathlib import Path
 from typing import Union
@@ -22,7 +23,7 @@ class Annotator:
         ms2pip_model_path: str = "models",
         ms2_tolerance: float = 0.05,
         calibration_set_size: float = 0.2,
-        deeplc_retrain: bool = False,
+        skip_deeplc_retrain: bool = False,
         processes: int = 2,
         id_decoy_pattern: str = "^DECOY_",
         lower_score_is_better: bool = True,
@@ -39,19 +40,38 @@ class Annotator:
 
         Parameters
         ----------
-        feature_generators (str): Comma-separated list of feature generators to use (e.g., "deeplc,ms2pip").
-        only_features (str): Comma-separated list of features to use for annotation. Default is None.
-        ms2pip_model (str): The MS2PIP model to use for annotation. Default is "HCD2021".
-        ms2pip_model_path (str): Path to the directory containing MS2PIP models. Default is "models".
-        ms2_tolerance (float): Tolerance for MS2PIP annotation. Default is 0.05.
-        calibration_set_size (float): Fraction of data used for calibration. Default is 0.2.
-        deeplc_retrain (bool): Whether to retrain DeepLC models. Default is False.
-        processes (int): Number of processes to use for parallel computation. Default is 2.
-        id_decoy_pattern (str): Regex pattern to identify decoy IDs. Default is "^DECOY_".
-        lower_score_is_better (bool): Whether a lower score indicates a better match. Default is True.
-        log_level (str): Logging level for the annotator. Default is "INFO".
-        spectrum_id_pattern (str): Regex pattern for spectrum IDs. Default is "(.*)".
-        psm_id_pattern (str): Regex pattern for PSM IDs. Default is "(.*)".
+        feature_generators : str
+            Comma-separated list of feature generators to use for annotation (e.g., "ms2pip,deeplc").
+        only_features : str, optional
+            Comma-separated list of features to include in the annotation (default: None).
+        ms2pip_model : str, optional
+            The MS2PIP model to use for feature generation (default: "HCD2021").
+        ms2pip_model_path : str, optional
+            The path to the MS2PIP model directory (default: "models").
+        ms2_tolerance : float, optional
+            The MS2 tolerance to use for feature generation (default: 0.05).
+        calibration_set_size : float, optional
+            The percentage of PSMs to use for calibration (default: 0.2).
+        skip_deeplc_retrain : bool, optional
+            Whether to skip retraining the deepLC model (default: False).
+        processes : int, optional
+            The number of processes to use for feature generation (default: 2).
+        id_decoy_pattern : str, optional
+            The pattern to use for identifying decoy PSMs (default: "^DECOY_").
+        lower_score_is_better : bool, optional
+            Whether a lower score is better for feature generation (default: True).
+        log_level : str, optional
+            The logging level to use for the Annotator (default: "INFO").
+        spectrum_id_pattern : str, optional
+            The pattern to use for identifying spectrum IDs (default: "(.*)").
+        psm_id_pattern : str, optional
+            The pattern to use for identifying PSM IDs (default: "(.*)").
+        remove_missing_spectra : bool, optional
+            Whether to remove PSMs with missing spectra (default: True).
+        ms2_only : bool, optional
+            Whether to only process MS2-level PSMs (default: True).
+        find_best_ms2pip_model : bool, optional
+            Whether to find the best MS2PIP model based on the top calibration set (default: False).
 
         Raises
         -------
@@ -87,14 +107,14 @@ class Annotator:
         self._log_level = log_level
         self._spectrum_id_pattern = spectrum_id_pattern
         self._psm_id_pattern = psm_id_pattern
-        self._deeplc_retrain = deeplc_retrain
+        self._skip_deeplc_retrain = skip_deeplc_retrain
         self._remove_missing_spectra = remove_missing_spectra
         self._ms2_only = ms2_only
         self._find_best_ms2pip_model = find_best_ms2pip_model
 
     def build_idxml_data(self, idxml_file: Union[str, Path], spectrum_path: Union[str, Path]):
         """
-        Build and load data from an idXML file for annotation.
+        Build and load deeplc_models from an idXML file for annotation.
 
         This method initializes the IdXMLRescoringReader with the specified
         idXML and mzML files, and counts the number of decoy and target PSMs.
@@ -135,8 +155,8 @@ class Annotator:
 
     def annotate(self):
         if self._idxml_reader is None:
-            logging.error("No idXML data loaded. Call build_idxml_data() first.")
-            raise ValueError("No idXML data loaded. Call build_idxml_data() first.")
+            logging.error("No idXML deeplc_models loaded. Call build_idxml_data() first.")
+            raise ValueError("No idXML deeplc_models loaded. Call build_idxml_data() first.")
 
         logging.debug(f"Running Annotations with following configurations: {self.__dict__}")
 
@@ -192,7 +212,7 @@ class Annotator:
                         logging.info("MS2PIP Annotations added to the PSMs")
                     else:
                         logging.error(
-                            "Not good model found for this data please review parameters"
+                            "Not good model found for this deeplc_models please review parameters"
                         )
             except Exception as e:
                 logging.error(f"Failed to add MS2PIP features: {str(e)}")
@@ -202,14 +222,50 @@ class Annotator:
 
             try:
                 kwargs = {}
-                if self._deeplc_retrain:
-                    kwargs = {"deeplc_retrain": True}
-                deeplc_annotator = DeepLCAnnotator(
-                    self._lower_score_is_better,
-                    calibration_set_size=self._calibration_set_size,
-                    processes=self._processes,
-                    **kwargs,
-                )
+                if self._skip_deeplc_retrain:
+                    deeplc_annotator = DeepLCAnnotator(
+                        self._lower_score_is_better,
+                        calibration_set_size=self._calibration_set_size,
+                        processes=self._processes,
+                        **kwargs,
+                    )
+                else:
+                    kwargs = {
+                        "deeplc_retrain": True,
+                    }
+                    retrain_deeplc_annotator = DeepLCAnnotator(
+                        self._lower_score_is_better,
+                        calibration_set_size=self._calibration_set_size,
+                        processes=self._processes,
+                        **kwargs,
+                    )
+                    temp_psms = self._idxml_reader.psms.psm_list
+                    retrained_psms = PSMList(psm_list=copy.deepcopy(temp_psms))
+                    retrain_deeplc_annotator.add_features(retrained_psms)
+
+                    kwargs = {
+                        "deeplc_retrain": False,
+                    }
+                    deeplc_annotator_model = DeepLCAnnotator(
+                        self._lower_score_is_better,
+                        calibration_set_size=self._calibration_set_size,
+                        processes=self._processes,
+                        **kwargs,
+                    )
+                    psms = PSMList(psm_list= copy.deepcopy(temp_psms))
+                    deeplc_annotator_model.add_features(psms)
+
+                    # Compare the results of the retrained and non-retrained models
+                    mae_trained = self._get_mae_from_psm_list(retrained_psms)
+                    mae_model = self._get_mae_from_psm_list(psms)
+
+                    if mae_trained < mae_model:
+                        logging.info(f"Retrained DeepLC model has lower MAE, using it. {retrain_deeplc_annotator.selected_model}")
+                        deeplc_annotator = retrain_deeplc_annotator
+                    else:
+                        logging.info(f"Retrained DeepLC model has higher MAE, using the original model. {deeplc_annotator_model.selected_model}")
+                        deeplc_annotator = deeplc_annotator_model
+
             except Exception as e:
                 logging.error(f"Failed to initialize DeepLC: {str(e)}")
                 raise
@@ -255,7 +311,10 @@ class Annotator:
                     for feature, value in psm.rescoring_features.items():
                         canonical_feature = OpenMSHelper.get_canonical_feature(feature)
                         if canonical_feature is not None:
-                            if self._only_features and canonical_feature not in self._only_features:
+                            if (
+                                self._only_features
+                                and canonical_feature not in self._only_features
+                            ):
                                 logging.warning(
                                     f"Feature {feature} not supported by quantms rescoring or not in only_features"
                                 )
@@ -283,7 +342,9 @@ class Annotator:
 
             if features_existing is None:
                 features_existing = ""
-            extra_features = (features_existing + "," if features_existing else "") + ",".join(features)
+            extra_features = (features_existing + "," if features_existing else "") + ",".join(
+                features
+            )
             search_parameters.setMetaValue("extra_features", extra_features)
             self._idxml_reader.oms_proteins[0].setSearchParameters(search_parameters)
 
@@ -352,3 +413,28 @@ class Annotator:
         elif first_key[1] == "CID":
             return "CID"
         return None
+
+    def _get_mae_from_psm_list(self, retrained_psms: PSMList) -> float:
+        """
+        Calculate the Mean Absolute Error (MAE) from a list of PSMs.
+
+        This method calculates the Mean Absolute Error (MAE) from a list of PSMs
+        by comparing the predicted retention time to the observed retention time
+        for each PSM. The MAE is calculated as the average of the absolute differences
+        between the predicted and observed retention times.
+
+        Parameters
+        ----------
+        retrained_psms : PSMList
+            A list of PSMs with predicted and observed retention times.
+
+        Returns
+        -------
+        float
+            The Mean Absolute Error (MAE) calculated from the PSMs.
+        """
+        best_scored_psms = self._get_top_batch_psms(retrained_psms)
+        mae = 0
+        for psm in best_scored_psms:
+            mae += abs(psm.rescoring_features["rt_diff"])
+        return mae / len(best_scored_psms)

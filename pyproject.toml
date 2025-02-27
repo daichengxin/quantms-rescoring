@@ -28,6 +28,9 @@ packages = [
     { include = "quantmsrescore" }
 ]
 
+[tool.poetry.package.include]
+"data/full_hc_PXD005573_mcp_1fd8363d9af9dcad3be7553c39396960.hdf5" = "quantmsrescore/data"
+
 [tool.poetry.dependencies]
 python = ">=3.9,<3.12"
 click = "*"

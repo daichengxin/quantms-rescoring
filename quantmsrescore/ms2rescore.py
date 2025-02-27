@@ -137,7 +137,7 @@ def msrescore2feature(
     idxml : str
         Path to the idXML file containing the PSMs.
     mzml : str
-        Path to the mzML file containing the mass spectrometry data.
+        Path to the mzML file containing the mass spectrometry deeplc_models.
     output_path : str
         Path to the output idXML file with annotated PSMs.
     log_level : str
@@ -155,7 +155,7 @@ def msrescore2feature(
     ms2_tolerance : float
         The tolerance for MS²PIP annotation.
     calibration_set_size : float
-        The fraction of data used for calibration.
+        The fraction of deeplc_models used for calibration.
     id_decoy_pattern : str
         The regex pattern to identify decoy IDs.
     lower_score_is_better : bool
@@ -173,7 +173,7 @@ def msrescore2feature(
         ms2pip_model_path=ms2pip_model_dir,
         ms2_tolerance=ms2_tolerance,
         calibration_set_size=calibration_set_size,
-        deeplc_retrain=True,
+        skip_deeplc_retrain=True,
         processes=processes,
         id_decoy_pattern=id_decoy_pattern,
         lower_score_is_better=lower_score_is_better,

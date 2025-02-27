@@ -105,6 +105,7 @@ def test_idxmlreader():
     stats = idxml_reader.stats
     assert stats.missing_spectra == 0
 
+
 def test_annotator_train_rt():
 
     idxml_file = (
@@ -123,7 +124,7 @@ def test_annotator_train_rt():
         ms2pip_model_path="models",
         ms2_tolerance=0.05,
         calibration_set_size=0.15,
-        deeplc_retrain=True,
+        skip_deeplc_retrain=False,
         processes=2,
         id_decoy_pattern="^DECOY_",
         lower_score_is_better=True,
@@ -141,7 +142,6 @@ def test_annotator_train_rt():
     )
 
     annotator.write_idxml_file(output_file)
-
 
 
 def test_idxmlreader_filtering():
@@ -163,7 +163,7 @@ def test_idxmlreader_filtering():
         ms2pip_model_path="models",
         ms2_tolerance=0.05,
         calibration_set_size=0.15,
-        deeplc_retrain=True,
+        skip_deeplc_retrain=True,
         processes=2,
         id_decoy_pattern="^DECOY_",
         lower_score_is_better=True,
@@ -202,7 +202,7 @@ def test_idxmlreader_wrong_model():
         ms2pip_model_path="models",
         ms2_tolerance=0.05,
         calibration_set_size=0.15,
-        deeplc_retrain=True,
+        skip_deeplc_retrain=True,
         processes=2,
         id_decoy_pattern="^DECOY_",
         lower_score_is_better=True,

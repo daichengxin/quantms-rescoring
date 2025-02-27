@@ -42,7 +42,7 @@ jobs:
         CUDA_VISIBLE_DEVICES: "-1"
       run: |
         poetry run pytest
-#    - name: Download test data
+#    - name: Download test deeplc_models
 #      env:
 #        CUDA_VISIBLE_DEVICES: "-1"
 #      run: |

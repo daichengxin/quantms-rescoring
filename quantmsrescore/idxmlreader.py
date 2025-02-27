@@ -14,7 +14,7 @@ from quantmsrescore.openms import OpenMSHelper
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
-# Suppress OpenMS warning about data path
+# Suppress OpenMS warning about deeplc_models path
 filterwarnings(
     "ignore",
     message="OPENMS_DATA_PATH environment variable already exists",
@@ -108,7 +108,7 @@ class IdXMLReader(psm_utils.io.idxml.IdXMLReader):
         """
         Build a SpectrumLookup indexer from an mzML file.
 
-        This method initializes the spectrum lookup and MS experiment data
+        This method initializes the spectrum lookup and MS experiment deeplc_models
         from the specified mzML file, storing them as class attributes for
         further processing and analysis.
 
@@ -142,39 +142,29 @@ class IdXMLRescoringReader(IdXMLReader):
         remove_missing_spectrum: bool = True,
     ) -> None:
         """
-        Initialize the IdXMLRescoringReader with the specified idXML file.
+        Initialize the IdXMLReader with the specified idXML file.
 
         Parameters
         ----------
         idexml_filename : Union[Path, str]
-            The path to the idXML file to be processed.
-        mzml_file : Union[str, Path]
-            The path to the mzML file corresponding to the idXML file.
-        only_ms2 : bool, optional
-            Flag to filter for MS2 spectra only, by default True.
+            The path to the idXML file to be read and parsed.
 
-        Attributes
-        ----------
+        Initializes
+        -----------
         filename : Path
-            The path to the idXML file.
-        high_score_better : Optional[bool]
-            Indicates if higher scores are better.
-        skip_invalid_psm : int
-            Counter for skipped invalid PSMs.
-        new_peptide_ids : List[oms.PeptideIdentification]
-            List to store new peptide identifications.
-        _mzml_path : Optional[str]
-            Path to the mzML file, if specified.
-        _psms : Optional[PSMList]
-            List of parsed PSMs.
-        _spec_lookup : Optional[oms.SpectrumLookup]
-            Spectrum lookup index.
-        _exp : Optional[oms.MSExperiment]
-            MS experiment data.
+            Stores the path to the idXML file.
         oms_proteins : List[oms.ProteinIdentification]
-            List of protein identifications from the idXML file.
+            List of protein identifications parsed from the idXML file.
         oms_peptides : List[oms.PeptideIdentification]
-            List of peptide identifications from the idXML file.
+            List of peptide identifications parsed from the idXML file.
+        _spec_lookup : None
+            Placeholder for spectrum lookup indexer.
+        _exp : None
+            Placeholder for MS experiment deeplc_models.
+        _mzml_path : None
+            Placeholder for the path to the mzML file.
+        _stats : None
+            Placeholder for idXML statistics.
         """
         super().__init__(idexml_filename)
         self.filename = Path(idexml_filename)
@@ -247,11 +237,11 @@ class IdXMLRescoringReader(IdXMLReader):
         is_decoy: bool = False,
     ) -> Optional[PSM]:
         """
-        Parse a peptide-spectrum match (PSM) from given protein and peptide data.
+        Parse a peptide-spectrum match (PSM) from given protein and peptide deeplc_models.
 
         This static method extracts relevant information from the provided
         protein, peptide, and peptide hit objects to construct a PSM object.
-        It handles the creation of provenance tracking data and logs errors
+        It handles the creation of provenance tracking deeplc_models and logs errors
         if parsing fails.
 
         Parameters
@@ -278,7 +268,7 @@ class IdXMLRescoringReader(IdXMLReader):
             spectrum_ref = peptide_id.getMetaValue("spectrum_reference")
             rt = peptide_id.getRT()
 
-            # Create provenance tracking data
+            # Create provenance tracking deeplc_models
             provenance_key = OpenMSHelper.get_psm_hash_unique_id(
                 peptide_hit=peptide_id, psm_hit=peptide_hit
             )

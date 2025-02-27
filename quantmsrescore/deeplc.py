@@ -58,18 +58,17 @@ class DeepLCAnnotator(DeepLCFeatureGenerator):
                         path_model=self.selected_model or self.user_model,
                         **self.deeplc_kwargs,
                     )
-                    self.deeplc_predictor.calibrate_preds(psm_list_calibration)
+                    self.deeplc_predictor.calibrate_preds(
+                        psm_list=psm_list_calibration, return_plotly_report=True
+                    )
                     # Still calibrate for each run, but do not try out all model options.
                     # Just use model that was selected based on first run
-                    if not self.selected_model:
-                        self.selected_model = list(self.deeplc_predictor.model.keys())
-                        self.deeplc_kwargs["deeplc_retrain"] = False
-                        logging.debug(
-                            f"Selected DeepLC model {self.selected_model} based on "
-                            "calibration of first run. Using this model (after new "
-                            "calibrations) for the remaining runs."
-                        )
-
+                    self.selected_model = list(self.deeplc_predictor.model.keys())
+                    logging.debug(
+                        f"Selected DeepLC model {self.selected_model} based on "
+                        "calibration of first run. Using this model (after new "
+                        "calibrations) for the remaining runs."
+                    )
                     logging.debug("Predicting retention times...")
                     predictions = np.array(self.deeplc_predictor.make_preds(psm_list_run))
                     observations = psm_list_run["retention_time"]

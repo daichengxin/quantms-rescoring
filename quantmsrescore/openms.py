@@ -220,7 +220,7 @@ class OpenMSHelper:
         scan_number: int, exp: oms.MSExperiment, lookup: SpectrumLookup
     ) -> Optional[Tuple[np.ndarray, np.ndarray]]:
         """
-        Get spectrum data for a given scan number
+        Get spectrum deeplc_models for a given scan number
 
         Parameters
         ----------

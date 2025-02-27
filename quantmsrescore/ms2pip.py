@@ -107,7 +107,7 @@ class MS2PIPAnnotator(MS2PIPFeatureGenerator):
 
     @staticmethod
     def _validate_scores(
-            ms2pip_results, calibration_set_size, correlation_threshold, lower_score_is_better
+        ms2pip_results, calibration_set_size, correlation_threshold, lower_score_is_better
     ) -> bool:
         """
         Validate MS²PIP results based on score and correlation criteria.
@@ -188,7 +188,9 @@ class MS2PIPAnnotator(MS2PIPFeatureGenerator):
         filtered_models = SUPPORTED_MODELS_MS2PIP
 
         if knwon_fragmentation:
-            filtered_models = {knwon_fragmentation: SUPPORTED_MODELS_MS2PIP.get(knwon_fragmentation)}
+            filtered_models = {
+                knwon_fragmentation: SUPPORTED_MODELS_MS2PIP.get(knwon_fragmentation)
+            }
 
         for fragment_types in filtered_models:
             for model in filtered_models[fragment_types]:
