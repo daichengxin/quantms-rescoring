@@ -252,7 +252,7 @@ class Annotator:
                         processes=self._processes,
                         **kwargs,
                     )
-                    psms = PSMList(psm_list= copy.deepcopy(temp_psms))
+                    psms = PSMList(psm_list=copy.deepcopy(temp_psms))
                     deeplc_annotator_model.add_features(psms)
 
                     # Compare the results of the retrained and non-retrained models
@@ -260,10 +260,14 @@ class Annotator:
                     mae_model = self._get_mae_from_psm_list(psms)
 
                     if mae_trained < mae_model:
-                        logging.info(f"Retrained DeepLC model has lower MAE, using it. {retrain_deeplc_annotator.selected_model}")
+                        logging.info(
+                            f"Retrained DeepLC model has lower MAE, using it. {retrain_deeplc_annotator.selected_model}"
+                        )
                         deeplc_annotator = retrain_deeplc_annotator
                     else:
-                        logging.info(f"Retrained DeepLC model has higher MAE, using the original model. {deeplc_annotator_model.selected_model}")
+                        logging.info(
+                            f"Retrained DeepLC model has higher MAE, using the original model. {deeplc_annotator_model.selected_model}"
+                        )
                         deeplc_annotator = deeplc_annotator_model
 
             except Exception as e:
