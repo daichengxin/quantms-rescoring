@@ -42,17 +42,17 @@ jobs:
         CUDA_VISIBLE_DEVICES: "-1"
       run: |
         poetry run pytest
-#    - name: Download test deeplc_models
-#      env:
-#        CUDA_VISIBLE_DEVICES: "-1"
-#      run: |
-#        wget https://ftp.pride.ebi.ac.uk/pub/databases/pride/resources/proteomes/quantms-ci-github/quantms-utils/TMT_Erwinia_1uLSike_Top10HCD_isol2_45stepped_60min_01.mzML
-#        wget https://ftp.pride.ebi.ac.uk/pub/databases/pride/resources/proteomes/quantms-ci-github/quantms-utils/TMT_Erwinia_1uLSike_Top10HCD_isol2_45stepped_60min_01_comet.idXML
-#    - name: Test percolator ms2rescore
-#      env:
-#        CUDA_VISIBLE_DEVICES: "-1"
-#      run: |
-#        rescoring ms2rescore --psm_file TMT_Erwinia_1uLSike_Top10HCD_isol2_45stepped_60min_01_comet.idXML --spectrum_path TMT_Erwinia_1uLSike_Top10HCD_isol2_45stepped_60min_01.mzML --processes 2 --ms2pip_model HCD2021 --feature_generators 'ms2pip,deeplc' --id_decoy_pattern ^rev --test_fdr 0.05
+    - name: Download test deeplc_models
+      env:
+        CUDA_VISIBLE_DEVICES: "-1"
+      run: |
+        wget https://ftp.pride.ebi.ac.uk/pub/databases/pride/resources/proteomes/quantms-ci-github/quantms-utils/TMT_Erwinia_1uLSike_Top10HCD_isol2_45stepped_60min_01.mzML
+        wget https://ftp.pride.ebi.ac.uk/pub/databases/pride/resources/proteomes/quantms-ci-github/quantms-utils/TMT_Erwinia_1uLSike_Top10HCD_isol2_45stepped_60min_01_comet.idXML
+    - name: Test percolator ms2rescore
+      env:
+        CUDA_VISIBLE_DEVICES: "-1"
+      run: |
+        rescoring msrescore2feature --idxml TMT_Erwinia_1uLSike_Top10HCD_isol2_45stepped_60min_01_comet.idXML --mzml TMT_Erwinia_1uLSike_Top10HCD_isol2_45stepped_60min_01.mzML --processes 2 --ms2pip_model HCD2021 --feature_generators 'ms2pip,deeplc' --id_decoy_pattern ^rev
     - name: Upload coverage reports to Codecov
       uses: codecov/codecov-action@v5
       with:
