@@ -154,7 +154,24 @@ class Annotator:
         )
 
     def annotate(self):
-        if self._idxml_reader is None:
+        """
+        Annotate peptide-spectrum matches (PSMs) using MS2PIP and DeepLC.
+
+        This method performs annotation of PSMs by adding features derived
+        from MS2PIP and DeepLC models. It first checks if the idXML data is
+        loaded, then proceeds to run MS2PIP and/or DeepLC based on the
+        configuration. If MS2PIP is enabled, it attempts to add MS2PIP-derived
+        features to the PSMs, and if necessary, finds the best MS2PIP model
+        through a brute-force search. If DeepLC is enabled, it adds DeepLC-derived
+        features, optionally retraining the model to improve accuracy. Finally,
+        it converts the annotated features into OMS peptides.
+
+        Raises
+        ------
+        ValueError
+            If no idXML data is loaded.
+        """
+        if not self._idxml_reader:
             logging.error("No idXML deeplc_models loaded. Call build_idxml_data() first.")
             raise ValueError("No idXML deeplc_models loaded. Call build_idxml_data() first.")
 
@@ -162,7 +179,6 @@ class Annotator:
 
         if self._ms2pip:
             logging.info("Running MS2PIP on the PSMs")
-
             try:
                 ms2pip_generator = MS2PIPAnnotator(
                     ms2_tolerance=self._ms2_tolerance,
@@ -176,7 +192,7 @@ class Annotator:
                     processes=self._processes,
                 )
             except Exception as e:
-                logging.error(f"Failed to initialize MS2PIP: {str(e)}")
+                logging.error(f"Failed to initialize MS2PIP: {e}")
                 raise
 
             psm_list = self._idxml_reader.psms
@@ -186,15 +202,13 @@ class Annotator:
                 logging.info("MS2PIP Annotations added to the PSMs")
             except Ms2pipIncorrectModelException:
                 if self._find_best_ms2pip_model:
-                    logging.info(
-                        "Finding best MS2PIP model - for now is a brute force search on the top calibrarion set"
-                    )
+                    logging.info("Finding best MS2PIP model - brute force search on the top calibration set")
                     batch_psms = self._get_top_batch_psms(psm_list)
                     model, corr = ms2pip_generator._find_best_ms2pip_model(
                         batch_psms=batch_psms,
                         knwon_fragmentation=self._get_highest_fragmentation(),
                     )
-                    if model is not None:
+                    if model:
                         logging.info(f"Best model found: {model} with average correlation {corr}")
                         ms2pip_generator = MS2PIPAnnotator(
                             ms2_tolerance=self._ms2_tolerance,
@@ -211,41 +225,27 @@ class Annotator:
                         self._idxml_reader.psms = psm_list
                         logging.info("MS2PIP Annotations added to the PSMs")
                     else:
-                        logging.error(
-                            "Not good model found for this deeplc_models please review parameters"
-                        )
+                        logging.error("No suitable model found for this deeplc_models, please review parameters")
             except Exception as e:
-                logging.error(f"Failed to add MS2PIP features: {str(e)}")
+                logging.error(f"Failed to add MS2PIP features: {e}")
 
         if self._deepLC:
             logging.info("Running deepLC on the PSMs")
-
             try:
-                kwargs = {}
-                if self._skip_deeplc_retrain:
-                    deeplc_annotator = DeepLCAnnotator(
-                        self._lower_score_is_better,
-                        calibration_set_size=self._calibration_set_size,
-                        processes=self._processes,
-                        **kwargs,
-                    )
-                else:
-                    kwargs = {
-                        "deeplc_retrain": True,
-                    }
-                    retrain_deeplc_annotator = DeepLCAnnotator(
-                        self._lower_score_is_better,
-                        calibration_set_size=self._calibration_set_size,
-                        processes=self._processes,
-                        **kwargs,
-                    )
+                kwargs = {"deeplc_retrain": not self._skip_deeplc_retrain}
+                deeplc_annotator = DeepLCAnnotator(
+                    self._lower_score_is_better,
+                    calibration_set_size=self._calibration_set_size,
+                    processes=self._processes,
+                    **kwargs,
+                )
+
+                if not self._skip_deeplc_retrain:
                     temp_psms = self._idxml_reader.psms.psm_list
                     retrained_psms = PSMList(psm_list=copy.deepcopy(temp_psms))
-                    retrain_deeplc_annotator.add_features(retrained_psms)
+                    deeplc_annotator.add_features(retrained_psms)
 
-                    kwargs = {
-                        "deeplc_retrain": False,
-                    }
+                    kwargs["deeplc_retrain"] = False
                     deeplc_annotator_model = DeepLCAnnotator(
                         self._lower_score_is_better,
                         calibration_set_size=self._calibration_set_size,
@@ -255,23 +255,17 @@ class Annotator:
                     psms = PSMList(psm_list=copy.deepcopy(temp_psms))
                     deeplc_annotator_model.add_features(psms)
 
-                    # Compare the results of the retrained and non-retrained models
                     mae_trained = self._get_mae_from_psm_list(retrained_psms)
                     mae_model = self._get_mae_from_psm_list(psms)
 
                     if mae_trained < mae_model:
-                        logging.info(
-                            f"Retrained DeepLC model has lower MAE, using it. {retrain_deeplc_annotator.selected_model}"
-                        )
-                        deeplc_annotator = retrain_deeplc_annotator
+                        logging.info(f"Retrained DeepLC model has lower MAE, using it. {deeplc_annotator.selected_model}")
                     else:
-                        logging.info(
-                            f"Retrained DeepLC model has higher MAE, using the original model. {deeplc_annotator_model.selected_model}"
-                        )
+                        logging.info(f"Retrained DeepLC model has higher MAE, using the original model. {deeplc_annotator_model.selected_model}")
                         deeplc_annotator = deeplc_annotator_model
 
             except Exception as e:
-                logging.error(f"Failed to initialize DeepLC: {str(e)}")
+                logging.error(f"Failed to initialize DeepLC: {e}")
                 raise
 
             psm_list = self._idxml_reader.psms
@@ -281,7 +275,7 @@ class Annotator:
         if self._ms2pip or self._deepLC:
             self._convert_features_psms_to_oms_peptides()
 
-        logging.info("Annotations added to the PSMs, starting to modified OMS peptides")
+        logging.info("Annotations added to the PSMs, starting to modify OMS peptides")
 
     def write_idxml_file(self, filename: Union[str, Path]):
         try:
