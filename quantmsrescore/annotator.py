@@ -438,7 +438,18 @@ class Annotator:
             The Mean Absolute Error (MAE) calculated from the PSMs.
         """
         best_scored_psms = self._get_top_batch_psms(retrained_psms)
+        if not best_scored_psms:
+            logging.warning("No PSMs found for MAE calculation")
+            return float('inf')  # Return infinity for empty list
+            
         mae = 0
         for psm in best_scored_psms:
-            mae += abs(psm.rescoring_features["rt_diff"])
+            if "rt_diff" in psm.rescoring_features:
+                mae += abs(psm.rescoring_features["rt_diff"])
+            else:
+                logging.warning("PSM missing rt_diff feature, skipping for MAE calculation")
+                return float('inf')  # Return infinity if any PSM is missing the feature
+                
+        if len(best_scored_psms) == 0:
+            return float('inf')  # Safeguard against division by zero
         return mae / len(best_scored_psms)
