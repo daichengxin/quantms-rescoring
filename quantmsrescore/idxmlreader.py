@@ -407,11 +407,12 @@ class IdXMLRescoringReader(IdXMLReader):
                         else:
                             logging.warning(f"Unknown dissociation method index {method_index}")
 
-                if ms_level == 3:
+                if ms_level != 2 and only_ms2:
                     logging.info(
                         f"MS level 3 spectrum found for PSM {psm}, please be aware, "
                         "ms2pip models are not trained on MS3 spectra"
                     )
+                    raise MS3NotSupported("MS3 spectra found in MS2 only mode, ms2pip, deeplc models are not trained on MS3 spectra")  # noqa
 
             if (remove_missing_spectrum and (missing_spectra or empty_spectra)) or (
                 only_ms2 and ms_level != 2
