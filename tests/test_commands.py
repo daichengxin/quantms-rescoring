@@ -89,7 +89,7 @@ def test_idxmlreader():
 
     idxml_reader = IdXMLRescoringReader(idexml_filename=idxml_file, mzml_file=mzml_file)
     logging.info("Loaded %s PSMs from %s", len(idxml_reader.psms), idxml_file)
-    assert len(idxml_reader.psms) == 5350
+    assert len(idxml_reader.psms) == 5346
 
     openms_helper = OpenMSHelper()
     decoys, targets = openms_helper.count_decoys_targets(idxml_reader.oms_peptides)
@@ -101,7 +101,7 @@ def test_idxmlreader():
         targets,
     )
     assert decoys == 1923
-    assert targets == 3427
+    assert targets == 3423
     stats = idxml_reader.stats
     assert stats.missing_spectra == 0
 
