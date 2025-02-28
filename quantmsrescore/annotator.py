@@ -23,23 +23,23 @@ class Annotator:
     """
 
     def __init__(
-            self,
-            feature_generators: str,
-            only_features: Optional[str] = None,
-            ms2pip_model: str = "HCD2021",
-            ms2pip_model_path: str = "models",
-            ms2_tolerance: float = 0.05,
-            calibration_set_size: float = 0.2,
-            skip_deeplc_retrain: bool = False,
-            processes: int = 2,
-            id_decoy_pattern: str = "^DECOY_",
-            lower_score_is_better: bool = True,
-            log_level: str = "INFO",
-            spectrum_id_pattern: str = "(.*)",  # default for openms idXML
-            psm_id_pattern: str = "(.*)",  # default for openms idXML
-            remove_missing_spectra: bool = True,
-            ms2_only: bool = True,
-            find_best_ms2pip_model: bool = False,
+        self,
+        feature_generators: str,
+        only_features: Optional[str] = None,
+        ms2pip_model: str = "HCD2021",
+        ms2pip_model_path: str = "models",
+        ms2_tolerance: float = 0.05,
+        calibration_set_size: float = 0.2,
+        skip_deeplc_retrain: bool = False,
+        processes: int = 2,
+        id_decoy_pattern: str = "^DECOY_",
+        lower_score_is_better: bool = True,
+        log_level: str = "INFO",
+        spectrum_id_pattern: str = "(.*)",  # default for openms idXML
+        psm_id_pattern: str = "(.*)",  # default for openms idXML
+        remove_missing_spectra: bool = True,
+        ms2_only: bool = True,
+        find_best_ms2pip_model: bool = False,
     ):
         """
         Initialize the Annotator with configuration parameters.
@@ -122,7 +122,9 @@ class Annotator:
         self._ms2_only = ms2_only
         self._find_best_ms2pip_model = find_best_ms2pip_model
 
-    def build_idxml_data(self, idxml_file: Union[str, Path], spectrum_path: Union[str, Path]) -> None:
+    def build_idxml_data(
+        self, idxml_file: Union[str, Path], spectrum_path: Union[str, Path]
+    ) -> None:
         """
         Load data from idXML and mzML files.
 
@@ -333,7 +335,9 @@ class Annotator:
             logging.error(f"Failed to apply DeepLC annotation: {e}")
             raise
 
-    def _create_deeplc_annotator(self, retrain: bool = False, calibration_set_size: float = None) -> DeepLCAnnotator:
+    def _create_deeplc_annotator(
+        self, retrain: bool = False, calibration_set_size: float = None
+    ) -> DeepLCAnnotator:
         """
         Create a DeepLC annotator with specified configuration.
 
@@ -378,7 +382,9 @@ class Annotator:
 
         # Test with pretrained model
         pretrained_psms = PSMList(psm_list=copy.deepcopy(temp_psms))
-        pretrained_annotator = self._create_deeplc_annotator(retrain=False, calibration_set_size=0.6)
+        pretrained_annotator = self._create_deeplc_annotator(
+            retrain=False, calibration_set_size=0.6
+        )
         pretrained_annotator.add_features(pretrained_psms)
 
         # Compare performance
@@ -425,7 +431,10 @@ class Annotator:
                         canonical_feature = OpenMSHelper.get_canonical_feature(feature)
 
                         if canonical_feature is not None:
-                            if self._only_features and canonical_feature not in self._only_features:
+                            if (
+                                self._only_features
+                                and canonical_feature not in self._only_features
+                            ):
                                 continue
 
                             oms_psm.setMetaValue(
@@ -467,7 +476,7 @@ class Annotator:
         try:
             features_existing = search_parameters.getMetaValue("extra_features")
             if features_existing:
-                existing_set = set(features_existing.split(','))
+                existing_set = set(features_existing.split(","))
             else:
                 existing_set = set()
         except Exception:
@@ -528,8 +537,7 @@ class Annotator:
 
         # Find the most common fragmentation method
         most_common = max(
-            stats.ms_level_dissociation_method,
-            key=stats.ms_level_dissociation_method.get
+            stats.ms_level_dissociation_method, key=stats.ms_level_dissociation_method.get
         )
 
         # Return "HCD" or "CID" if applicable
