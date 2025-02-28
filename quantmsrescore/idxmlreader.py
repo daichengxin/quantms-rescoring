@@ -405,7 +405,7 @@ class IdXMLRescoringReader(IdXMLReader):
             else:
                 new_peptide_ids.append(peptide_id)
 
-        if peptide_removed:
+        if peptide_removed > 0:
             logging.warning(f"Removed {peptide_removed} PSMs with missing or empty spectra or MS3 spectra")
             self.oms_peptides = new_peptide_ids
             filter = IDFilter()
