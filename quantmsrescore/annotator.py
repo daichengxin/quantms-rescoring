@@ -1,8 +1,7 @@
 import copy
 import logging
-from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple, Union
+from typing import Optional, Set, Union
 
 from psm_utils import PSMList
 
@@ -317,9 +316,6 @@ class Annotator:
         logging.info("Running DeepLC annotation")
 
         try:
-            # Initialize with configuration
-            kwargs = {"deeplc_retrain": not self._skip_deeplc_retrain}
-
             if self._skip_deeplc_retrain:
                 # Simple case - use pre-trained model
                 deeplc_annotator = self._create_deeplc_annotator(retrain=False)
@@ -337,7 +333,7 @@ class Annotator:
             logging.error(f"Failed to apply DeepLC annotation: {e}")
             raise
 
-    def _create_deeplc_annotator(self, retrain: bool = False) -> DeepLCAnnotator:
+    def _create_deeplc_annotator(self, retrain: bool = False, calibration_set_size: float = None) -> DeepLCAnnotator:
         """
         Create a DeepLC annotator with specified configuration.
 
@@ -351,11 +347,16 @@ class Annotator:
         DeepLCAnnotator
             Configured DeepLC annotator.
         """
+        kwargs = {"deeplc_retrain": retrain}
+
+        if calibration_set_size is None:
+            calibration_set_size = self._calibration_set_size
+
         return DeepLCAnnotator(
             self._lower_score_is_better,
-            calibration_set_size=self._calibration_set_size,
+            calibration_set_size=calibration_set_size,
             processes=self._processes,
-            deeplc_retrain=retrain,
+            **kwargs,
         )
 
     def _select_best_deeplc_model(self) -> DeepLCAnnotator:
@@ -372,12 +373,12 @@ class Annotator:
 
         # Test with retrained model
         retrained_psms = PSMList(psm_list=copy.deepcopy(temp_psms))
-        retrained_annotator = self._create_deeplc_annotator(retrain=True)
+        retrained_annotator = self._create_deeplc_annotator(retrain=True, calibration_set_size=0.6)
         retrained_annotator.add_features(retrained_psms)
 
         # Test with pretrained model
         pretrained_psms = PSMList(psm_list=copy.deepcopy(temp_psms))
-        pretrained_annotator = self._create_deeplc_annotator(retrain=False)
+        pretrained_annotator = self._create_deeplc_annotator(retrain=False, calibration_set_size=0.6)
         pretrained_annotator.add_features(pretrained_psms)
 
         # Compare performance
