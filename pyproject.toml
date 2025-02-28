@@ -3,7 +3,7 @@ name = "quantms-rescoring"
 description = "quantms-rescoring: Python scripts and helpers for the quantMS workflow"
 readme = "README.md"
 license = "MIT"
-version = "0.0.4"
+version = "0.0.5"
 authors = [
     "Yasset Perez-Riverol <ypriverol@gmail.com>",
     "Dai Chengxin <chengxin2024@126.com>",
@@ -29,17 +29,18 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-python = ">=3.8,<3.12"
+python = ">=3.9,<3.12"
 click = "*"
-pyopenms = "*"
-ms2rescore = "3.0.3"
+pyopenms = ">=3.0"
+ms2rescore = "3.1.4"
 pandas = "*"
-numpy = "*"
-psm-utils = "0.8.3"
-deepLC = "2.2.38"
-scipy = "1.13.1"
+numpy = ">=1.25"
+psm-utils = "*"
+deepLC = ">=3.0"
+scipy = "*"
 pygam = "*"
-protobuf= "3.19.6"
+protobuf= "*"
+ms2pip = ">=4.0"
 
 [tool.poetry.urls]
 GitHub = "https://github.com/bigbio/quantms-rescoring"
