@@ -22,7 +22,7 @@ class OpenMSHelper:
 
     @staticmethod
     def count_decoys_targets(
-        peptide_list: Union[List[PeptideIdentification], List[PeptideHit]],
+            peptide_list: Union[List[PeptideIdentification], List[PeptideHit]],
     ) -> (int, int):
         """
         Count the number of decoy and target PSMs in the given list.
@@ -126,7 +126,7 @@ class OpenMSHelper:
 
     @staticmethod
     def get_spectrum_lookup_indexer(
-        mzml_file: Union[str, Path],
+            mzml_file: Union[str, Path],
     ) -> tuple[oms.MSExperiment, SpectrumLookup]:
         """
         Create a SpectrumLookup indexer from an mzML file.
@@ -156,14 +156,41 @@ class OpenMSHelper:
         return exp, lookup
 
     @staticmethod
+    def get_spectrum_reference(identification: Union[PSM, PeptideIdentification]) -> Union[str, None]:
+        """
+        Get the spectrum reference for a PSM.
+
+        This method retrieves the spectrum reference from a PSM object,
+        which can be either a PSM or a PeptideIdentification object.
+
+        Parameters
+        ----------
+        identification : Union[PSM, PeptideIdentification]
+            The PSM object containing the spectrum reference.
+
+        Returns
+        -------
+        str
+            The spectrum reference for the PSM.
+        """
+        if isinstance(identification, PSM):
+            return identification.spectrum_id
+        elif isinstance(identification, PeptideIdentification):
+            return identification.getMetaValue("spectrum_reference")
+        return None
+
+    @staticmethod
     def get_spectrum_for_psm(
-        psm: Union[PSM, PeptideIdentification], exp: oms.MSExperiment, lookup: SpectrumLookup
+            psm: Union[PSM, PeptideIdentification], exp: oms.MSExperiment, lookup: SpectrumLookup
     ) -> Union[None, oms.MSSpectrum]:
-        spectrum_reference = ""
-        if isinstance(psm, PSM):
-            spectrum_reference = psm.spectrum_id
-        elif isinstance(psm, PeptideIdentification):
-            spectrum_reference = psm.getMetaValue("spectrum_reference")
+
+        spectrum_reference = OpenMSHelper.get_spectrum_reference(psm)
+        if spectrum_reference is None:
+            psm_info = psm.provenance_data if hasattr(psm, "provenance_data") else "N/A"
+            logging.warning(
+                f"Missing spectrum reference for PSM {psm_info}, skipping spectrum retrieval."
+            )
+            return None
 
         matches = re.findall(r"(spectrum|scan)=(\d+)", spectrum_reference)
         if not matches:
@@ -191,9 +218,9 @@ class OpenMSHelper:
 
     @staticmethod
     def write_idxml_file(
-        filename: Union[str, Path],
-        peptide_ids: List[PeptideIdentification],
-        protein_ids: List[ProteinIdentification],
+            filename: Union[str, Path],
+            peptide_ids: List[PeptideIdentification],
+            protein_ids: List[ProteinIdentification],
     ) -> None:
         """
         Write protein and peptide identifications to an idXML file.
@@ -217,7 +244,7 @@ class OpenMSHelper:
 
     @staticmethod
     def get_peaks_by_scan(
-        scan_number: int, exp: oms.MSExperiment, lookup: SpectrumLookup
+            scan_number: int, exp: oms.MSExperiment, lookup: SpectrumLookup
     ) -> Optional[Tuple[np.ndarray, np.ndarray]]:
         """
         Get spectrum deeplc_models for a given scan number
@@ -242,7 +269,7 @@ class OpenMSHelper:
 
     @staticmethod
     def get_ms_level(
-        psm_hit: PeptideIdentification, spec_lookup: oms.SpectrumLookup, exp: oms.MSExperiment
+            psm_hit: PeptideIdentification, spec_lookup: oms.SpectrumLookup, exp: oms.MSExperiment
     ) -> int:
         spectrum = OpenMSHelper.get_spectrum_for_psm(psm_hit, exp, spec_lookup)
         if spectrum is None:

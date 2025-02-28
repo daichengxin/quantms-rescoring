@@ -7,6 +7,7 @@ from warnings import filterwarnings
 import psm_utils
 import pyopenms as oms
 from psm_utils import PSM, PSMList
+from pyopenms import IDFilter
 
 from quantmsrescore.constants import OPENMS_DISSOCIATION_METHODS_PATCH
 from quantmsrescore.exceptions import MS3NotSupportedException
@@ -22,7 +23,6 @@ filterwarnings(
     category=UserWarning,
     module="pyopenms",
 )
-
 
 class ScoreStats:
     """Statistics about score occurrence in peptide hits."""
@@ -171,10 +171,11 @@ class IdXMLRescoringReader(IdXMLReader):
         # Private attributes
         self._psms: Optional[PSMList] = None
         self.build_spectrum_lookup(mzml_file)
-        self._build_psm_index(only_ms2=only_ms2)
         self._validate_psm_spectrum_references(
             only_ms2=only_ms2, remove_missing_spectrum=remove_missing_spectrum
         )
+        self._build_psm_index(only_ms2=only_ms2)
+
 
     @property
     def psms(self) -> Optional[PSMList]:
@@ -358,25 +359,30 @@ class IdXMLRescoringReader(IdXMLReader):
         MS3NotSupported
             If MS3 spectra are found in MS2-only mode.
         """
-        if self._spec_lookup is None or self._exp is None or not self._psms:
+        if self._spec_lookup is None or self._exp is None:
             raise ValueError("Spectrum lookup or PSMs not initialized")
 
         self._stats = SpectrumStats()
-        new_psm_list = []
 
-        for psm in self._psms:  # No need to copy since we're building a new list
-            spectrum = OpenMSHelper.get_spectrum_for_psm(psm, self._exp, self._spec_lookup)
+        new_peptide_ids = []
+        peptide_removed = 0
+
+        for peptide_id in self.oms_peptides:
+            spectrum = OpenMSHelper.get_spectrum_for_psm(peptide_id, self._exp, self._spec_lookup)
+            spectrum_reference = OpenMSHelper.get_spectrum_reference(peptide_id)
+
             missing_spectrum, empty_spectrum = False, False
             ms_level = 2
 
             if spectrum is None:
-                logging.error(f"Spectrum not found for PSM {psm}")
+
+                logging.error(f"Spectrum not found for PeptideIdentification with {spectrum_reference}")
                 self._stats.missing_spectra += 1
                 missing_spectrum = True
             else:
                 peaks = spectrum.get_peaks()[0]
                 if peaks is None or len(peaks) == 0:
-                    logging.warning(f"Empty spectrum found for PSM {psm}")
+                    logging.warning(f"Empty spectrum found for PSM {spectrum_reference}")
                     empty_spectrum = True
                     self._stats.empty_spectra += 1
 
@@ -387,24 +393,32 @@ class IdXMLRescoringReader(IdXMLReader):
 
                 if ms_level != 2 and only_ms2:
                     logging.info(
-                        f"MS level {ms_level} spectrum found for PSM {psm}. "
+                        f"MS level {ms_level} spectrum found for PSM {spectrum_reference}. "
                         "MS2pip models are not trained on MS3 spectra"
-                    )
-                    raise MS3NotSupportedException(
-                        "MS3 spectra found in MS2 only mode. MS2pip and DeepLC models "
-                        "are not trained on MS3 spectra"
                     )
 
             if (remove_missing_spectrum and (missing_spectrum or empty_spectrum)) or (
                 only_ms2 and ms_level != 2
             ):
-                logging.debug(f"Removing PSM {psm}")
+                logging.debug(f"Removing PSM {spectrum_reference}")
+                peptide_removed += 1
             else:
-                new_psm_list.append(psm)
+                new_peptide_ids.append(peptide_id)
 
-        self._psms = PSMList(psm_list=new_psm_list)
+        if peptide_removed:
+            logging.warning(f"Removed {peptide_removed} PSMs with missing or empty spectra or MS3 spectra")
+            self.oms_peptides = new_peptide_ids
+            filter = IDFilter()
+            # We only want to have protein accessions with at least one peptide identification
+            filter.removeEmptyIdentifications(self.oms_peptides)
+            filter.removeUnreferencedProteins(self.oms_proteins, self.oms_peptides)
+
         self._log_spectrum_statistics()
 
+        if only_ms2 and self._stats.ms_level_counts.get(3, 0) > 0:
+            ms2_dissociation_methods = self._stats.ms_level_dissociation_method.get((2, "HCD"), 0)
+            logging.error("MS3 spectra found in MS2-only mode, please filter your search for MS2 or dissociation method: {}".format(ms2_dissociation_methods))
+            raise MS3NotSupportedException("MS3 spectra found in MS2-only mode")
         return self._stats
 
     def _process_dissociation_methods(self, spectrum, ms_level):
