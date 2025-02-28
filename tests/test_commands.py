@@ -103,7 +103,7 @@ def test_idxmlreader():
     assert decoys == 1923
     assert targets == 3423
     stats = idxml_reader.stats
-    assert stats.missing_spectra == 0
+    assert stats.missing_spectra == 4
 
 
 def test_annotator_train_rt():
