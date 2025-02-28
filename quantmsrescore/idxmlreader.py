@@ -408,10 +408,10 @@ class IdXMLRescoringReader(IdXMLReader):
         if peptide_removed > 0:
             logging.warning(f"Removed {peptide_removed} PSMs with missing or empty spectra or MS3 spectra")
             self.oms_peptides = new_peptide_ids
-            filter = IDFilter()
+            oms_filter = IDFilter()
             # We only want to have protein accessions with at least one peptide identification
-            filter.removeEmptyIdentifications(self.oms_peptides)
-            filter.removeUnreferencedProteins(self.oms_proteins, self.oms_peptides)
+            oms_filter.removeEmptyIdentifications(self.oms_peptides)
+            oms_filter.removeUnreferencedProteins(self.oms_proteins, self.oms_peptides)
 
         self._log_spectrum_statistics()
 
