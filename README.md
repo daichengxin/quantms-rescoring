@@ -6,6 +6,7 @@
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 ## quantms-rescoring 
+
 quantms-rescoring is a Python tool that aims to add features to peptide-spectrum matches (PSMs) in idXML files using multiple tools including SAGE features, quantms spectrum features, MS2PIP and DeepLC. It is part of the quantms ecosystem package and leverages the MS²Rescore framework to improve identification confidence in proteomics data analysis.
 
 ### Core Components
@@ -64,7 +65,7 @@ Add additional spectrum feature like signal-to-noise to each PSM in the idXML.
 - **Output / Input files**: 
   - Only works for OpenMS formats idXML, and mzML as input and export to idXML with the annotated features. 
 
-###  Installation
+### Installation
 
 Install quantms-rescoring using one of the following methods:
 
@@ -84,35 +85,35 @@ Install quantms-rescoring using one of the following methods:
 
 1. Clone the quantms-rescoring repository:
 
-```sh
-❯ git clone https://github.com/bigbio/quantms-rescoring
-```
+   ```sh
+   ❯ git clone https://github.com/bigbio/quantms-rescoring
+   ```
 
 2. Navigate to the project directory:
 
-```sh
-❯ cd quantms-rescoring
-```
+   ```sh
+   ❯ cd quantms-rescoring
+   ```
 
 3. Install the project dependencies:
 
-- Using `pip`:
+   - Using `pip`:
 
-  ```sh
-  ❯ pip install -r requirements.txt
-  ```
+     ```sh
+     ❯ pip install -r requirements.txt
+     ```
 
-- Using `conda`:
+   - Using `conda`:
 
-  ```sh
-  ❯ conda env create -f environment.yml
-  ```
-
+     ```sh
+     ❯ conda env create -f environment.yml
+     ```
+  
 4. Install the package using `poetry`:
 
-```sh
-❯ poetry install
-```
+   ```sh
+   ❯ poetry install
+   ```
 
 ### Issues and Contributions
 
