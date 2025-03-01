@@ -5,8 +5,6 @@
 [![PyPI version](https://badge.fury.io/py/quantms-rescoring.svg)](https://badge.fury.io/py/quantms-rescoring)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-
-
 ## quantms-rescoring 
 quantms-rescoring is a Python tool that aims to add features to peptide-spectrum matches (PSMs) in idXML files using multiple tools including SAGE features, quantms spectrum features, MS2PIP and DeepLC. It is part of the quantms ecosystem package and leverages the MS²Rescore framework to improve identification confidence in proteomics data analysis.
 
@@ -16,7 +14,7 @@ quantms-rescoring is a Python tool that aims to add features to peptide-spectrum
 - **Feature Generation**: Extracts signal-to-noise ratios, spectrum metrics, SAGE extra features and add them to each PSM for posterior downstream with Percolator.
 - **OpenMS Integration**: Processes idXML and mzML files with custom validation methods.
 
-### CLI Tools:
+### CLI Tools
 
 ```sh
  quantms-rescoring msrescore2feature --help
@@ -31,9 +29,7 @@ Incorporates additional features from SAGE into idXML files.
 ```sh
  quantms-rescoring spectrum2feature --help
 ```
-Add additional spectrum feature like signal-to-noise to each PSM in the idXML. 
-
-Here's the markdown source code:
+Add additional spectrum feature like signal-to-noise to each PSM in the idXML.
 
 ### Technical Implementation Details
 
@@ -42,7 +38,7 @@ Here's the markdown source code:
 - **MS2PIP Model Selection**: 
   - Automatically evaluate the quality of the MS2PIP model selected by the user. If the correlation between predicted and experiemtanl spectra is lower than a given threshold, we will try to find the best model to use (`annotator.py`)
 - **DeepLC Model Selection**: 
-  - Automatically select the best DeepLC model for each run based on the retention time calibration and prediction accuracy. Different to ms2rescore, the tool will try to use the best model from MS2PIP and benchmarke it with the same model by using transfer learning (`annotator.py`). The best model is selected to be used to predict the retention time of PSMs.
+  - Automatically select the best DeepLC model for each run based on the retention time calibration and prediction accuracy. Different to ms2rescore, the tool will try to use the best model from MS2PIP and benchmark it with the same model by using transfer learning (`annotator.py`). The best model is selected to be used to predict the retention time of PSMs.
 
 #### Feature Engineering Pipeline
 
@@ -61,7 +57,7 @@ Here's the markdown source code:
 
 - **Parallel Processing**: Implements multiprocessing capabilities for handling large datasets efficiently
 - **OpenMS Compatibility Layer**: Custom helper classes that gather statistics of number of PSMs by MS levels / dissociation methods, etc.
-- **Feature Validation**: Convert all Features from MS2PIP, DeepLC, and quantms into OpenMS features with well established names (`constants.py`)
+- **Feature Validation**: Convert all Features from MS2PIP, DeepLC, and quantms into OpenMS features with well-established names (`constants.py`)
 - **PSM Filtering and Validation**: 
   - Filter PSMs with **missing spectra information** or **empty peaks**.
   - Breaks the analysis of the input file contains more than one MS level or dissociation method, **only support for MS2 level** spectra. 
@@ -72,13 +68,13 @@ Here's the markdown source code:
 
 Install quantms-rescoring using one of the following methods:
 
-**Using `pip`** &nbsp; [<img align="center" src="https://img.shields.io/badge/Pip-3776AB.svg?style={badge_style}&logo=pypi&logoColor=white" />](https://pypi.org/project/pip/)
+**Using `pip`**
 
 ```sh
 ❯ pip install quantms-rescoring
 ```
 
-**Using `conda`** &nbsp; [<img align="center" src="https://img.shields.io/badge/conda-342B029.svg?style={badge_style}&logo=anaconda&logoColor=white" />](https://docs.conda.io/)
+**Using `conda`** 
 
 ```sh
 ❯ conda install -c bioconda quantms-rescoring
@@ -87,11 +83,13 @@ Install quantms-rescoring using one of the following methods:
 **Build from source:**
 
 1. Clone the quantms-rescoring repository:
+
 ```sh
 ❯ git clone https://github.com/bigbio/quantms-rescoring
 ```
 
 2. Navigate to the project directory:
+
 ```sh
 ❯ cd quantms-rescoring
 ```
@@ -105,11 +103,13 @@ Install quantms-rescoring using one of the following methods:
   ```
 
 - Using `conda`:
+
   ```sh
   ❯ conda env create -f environment.yml
   ```
 
 4. Install the package using `poetry`:
+
 ```sh
 ❯ poetry install
 ```
