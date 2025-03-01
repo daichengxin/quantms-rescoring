@@ -51,6 +51,7 @@ Add additional spectrum feature like signal-to-noise to each PSM in the idXML.
   - Calculates spectral entropy to quantify peak distribution uniformity
   - Analyzes TIC (Total Ion Current) distribution across peaks for quality assessment
   - Determines weighted standard deviation of m/z values for spectral complexity estimation
+- **Feature Selection**: The parameters `only_features` allows to select the features to be added to the idXML file. For example: `--only_features "DeepLC:RtDiff,DeepLC:PredictedRetentionTimeBest,Ms2pip:DotProd"` . 
 
 #### Data Processing of idXML Files
 
@@ -112,6 +113,10 @@ Install quantms-rescoring using one of the following methods:
    ```sh
    ❯ poetry install
    ```
+
+### TODO
+
+- [ ] Add support for multiple Files combined idXML and mzML
 
 ### Issues and Contributions
 
