@@ -28,7 +28,7 @@ class OpenMSHelper:
 
     @staticmethod
     def count_decoys_targets(
-        peptide_list: Union[List[PeptideIdentification], List[PeptideHit]],
+            peptide_list: Union[List[PeptideIdentification], List[PeptideHit]],
     ) -> (int, int):
         """
         Count the number of decoy and target PSMs in the given list.
@@ -132,7 +132,7 @@ class OpenMSHelper:
 
     @staticmethod
     def get_spectrum_lookup_indexer(
-        mzml_file: Union[str, Path],
+            mzml_file: Union[str, Path],
     ) -> tuple[oms.MSExperiment, SpectrumLookup]:
         """
         Create a SpectrumLookup indexer from an mzML file.
@@ -163,7 +163,7 @@ class OpenMSHelper:
 
     @staticmethod
     def get_spectrum_reference(
-        identification: Union[PSM, PeptideIdentification]
+            identification: Union[PSM, PeptideIdentification]
     ) -> Union[str, None]:
         """
         Get the spectrum reference for a PSM.
@@ -189,7 +189,7 @@ class OpenMSHelper:
 
     @staticmethod
     def get_spectrum_for_psm(
-        psm: Union[PSM, PeptideIdentification], exp: oms.MSExperiment, lookup: SpectrumLookup
+            psm: Union[PSM, PeptideIdentification], exp: oms.MSExperiment, lookup: SpectrumLookup
     ) -> Union[None, oms.MSSpectrum]:
 
         spectrum_reference = OpenMSHelper.get_spectrum_reference(psm)
@@ -226,9 +226,9 @@ class OpenMSHelper:
 
     @staticmethod
     def write_idxml_file(
-        filename: Union[str, Path],
-        peptide_ids: List[PeptideIdentification],
-        protein_ids: List[ProteinIdentification],
+            filename: Union[str, Path],
+            peptide_ids: List[PeptideIdentification],
+            protein_ids: List[ProteinIdentification],
     ) -> None:
         """
         Write protein and peptide identifications to an idXML file.
@@ -252,7 +252,7 @@ class OpenMSHelper:
 
     @staticmethod
     def get_peaks_by_scan(
-        scan_number: int, exp: oms.MSExperiment, lookup: SpectrumLookup
+            scan_number: int, exp: oms.MSExperiment, lookup: SpectrumLookup
     ) -> Optional[Tuple[np.ndarray, np.ndarray]]:
         """
         Get spectrum deeplc_models for a given scan number
@@ -277,7 +277,7 @@ class OpenMSHelper:
 
     @staticmethod
     def get_ms_level(
-        psm_hit: PeptideIdentification, spec_lookup: oms.SpectrumLookup, exp: oms.MSExperiment
+            psm_hit: PeptideIdentification, spec_lookup: oms.SpectrumLookup, exp: oms.MSExperiment
     ) -> int:
         spectrum = OpenMSHelper.get_spectrum_for_psm(psm_hit, exp, spec_lookup)
         if spectrum is None:
@@ -430,6 +430,7 @@ class OpenMSHelper:
             logging.warning("OpenMS version not supported, can't find the dissociation method.")
             return None
         return dissociation_methods
+
     @staticmethod
     def get_dissociation_method(method_index: int, matrix: List[dict] = None) -> Union[str, None]:
         """
