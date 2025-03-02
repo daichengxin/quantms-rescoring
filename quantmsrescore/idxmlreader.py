@@ -9,7 +9,7 @@ import pyopenms as oms
 from psm_utils import PSM, PSMList
 from pyopenms import IDFilter
 
-from quantmsrescore.constants import OPENMS_DISSOCIATION_METHODS_PATCH
+from quantmsrescore.constants import OPENMS_DISSOCIATION_METHODS_PATCH_3_3_0
 from quantmsrescore.exceptions import MS3NotSupportedException
 from quantmsrescore.openms import OpenMSHelper
 
@@ -446,12 +446,13 @@ class IdXMLRescoringReader(IdXMLReader):
 
     def _process_dissociation_methods(self, spectrum, ms_level):
         """Process dissociation methods from spectrum precursors."""
+        OPENMS_DISSOCIATION_METHOD = OpenMSHelper.get_pyopenms_dissociation_matrix()
         for precursor in spectrum.getPrecursors():
             for method_index in precursor.getActivationMethods():
-                if 0 <= method_index < len(OPENMS_DISSOCIATION_METHODS_PATCH):
+                if (OPENMS_DISSOCIATION_METHOD is not None) and (0 <= method_index < len(OPENMS_DISSOCIATION_METHOD)):
                     method = (
                         ms_level,
-                        list(OPENMS_DISSOCIATION_METHODS_PATCH[method_index].keys())[0],
+                        OpenMSHelper.get_dissociation_method(method_index, OPENMS_DISSOCIATION_METHOD),
                     )
                     self._stats.ms_level_dissociation_method[method] = (
                         self._stats.ms_level_dissociation_method.get(method, 0) + 1
