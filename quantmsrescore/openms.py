@@ -9,8 +9,12 @@ from packaging import version
 from psm_utils import PSM
 from pyopenms import PeptideIdentification, ProteinIdentification, SpectrumLookup, PeptideHit
 
-from quantmsrescore.constants import DEEPLC_FEATURES, MS2PIP_FEATURES, OPENMS_DISSOCIATION_METHODS_PATCH_3_3_0, \
-    OPENMS_DISSOCIATION_METHODS_PATCH_3_1_0
+from quantmsrescore.constants import (
+    DEEPLC_FEATURES,
+    MS2PIP_FEATURES,
+    OPENMS_DISSOCIATION_METHODS_PATCH_3_3_0,
+    OPENMS_DISSOCIATION_METHODS_PATCH_3_1_0,
+)
 
 OPENMS_DECOY_FIELD = "target_decoy"
 SPECTRUM_PATTERN = r"(spectrum|scan)=(\d+)"
@@ -398,7 +402,9 @@ class OpenMSHelper:
             The version of the pyopenms library.
         """
         oms_version = oms.VersionInfo.getVersionStruct()
-        return f"{oms_version.version_major}.{oms_version.version_minor}.{oms_version.version_patch}"
+        return (
+            f"{oms_version.version_major}.{oms_version.version_minor}.{oms_version.version_patch}"
+        )
 
     @staticmethod
     def get_pyopenms_dissociation_matrix() -> Union[List[dict], None]:
@@ -415,15 +421,15 @@ class OpenMSHelper:
             A list of dissociation methods if the version is supported, otherwise None.
         """
         oms_version = version.parse(OpenMSHelper.get_pyopenms_version())
-        DISSOCIATION_METHODS = []
+        dissociation_methods = []
         if oms_version <= version.parse("3.1.0"):
-            DISSOCIATION_METHODS = OPENMS_DISSOCIATION_METHODS_PATCH_3_1_0
+            dissociation_methods = OPENMS_DISSOCIATION_METHODS_PATCH_3_1_0
         if oms_version >= version.parse("3.2.0"):
-            DISSOCIATION_METHODS = OPENMS_DISSOCIATION_METHODS_PATCH_3_3_0
-        if not DISSOCIATION_METHODS:
+            dissociation_methods = OPENMS_DISSOCIATION_METHODS_PATCH_3_3_0
+        if not dissociation_methods:
             logging.warning("OpenMS version not supported, can't find the dissociation method.")
             return None
-        return DISSOCIATION_METHODS
+        return dissociation_methods
 
     @staticmethod
     def get_dissociation_method(method_index: int, matrix: List[dict] = None) -> Union[str, None]:
@@ -438,6 +444,9 @@ class OpenMSHelper:
         ----------
         method_index : int
             The index of the dissociation method to retrieve.
+        matrix : List[dict], optional
+            The dissociation methods matrix to use. If not provided, the default
+            matrix for the current pyopenms version is used.
 
         Returns
         -------
@@ -445,12 +454,12 @@ class OpenMSHelper:
             The name of the dissociation method if found, otherwise None.
         """
         if matrix is None:
-            DISSOCIATION_METHODS = OpenMSHelper.get_pyopenms_dissociation_matrix()
+            dissociation_methods = OpenMSHelper.get_pyopenms_dissociation_matrix()
         else:
-            DISSOCIATION_METHODS = matrix
-        if DISSOCIATION_METHODS is None:
+            dissociation_methods = matrix
+        if dissociation_methods is None:
             return None
-        if method_index < 0 or method_index >= len(DISSOCIATION_METHODS):
+        if method_index < 0 or method_index >= len(dissociation_methods):
             logging.warning("Invalid dissociation method index.")
             return None
-        return list(DISSOCIATION_METHODS[method_index].keys())[0]
+        return list(dissociation_methods[method_index].keys())[0]
