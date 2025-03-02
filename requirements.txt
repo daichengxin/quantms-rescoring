@@ -2,7 +2,7 @@ click
 pyopenms>=3.0
 ms2rescore==3.1.4
 pandas
-numpy>=1.25
+numpy>=1.23
 deepLC>=3.0
 psm-utils
 scipy
