@@ -422,7 +422,7 @@ class OpenMSHelper:
         """
         oms_version = version.parse(OpenMSHelper.get_pyopenms_version())
         dissociation_methods = []
-        if oms_version <= version.parse("3.1.0"):
+        if oms_version < version.parse("3.2.0"):
             dissociation_methods = OPENMS_DISSOCIATION_METHODS_PATCH_3_1_0
         if oms_version >= version.parse("3.2.0"):
             dissociation_methods = OPENMS_DISSOCIATION_METHODS_PATCH_3_3_0
@@ -430,7 +430,6 @@ class OpenMSHelper:
             logging.warning("OpenMS version not supported, can't find the dissociation method.")
             return None
         return dissociation_methods
-
     @staticmethod
     def get_dissociation_method(method_index: int, matrix: List[dict] = None) -> Union[str, None]:
         """
