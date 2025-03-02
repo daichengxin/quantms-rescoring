@@ -316,3 +316,35 @@ def test_add_sage_feature_help():
     result = runner.invoke(cli, ["sage2feature", "--help"])
 
     assert result.exit_code == 0
+
+
+# test for the ms2rescore
+
+
+@pytest.mark.skip(reason="This is for local test in big datasets, kipping for now")
+def test_local_file():
+    runner = CliRunner()
+    local_folder = TESTS_DIR / "test_data" / "dae1cb16fb57893b94bfcb731b2bf7"
+    result = runner.invoke(
+        cli,
+        [
+            "msrescore2feature",
+            "--idxml",
+            "{}/UPS1_50amol_R1_comet.idXML".format(local_folder),
+            "--mzml",
+            "{}/UPS1_50amol_R1_converted.mzML".format(local_folder),
+            "--processes",
+            "2",
+            "--ms2pip_model",
+            "CID",
+            "--feature_generators",
+            "ms2pip,deeplc",
+            "--id_decoy_pattern",
+            "^DECOY_",
+            "--output",
+            "{}/UPS1_50amol_R1_rescored.idXML".format(local_folder),
+            "--ms2_tolerance",
+            "0.05",
+        ],
+    )
+    assert 0 == result.exit_code
