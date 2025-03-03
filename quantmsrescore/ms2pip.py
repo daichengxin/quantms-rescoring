@@ -264,9 +264,14 @@ class MS2PIPAnnotator(MS2PIPFeatureGenerator):
         float
             The best tolerance to use.
         """
-        if _reported_tolerance[1] is None or _reported_tolerance[1] == "ppm":
+        if _reported_tolerance[1] is None:
             logging.info(
                 f"No MS²PIP tolerance reported in the idXML. Using the one provided in the command line ({ms2_tolerance})."
+            )
+            return ms2_tolerance
+        elif _reported_tolerance[1] == "ppm":
+            logging.warning(
+                f"MS²PIP tolerance reported in the idXML is in ppm. We can't do anything with it. Using the one provided in the command line ({ms2_tolerance})."
             )
             return ms2_tolerance
 
@@ -280,7 +285,8 @@ class MS2PIPAnnotator(MS2PIPFeatureGenerator):
         if ms2_tolerance < _reported_tolerance[0]:
             if (ms2_tolerance / _reported_tolerance[0]) > 0.1:
                 logging.warning(
-                    f"MS²PIP tolerance used in the command line ({ms2_tolerance}) is more restrictive by {(ms2_tolerance / _reported_tolerance[0]) * 100} % than the one "
+                    f"MS²PIP tolerance used in the command line ({ms2_tolerance}) is more restrictive "
+                    f"by {(ms2_tolerance / _reported_tolerance[0]) * 100} % than the one "
                     f"reported in the idXML ({_reported_tolerance}). Using the reported tolerance to find the model"
                 )
                 return _reported_tolerance[0]
