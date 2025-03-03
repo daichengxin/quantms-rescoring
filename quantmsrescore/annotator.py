@@ -1,7 +1,7 @@
 import copy
 import logging
 from pathlib import Path
-from typing import Optional, Set, Union, Tuple
+from typing import Optional, Set, Union
 
 from psm_utils import PSMList
 
