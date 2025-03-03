@@ -39,7 +39,7 @@ class Annotator:
         psm_id_pattern: str = "(.*)",  # default for openms idXML
         remove_missing_spectra: bool = True,
         ms2_only: bool = True,
-        find_best_ms2pip_model: bool = False,
+        find_best_ms2pip_model: bool = True,
     ):
         """
         Initialize the Annotator with configuration parameters.
