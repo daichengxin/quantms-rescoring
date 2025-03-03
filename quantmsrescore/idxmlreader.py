@@ -45,6 +45,8 @@ class SpectrumStats:
         self.empty_spectra: int = 0
         self.ms_level_counts: DefaultDict[int, int] = defaultdict(int)
         self.ms_level_dissociation_method: Dict[Tuple[int, str], int] = {}
+        # self.predicted_ms_tolerance: Tuple[float, str] = [0.0, None]
+        self.reported_ms_tolerance: Tuple[float, str] = [0.0, None]
 
 
 class IdXMLReader:
@@ -115,7 +117,9 @@ class IdXMLReader:
         """Get the path to the mzML file."""
         return self._mzml_path
 
-    def build_spectrum_lookup(self, mzml_file: Union[str, Path]) -> None:
+    def build_spectrum_lookup(
+        self, mzml_file: Union[str, Path], check_unix_compatibility: bool = False
+    ) -> None:
         """
         Build a SpectrumLookup indexer from an mzML file.
 
@@ -123,8 +127,12 @@ class IdXMLReader:
         ----------
         mzml_file : Union[str, Path]
             The path to the mzML file to be processed.
+        check_unix_compatibility : bool, optional
+            Flag to check for Unix compatibility in the mzML file, by default, False.
         """
         self._mzml_path = str(mzml_file) if isinstance(mzml_file, Path) else mzml_file
+        if check_unix_compatibility:
+            OpenMSHelper.check_unix_compatibility(self._mzml_path)
         self._exp, self._spec_lookup = OpenMSHelper.get_spectrum_lookup_indexer(self._mzml_path)
         logging.info(f"Built SpectrumLookup from {self._mzml_path}")
 
@@ -170,7 +178,7 @@ class IdXMLRescoringReader(IdXMLReader):
 
         # Private attributes
         self._psms: Optional[PSMList] = None
-        self.build_spectrum_lookup(mzml_file)
+        self.build_spectrum_lookup(mzml_file, check_unix_compatibility=True)
         self._validate_psm_spectrum_references(
             only_ms2=only_ms2, remove_missing_spectrum=remove_missing_spectrum
         )
@@ -341,7 +349,7 @@ class IdXMLRescoringReader(IdXMLReader):
 
         This method validates each peptide identification by checking if its referenced
         spectrum exists and has peaks. It also tracks MS level statistics and dissociation
-        methods. Optionally removes peptide identifications with missing/empty spectra or
+        methods. Optionally, removes peptide identifications with missing/empty spectra or
         those that are not MS2 level.
 
         Parameters
@@ -384,6 +392,12 @@ class IdXMLRescoringReader(IdXMLReader):
         for peptide_id in self.oms_peptides:
             spectrum = OpenMSHelper.get_spectrum_for_psm(peptide_id, self._exp, self._spec_lookup)
             spectrum_reference = OpenMSHelper.get_spectrum_reference(peptide_id)
+
+            # TODO: Predict MS tolerance for PSMs, in the future would be good.
+            # for hit in peptide_id.getHits():
+            #     predicted_ms_tolerance = OpenMSHelper.get_predicted_ms_tolerance(spectrum, hit)
+            #     psm_ui = OpenMSHelper.get_psm_hash_unique_id(peptide_id, hit)
+            #     tolerances[psm_ui] = (predicted_ms_tolerance, hit.getScore())
 
             missing_spectrum, empty_spectrum = False, False
             ms_level = 2
@@ -431,6 +445,9 @@ class IdXMLRescoringReader(IdXMLReader):
             oms_filter.removeEmptyIdentifications(self.oms_peptides)
             oms_filter.removeUnreferencedProteins(self.oms_proteins, self.oms_peptides)
 
+        ms_tolerance, ms_unit = OpenMSHelper.get_ms_tolerance(self.oms_proteins)
+        self._stats.reported_ms_tolerance = (ms_tolerance, ms_unit)
+
         self._log_spectrum_statistics()
 
         if only_ms2 and self._stats.ms_level_counts.get(3, 0) > 0:
@@ -441,6 +458,16 @@ class IdXMLRescoringReader(IdXMLReader):
                 )
             )
             raise MS3NotSupportedException("MS3 spectra found in MS2-only mode")
+
+        # if len(tolerances) > 0:
+        # TODO: would be good to predict the tolerance for PSMs in a good accurate way.
+        #     # Sort by score depending on high_score_better
+        #     sorted_tolerances = sorted(tolerances.items(), key=lambda x: x[1][1], reverse=self.high_score_better)
+        #     # select the best 20% of the PSMs
+        #     top_20_percent = int(len(sorted_tolerances) * 0.2)
+        #     top_20_percent_tolerances = sorted_tolerances[:top_20_percent]
+        #     # calculate the average tolerance
+        #     average_tolerance = sum([t[1][0] for t in top_20_percent_tolerances]) / top_20_percent
         return self._stats
 
     def _process_dissociation_methods(self, spectrum, ms_level):

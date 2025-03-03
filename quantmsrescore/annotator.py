@@ -1,7 +1,7 @@
 import copy
 import logging
 from pathlib import Path
-from typing import Optional, Set, Union
+from typing import Optional, Set, Union, Tuple
 
 from psm_utils import PSMList
 
@@ -85,6 +85,7 @@ class Annotator:
             If no feature generators are provided or if neither ms2pip nor deeplc is specified.
         """
         # Set up logging
+
         numeric_level = getattr(logging, log_level.upper(), None)
         if isinstance(numeric_level, int):
             logging.getLogger().setLevel(numeric_level)
@@ -121,6 +122,7 @@ class Annotator:
         self._remove_missing_spectra = remove_missing_spectra
         self._ms2_only = ms2_only
         self._find_best_ms2pip_model = find_best_ms2pip_model
+        self.annotated_ms_tolerance = (0.0, None)
 
     def build_idxml_data(
         self, idxml_file: Union[str, Path], spectrum_path: Union[str, Path]
@@ -163,6 +165,8 @@ class Annotator:
             logging.info(
                 f"Loaded {len(psm_list)} PSMs from {idxml_path.name}: {decoys} decoys and {targets} targets"
             )
+
+            self.annotated_ms_tolerance= self._idxml_reader.stats.reported_ms_tolerance
 
         except Exception as e:
             logging.error(f"Failed to load input files: {str(e)}")
@@ -274,6 +278,7 @@ class Annotator:
             correlation_threshold=0.7,  # Consider making this configurable
             lower_score_is_better=self._lower_score_is_better,
             processes=self._processes,
+            annotated_ms_tolerance=self.annotated_ms_tolerance,
         )
 
     def _find_and_apply_best_ms2pip_model(self, psm_list: PSMList) -> None:

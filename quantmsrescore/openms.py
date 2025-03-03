@@ -7,7 +7,8 @@ import numpy as np
 import pyopenms as oms
 from packaging import version
 from psm_utils import PSM
-from pyopenms import PeptideIdentification, ProteinIdentification, SpectrumLookup, PeptideHit
+from pyopenms import PeptideIdentification, ProteinIdentification, SpectrumLookup, PeptideHit, MSSpectrum, \
+    TheoreticalSpectrumGenerator
 
 from quantmsrescore.constants import (
     DEEPLC_FEATURES,
@@ -15,6 +16,7 @@ from quantmsrescore.constants import (
     OPENMS_DISSOCIATION_METHODS_PATCH_3_3_0,
     OPENMS_DISSOCIATION_METHODS_PATCH_3_1_0,
 )
+from quantmsrescore.exceptions import MzMLNotUnixException
 
 OPENMS_DECOY_FIELD = "target_decoy"
 SPECTRUM_PATTERN = r"(spectrum|scan)=(\d+)"
@@ -28,7 +30,7 @@ class OpenMSHelper:
 
     @staticmethod
     def count_decoys_targets(
-            peptide_list: Union[List[PeptideIdentification], List[PeptideHit]],
+        peptide_list: Union[List[PeptideIdentification], List[PeptideHit]],
     ) -> (int, int):
         """
         Count the number of decoy and target PSMs in the given list.
@@ -132,7 +134,7 @@ class OpenMSHelper:
 
     @staticmethod
     def get_spectrum_lookup_indexer(
-            mzml_file: Union[str, Path],
+        mzml_file: Union[str, Path]
     ) -> tuple[oms.MSExperiment, SpectrumLookup]:
         """
         Create a SpectrumLookup indexer from an mzML file.
@@ -163,7 +165,7 @@ class OpenMSHelper:
 
     @staticmethod
     def get_spectrum_reference(
-            identification: Union[PSM, PeptideIdentification]
+        identification: Union[PSM, PeptideIdentification]
     ) -> Union[str, None]:
         """
         Get the spectrum reference for a PSM.
@@ -189,7 +191,7 @@ class OpenMSHelper:
 
     @staticmethod
     def get_spectrum_for_psm(
-            psm: Union[PSM, PeptideIdentification], exp: oms.MSExperiment, lookup: SpectrumLookup
+        psm: Union[PSM, PeptideIdentification], exp: oms.MSExperiment, lookup: SpectrumLookup
     ) -> Union[None, oms.MSSpectrum]:
 
         spectrum_reference = OpenMSHelper.get_spectrum_reference(psm)
@@ -226,9 +228,9 @@ class OpenMSHelper:
 
     @staticmethod
     def write_idxml_file(
-            filename: Union[str, Path],
-            peptide_ids: List[PeptideIdentification],
-            protein_ids: List[ProteinIdentification],
+        filename: Union[str, Path],
+        peptide_ids: List[PeptideIdentification],
+        protein_ids: List[ProteinIdentification],
     ) -> None:
         """
         Write protein and peptide identifications to an idXML file.
@@ -252,7 +254,7 @@ class OpenMSHelper:
 
     @staticmethod
     def get_peaks_by_scan(
-            scan_number: int, exp: oms.MSExperiment, lookup: SpectrumLookup
+        scan_number: int, exp: oms.MSExperiment, lookup: SpectrumLookup
     ) -> Optional[Tuple[np.ndarray, np.ndarray]]:
         """
         Get spectrum deeplc_models for a given scan number
@@ -277,7 +279,7 @@ class OpenMSHelper:
 
     @staticmethod
     def get_ms_level(
-            psm_hit: PeptideIdentification, spec_lookup: oms.SpectrumLookup, exp: oms.MSExperiment
+        psm_hit: PeptideIdentification, spec_lookup: oms.SpectrumLookup, exp: oms.MSExperiment
     ) -> int:
         spectrum = OpenMSHelper.get_spectrum_for_psm(psm_hit, exp, spec_lookup)
         if spectrum is None:
@@ -463,3 +465,102 @@ class OpenMSHelper:
             logging.warning("Invalid dissociation method index.")
             return None
         return list(dissociation_methods[method_index].keys())[0]
+
+    @classmethod
+    def check_unix_compatibility(cls, mzml_path: Union[str, Path]):
+        """
+        Check if an mzML file has Unix-style line endings.
+
+        This method verifies whether the specified mzML file uses Unix-style
+        LF line endings. If Windows-style CRLF line endings are detected,
+        an MzMLNotUnixException is raised.
+
+        This is necessary because ms2rescore-rs is using a rust dependency to read mzML files, that if the file
+        fails with Windows-style CRLF line endings, do not give an error message, just fail silently.
+
+        Parameters
+        ----------
+        mzml_path : Union[str, Path]
+            The path to the mzML file to be checked.
+
+        Raises
+        ------
+        MzMLNotUnixException
+            If the file contains Windows-style CRLF line endings.
+        """
+
+        if isinstance(mzml_path, Path):
+            mzml_path = str(mzml_path)
+
+        with open(mzml_path, "rb") as f:
+            content = f.read()
+            if b"\r\n" in content:
+                raise MzMLNotUnixException(
+                    f"File {mzml_path} has Windows-style CRLF line endings. Please convert to LF (Unix-style) using `dos2unix` or similar."
+                )
+            else:
+                logging.info(f"File {mzml_path} has the correct Unix-style LF line endings.")
+
+    @staticmethod
+    def get_ms_tolerance(
+        oms_proteins: List[ProteinIdentification],
+    ) -> Union[Tuple[float, str], Tuple[float, None]]:
+        """
+        Get the mass tolerance and unit from the search parameters.
+
+        Parameters
+        ----------
+        oms_proteins : List[ProteinIdentification]
+            The list of ProteinIdentification objects to be analyzed.
+
+        Returns
+        -------
+        Tuple[float, str]
+            A tuple containing the mass tolerance and the unit.
+
+        """
+
+        if oms_proteins is None:
+            return 0.0, None
+        search_parameters = oms_proteins[0].getSearchParameters()
+        if search_parameters.fragment_mass_tolerance_ppm:
+            return search_parameters.fragment_mass_tolerance, "ppm"
+        else:
+            return search_parameters.fragment_mass_tolerance, "Da"
+
+    @staticmethod
+    def generate_theoretical_spectrum(peptide_sequence: str, charge: int):
+        """
+        Generate a theoretical spectrum for a given peptide sequence.
+
+        Parameters:
+        - peptide (str): Peptide sequence (e.g., "PEPTIDE").
+        - charge (int): Charge state of the fragments.
+
+        Returns:
+        - theoretical_mzs (list): List of theoretical fragment m/z values.
+        - ion_labels (list): Corresponding fragment ion labels.
+        """
+
+        tsg = TheoreticalSpectrumGenerator()
+        spec = oms.MSSpectrum()
+        peptide =oms.AASequence.fromString(peptide_sequence)
+
+        # Generate b- and y-ions (can be extended for other ion types)
+        tsg.getSpectrum(spec, peptide, 1, charge)
+
+        theoretical_mzs = [peak.getMZ() for peak in spec]
+        return theoretical_mzs
+
+    @staticmethod
+    def get_predicted_ms_tolerance(exp_ms: MSSpectrum, peptide_hit: PeptideHit) -> float:
+
+        theoretical_mzs = OpenMSHelper.generate_theoretical_spectrum(peptide_hit.getSequence().toString(), peptide_hit.getCharge())
+        observed_mzs = [peak.getMZ() for peak in exp_ms]
+        error_da = 0.0
+        for theo_mz in theoretical_mzs:
+            # Find the closest observed peak within tolerance
+            closest_mz = min(observed_mzs, key=lambda obs_mz: abs(obs_mz - theo_mz))
+            error_da += abs(closest_mz - theo_mz)
+        return error_da / len(theoretical_mzs)
+

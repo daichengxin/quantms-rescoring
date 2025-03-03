@@ -6,7 +6,7 @@ from quantmsrescore.sage_feature import add_sage_feature
 from quantmsrescore.snr import spectrum2feature
 
 # Patch ms2rescore to allow for the use of the MS²PIP and DeepLC feature generators
-import quantmsrescore.ms2rescore_patch # noqa: F401
+import quantmsrescore.ms2rescore_patch  # noqa: F401
 
 CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
 
