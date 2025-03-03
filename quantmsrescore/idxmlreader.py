@@ -45,8 +45,8 @@ class SpectrumStats:
         self.empty_spectra: int = 0
         self.ms_level_counts: DefaultDict[int, int] = defaultdict(int)
         self.ms_level_dissociation_method: Dict[Tuple[int, str], int] = {}
-        # self.predicted_ms_tolerance: Tuple[float, str] = [0.0, None]
-        self.reported_ms_tolerance: Tuple[float, str] = [0.0, None]
+        # self.predicted_ms_tolerance: Tuple[float, Optional[str]] = (0.0, None)
+        self.reported_ms_tolerance: Tuple[float, Optional[str]] = (0.0, None)
 
 
 class IdXMLReader:
