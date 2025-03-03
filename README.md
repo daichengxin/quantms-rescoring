@@ -35,7 +35,8 @@ Add additional spectrum feature like signal-to-noise to each PSM in the idXML.
 #### Model Selection and Optimization
 
 - **MS2PIP Model Selection**: 
-  - Automatically evaluate the quality of the MS2PIP model selected by the user. If the correlation between predicted and experiemtanl spectra is lower than a given threshold, we will try to find the best model to use (`annotator.py`)
+  - Automatically evaluate the quality of the MS2PIP model selected by the user. If the correlation between predicted and experimental spectra is lower than a given threshold, we will try to find the best model to use (`annotator.py`). For example, if the user provides as model parameter HCD for a CI experiment, the tool will try to find the best model for this experiment within the CID models available. 
+  - If the `ms_tolerance` is to restrictive for the data (e.g. 0.05 Da for a 0.5 Da dataset), the tool will try to find the annotated tolerances in the idXML file and use the best model for this tolerance.
 - **DeepLC Model Selection**: 
   - Automatically select the best DeepLC model for each run based on the retention time calibration and prediction accuracy. Different to ms2rescore, the tool will try to use the best model from MS2PIP and benchmark it with the same model by using transfer learning (`annotator.py`). The best model is selected to be used to predict the retention time of PSMs.
 
