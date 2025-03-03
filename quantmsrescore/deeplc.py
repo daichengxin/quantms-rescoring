@@ -62,7 +62,7 @@ class DeepLCAnnotator(DeepLCFeatureGenerator):
                         psm_list=psm_list_calibration, return_plotly_report=True
                     )
                     # Still calibrate for each run, but do not try out all model options.
-                    # Just use model that was selected based on first run
+                    # Just use the model that was selected based on the first run
                     self.selected_model = list(self.deeplc_predictor.model.keys())
                     logging.debug(
                         f"Selected DeepLC model {self.selected_model} based on "

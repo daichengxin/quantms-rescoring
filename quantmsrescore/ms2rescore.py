@@ -30,7 +30,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 )
 @click.option(
     "-o",
-    "--output_path",
+    "--output",
     help="Path the output idxml for the annotated PSMs",
 )
 @click.option("--log_level", help="Logging level (default: `info`)", default="info")
@@ -105,7 +105,7 @@ def msrescore2feature(
     ctx,
     idxml: str,
     mzml,
-    output_path: str,
+    output: str,
     log_level,
     processes,
     feature_generators,
@@ -137,7 +137,7 @@ def msrescore2feature(
         Path to the idXML file containing the PSMs.
     mzml : str
         Path to the mzML file containing the mass spectrometry deeplc_models.
-    output_path : str
+    output : str
         Path to the output idXML file with annotated PSMs.
     log_level : str
         The logging level for the CLI command.
@@ -185,5 +185,5 @@ def msrescore2feature(
     annotator.build_idxml_data(idxml, mzml)
     annotator.annotate()
 
-    if output_path:
-        annotator.write_idxml_file(output_path)
+    if output:
+        annotator.write_idxml_file(output)
