@@ -347,4 +347,4 @@ def test_local_file():
             "0.05",
         ],
     )
-    assert 0 == result.exit_code
+    assert result.exit_code == 0
