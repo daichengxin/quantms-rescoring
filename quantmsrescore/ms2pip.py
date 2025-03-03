@@ -194,7 +194,9 @@ class MS2PIPAnnotator(MS2PIPFeatureGenerator):
                 knwon_fragmentation: SUPPORTED_MODELS_MS2PIP.get(knwon_fragmentation)
             }
 
-        self.ms2_tolerance = self._check_best_tolerance(ms2_tolerance=self.ms2_tolerance, _reported_tolerance=self._reported_tolerance)
+        self.ms2_tolerance = self._check_best_tolerance(
+            ms2_tolerance=self.ms2_tolerance, _reported_tolerance=self._reported_tolerance
+        )
 
         for fragment_types in filtered_models:
             for model in filtered_models[fragment_types]:
@@ -237,7 +239,9 @@ class MS2PIPAnnotator(MS2PIPFeatureGenerator):
         total_correlation = sum([psm.correlation for psm in ms2pip_results])
         return total_correlation / len(ms2pip_results)
 
-    def _check_best_tolerance(self, ms2_tolerance: float, _reported_tolerance: Tuple[float, str]) -> float:
+    def _check_best_tolerance(
+        self, ms2_tolerance: float, _reported_tolerance: Tuple[float, str]
+    ) -> float:
         """
         Check the best MS²PIP tolerance. This method compares both tolerances in Da and return to the user the reported
         one in the idXML.

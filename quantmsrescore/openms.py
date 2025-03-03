@@ -7,8 +7,14 @@ import numpy as np
 import pyopenms as oms
 from packaging import version
 from psm_utils import PSM
-from pyopenms import PeptideIdentification, ProteinIdentification, SpectrumLookup, PeptideHit, MSSpectrum, \
-    TheoreticalSpectrumGenerator
+from pyopenms import (
+    PeptideIdentification,
+    ProteinIdentification,
+    SpectrumLookup,
+    PeptideHit,
+    MSSpectrum,
+    TheoreticalSpectrumGenerator,
+)
 
 from quantmsrescore.constants import (
     DEEPLC_FEATURES,
@@ -544,7 +550,7 @@ class OpenMSHelper:
 
         tsg = TheoreticalSpectrumGenerator()
         spec = oms.MSSpectrum()
-        peptide =oms.AASequence.fromString(peptide_sequence)
+        peptide = oms.AASequence.fromString(peptide_sequence)
 
         # Generate b- and y-ions (can be extended for other ion types)
         tsg.getSpectrum(spec, peptide, 1, charge)
@@ -555,7 +561,9 @@ class OpenMSHelper:
     @staticmethod
     def get_predicted_ms_tolerance(exp_ms: MSSpectrum, peptide_hit: PeptideHit) -> float:
 
-        theoretical_mzs = OpenMSHelper.generate_theoretical_spectrum(peptide_hit.getSequence().toString(), peptide_hit.getCharge())
+        theoretical_mzs = OpenMSHelper.generate_theoretical_spectrum(
+            peptide_hit.getSequence().toString(), peptide_hit.getCharge()
+        )
         observed_mzs = [peak.getMZ() for peak in exp_ms]
         error_da = 0.0
         for theo_mz in theoretical_mzs:
@@ -563,4 +571,3 @@ class OpenMSHelper:
             closest_mz = min(observed_mzs, key=lambda obs_mz: abs(obs_mz - theo_mz))
             error_da += abs(closest_mz - theo_mz)
         return error_da / len(theoretical_mzs)
-

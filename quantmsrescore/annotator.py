@@ -166,7 +166,7 @@ class Annotator:
                 f"Loaded {len(psm_list)} PSMs from {idxml_path.name}: {decoys} decoys and {targets} targets"
             )
 
-            self.annotated_ms_tolerance= self._idxml_reader.stats.reported_ms_tolerance
+            self.annotated_ms_tolerance = self._idxml_reader.stats.reported_ms_tolerance
 
         except Exception as e:
             logging.error(f"Failed to load input files: {str(e)}")
