@@ -122,7 +122,6 @@ class Annotator:
         self._remove_missing_spectra = remove_missing_spectra
         self._ms2_only = ms2_only
         self._find_best_ms2pip_model = find_best_ms2pip_model
-        self.annotated_ms_tolerance = (0.0, None)
 
     def build_idxml_data(
         self, idxml_file: Union[str, Path], spectrum_path: Union[str, Path]
@@ -165,8 +164,6 @@ class Annotator:
             logging.info(
                 f"Loaded {len(psm_list)} PSMs from {idxml_path.name}: {decoys} decoys and {targets} targets"
             )
-
-            self.annotated_ms_tolerance = self._idxml_reader.stats.reported_ms_tolerance
 
         except Exception as e:
             logging.error(f"Failed to load input files: {str(e)}")
@@ -254,7 +251,7 @@ class Annotator:
         except Exception as e:
             logging.error(f"Failed to add MS2PIP features: {e}")
 
-    def _create_ms2pip_annotator(self, model: Optional[str] = None) -> MS2PIPAnnotator:
+    def _create_ms2pip_annotator(self, model: Optional[str] = None, tolerance: Optional[float] = None) -> MS2PIPAnnotator:
         """
         Create an MS2PIP annotator with the specified or default model.
 
@@ -269,7 +266,7 @@ class Annotator:
             Configured MS2PIP annotator.
         """
         return MS2PIPAnnotator(
-            ms2_tolerance=self._ms2_tolerance,
+            ms2_tolerance=tolerance or self._ms2_tolerance,
             model=model or self._ms2pip_model,
             spectrum_path=self._idxml_reader.spectrum_path,
             spectrum_id_pattern=self._spectrum_id_pattern,
@@ -278,7 +275,8 @@ class Annotator:
             correlation_threshold=0.7,  # Consider making this configurable
             lower_score_is_better=self._lower_score_is_better,
             processes=self._processes,
-            annotated_ms_tolerance=self.annotated_ms_tolerance,
+            annotated_ms_tolerance=self._idxml_reader.stats.reported_ms_tolerance,
+            predicted_ms_tolerance=self._idxml_reader.stats.predicted_ms_tolerance,
         )
 
     def _find_and_apply_best_ms2pip_model(self, psm_list: PSMList) -> None:
@@ -300,7 +298,7 @@ class Annotator:
 
         # Find best model based on fragmentation type
         fragmentation = self._get_highest_fragmentation()
-        model, corr = ms2pip_generator._find_best_ms2pip_model(
+        model, corr, tolerance = ms2pip_generator._find_best_ms2pip_model(
             batch_psms=batch_psms,
             knwon_fragmentation=fragmentation,
         )
@@ -309,7 +307,7 @@ class Annotator:
             logging.info(f"Best model found: {model} with average correlation {corr}")
 
             # Create new annotator with best model
-            ms2pip_generator = self._create_ms2pip_annotator(model=model)
+            ms2pip_generator = self._create_ms2pip_annotator(model=model, tolerance = tolerance)
 
             # Apply annotation with best model
             ms2pip_generator.add_features(psm_list)

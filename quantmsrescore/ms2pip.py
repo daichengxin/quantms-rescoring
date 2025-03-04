@@ -31,6 +31,7 @@ class MS2PIPAnnotator(MS2PIPFeatureGenerator):
         correlation_threshold: Optional[float] = 0.6,
         lower_score_is_better: bool = True,
         annotated_ms_tolerance: Tuple[float, str] = (0.0, None),
+        predicted_ms_tolerance: Tuple[float, str] = (0.0, None),
         **kwargs,
     ):
         super().__init__(
@@ -44,6 +45,7 @@ class MS2PIPAnnotator(MS2PIPFeatureGenerator):
             kwargs=kwargs,
         )
         self._reported_tolerance: Tuple[float, str] = annotated_ms_tolerance
+        self._predicted_tolerance: Tuple[float, str] = predicted_ms_tolerance
         self._calibration_set_size: float = calibration_set_size
         self._correlation_threshold: float = correlation_threshold
         self._lower_score_is_better: bool = lower_score_is_better
@@ -167,7 +169,7 @@ class MS2PIPAnnotator(MS2PIPFeatureGenerator):
 
     def _find_best_ms2pip_model(
         self, batch_psms: PSMList, knwon_fragmentation: Optional[str] = None
-    ) -> Tuple[str, float]:
+    ) -> Tuple[str, float, float]:
         """
         Find the best MS²PIP model for a batch of PSMs.
 
@@ -194,8 +196,9 @@ class MS2PIPAnnotator(MS2PIPFeatureGenerator):
                 knwon_fragmentation: SUPPORTED_MODELS_MS2PIP.get(knwon_fragmentation)
             }
 
-        self.ms2_tolerance = self._check_best_tolerance(
-            ms2_tolerance=self.ms2_tolerance, _reported_tolerance=self._reported_tolerance
+        self.ms2_tolerance = self.choose_best_ms2pip_tolerance(
+            ms2_tolerance=self.ms2_tolerance, reported_tolerance=self._reported_tolerance
+            , predicted_tolerance=self._predicted_tolerance
         )
 
         for fragment_types in filtered_models:
@@ -216,7 +219,7 @@ class MS2PIPAnnotator(MS2PIPFeatureGenerator):
                     best_model = model
                     best_correlation = correlation
 
-        return best_model, best_correlation
+        return best_model, best_correlation, self.ms2_tolerance
 
     @staticmethod
     def _calculate_correlation(ms2pip_results: List[ProcessingResult]) -> float:
@@ -239,65 +242,90 @@ class MS2PIPAnnotator(MS2PIPFeatureGenerator):
         total_correlation = sum([psm.correlation for psm in ms2pip_results])
         return total_correlation / len(ms2pip_results)
 
-    def _check_best_tolerance(
-        self, ms2_tolerance: float, _reported_tolerance: Tuple[float, str]
+    def choose_best_ms2pip_tolerance(
+        self,
+        ms2_tolerance: float,
+        reported_tolerance: Tuple[float, str],
+        predicted_tolerance: Tuple[float, str] = None,
     ) -> float:
         """
-        Check the best MS²PIP tolerance. This method compares both tolerances in Da and return to the user the reported
-        one in the idXML.
-        - If the reported tolerance is None: return the one used in the command line.
-        - If commandline is lower than the reported one, return commandline one, it is less restricted any way,
-          it should be fine and produce better results.
-        - If the commandline is higher than the reported one, return the reported one, but only if is higher than 50%
-          of the commandline one, otherwise return the commandline one.
-        - If we switch tolerances, please inform the user and log the change, if not log that not change is necessary.
+        Determine the best MS²PIP tolerance to use by comparing tolerances in Da.
 
-        Parameters
-        ----------
-        ms2_tolerance : float
-            The tolerance used in the command line.
-        _reported_tolerance : float
-            The tolerance reported in the idXML.
+        Logic:
+          - If reported tolerance is None: use the command line tolerance
+          - If reported tolerance is in ppm: try to use the predicted Da equivalent if available
+            and if it's not too different from the command line value
+          - If command line tolerance is less restrictive (higher): use command line value
+          - If command line tolerance is more restrictive (lower):
+          - Use reported tolerance if command line is at least 10% of reported value
+          - Otherwise use command line tolerance
+          - Log all decisions for transparency
 
-        Returns
-        -------
-        float
-            The best tolerance to use.
+          Parameters
+          ----------
+          ms2_tolerance : float
+              The MS²PIP tolerance specified in the command line (in Da).
+          reported_tolerance : tuple(float, str)
+              The tolerance reported in the idXML as (value, unit).
+              Unit can be 'Da', 'ppm', or None.
+          predicted_tolerance : tuple(float, str), optional
+             The tolerance predicted in Da if the reported one is in ppm.
+             Format is (value, unit) where unit should be 'Da' if provided.
+
+          Returns
+          -------
+          float
+             The best tolerance value to use (in Da).
         """
-        if _reported_tolerance[1] is None:
+
+        # Case 1: No reported tolerance
+        if reported_tolerance[1] is None:
             logging.info(
-                f"No MS²PIP tolerance reported in the idXML. Using the one provided in the command line ({ms2_tolerance})."
-            )
-            return ms2_tolerance
-        elif _reported_tolerance[1] == "ppm":
-            logging.warning(
-                f"MS²PIP tolerance reported in the idXML is in ppm. We can't do anything with it. Using the one provided in the command line ({ms2_tolerance})."
+                f"No MS²PIP tolerance reported in the idXML. Using command line value ({ms2_tolerance} Da)."
             )
             return ms2_tolerance
 
-        if ms2_tolerance > _reported_tolerance[0]:
-            logging.warning(
-                f"MS²PIP tolerance used in the command line ({ms2_tolerance}) is less restrictive than the one "
-                f"reported in the idXML ({_reported_tolerance})."
-            )
-            return ms2_tolerance
-
-        if ms2_tolerance < _reported_tolerance[0]:
-            if (ms2_tolerance / _reported_tolerance[0]) > 0.1:
+        # Case 2: Reported tolerance is in ppm
+        if reported_tolerance[1] == "ppm":
+            if (
+                predicted_tolerance is not None
+                and predicted_tolerance[1] == "Da"
+                and ms2_tolerance < predicted_tolerance[0]
+                and (predicted_tolerance[0]/ms2_tolerance) > 0.1
+            ):
                 logging.warning(
-                    f"MS²PIP tolerance used in the command line ({ms2_tolerance}) is more restrictive "
-                    f"by {(ms2_tolerance / _reported_tolerance[0]) * 100} % than the one "
-                    f"reported in the idXML ({_reported_tolerance}). Using the reported tolerance to find the model"
+                    f"Reported MS²PIP tolerance is in ppm. Using the predicted Da equivalent: "
+                    f"{predicted_tolerance[0]} Da (instead of command line value: {ms2_tolerance} Da)."
                 )
-                return _reported_tolerance[0]
+                return predicted_tolerance[0]
             else:
                 logging.warning(
-                    f"MS²PIP tolerance used in the command line ({ms2_tolerance}) is more restrictive than the one "
-                    f"reported in the idXML ({_reported_tolerance}). Keeping the command line tolerance."
+                    f"Reported MS²PIP tolerance is in ppm and no suitable Da prediction available. "
+                    f"Using command line value ({ms2_tolerance} Da)."
                 )
                 return ms2_tolerance
 
+        # Command line value is more restrictive (lower)
+        if ms2_tolerance < reported_tolerance[0]:
+            ratio = ms2_tolerance / reported_tolerance[0]
+            if ratio > 0.1:
+                logging.warning(
+                    f"Command line MS²PIP tolerance ({ms2_tolerance} Da) is more restrictive "
+                    f"by {(1 - ratio) * 100:.1f}% than reported value ({reported_tolerance[0]} Da). "
+                    f"Using reported value for better model compatibility."
+                )
+                return reported_tolerance[0]
+
+            else:
+                logging.warning(
+                    f"Command line MS²PIP tolerance ({ms2_tolerance} Da) is significantly more restrictive "
+                    f"({ratio * 100:.1f}% of reported value: {reported_tolerance[0]} Da). "
+                    f"Using command line value as specified."
+                )
+                return ms2_tolerance
+
+        # Values are the same
         logging.info(
-            f"MS²PIP tolerance used in the command line ({ms2_tolerance}) is the same as the one reported in the idXML."
+            f"MS²PIP tolerance in command line ({ms2_tolerance} Da) will continue be used instead of any reported idXML value."
         )
         return ms2_tolerance
