@@ -321,7 +321,7 @@ def test_add_sage_feature_help():
 # test for the ms2rescore
 
 
-
+@pytest.mark.skip(reason="This is for local test in big datasets, kipping for now")
 def test_local_file():
     runner = CliRunner()
     local_folder = TESTS_DIR / "test_data" / "dae1cb16fb57893b94bfcb731b2bf7"
