@@ -45,7 +45,7 @@ class SpectrumStats:
         self.empty_spectra: int = 0
         self.ms_level_counts: DefaultDict[int, int] = defaultdict(int)
         self.ms_level_dissociation_method: Dict[Tuple[int, str], int] = {}
-        # self.predicted_ms_tolerance: Tuple[float, Optional[str]] = (0.0, None)
+        self.predicted_ms_tolerance: Tuple[float, Optional[str]] = (0.0, None)
         self.reported_ms_tolerance: Tuple[float, Optional[str]] = (0.0, None)
 
 
@@ -393,12 +393,6 @@ class IdXMLRescoringReader(IdXMLReader):
             spectrum = OpenMSHelper.get_spectrum_for_psm(peptide_id, self._exp, self._spec_lookup)
             spectrum_reference = OpenMSHelper.get_spectrum_reference(peptide_id)
 
-            # TODO: Predict MS tolerance for PSMs, in the future would be good.
-            # for hit in peptide_id.getHits():
-            #     predicted_ms_tolerance = OpenMSHelper.get_predicted_ms_tolerance(spectrum, hit)
-            #     psm_ui = OpenMSHelper.get_psm_hash_unique_id(peptide_id, hit)
-            #     tolerances[psm_ui] = (predicted_ms_tolerance, hit.getScore())
-
             missing_spectrum, empty_spectrum = False, False
             ms_level = 2
 
@@ -459,15 +453,11 @@ class IdXMLRescoringReader(IdXMLReader):
             )
             raise MS3NotSupportedException("MS3 spectra found in MS2-only mode")
 
-        # if len(tolerances) > 0:
-        # TODO: would be good to predict the tolerance for PSMs in a good accurate way.
-        #     # Sort by score depending on high_score_better
-        #     sorted_tolerances = sorted(tolerances.items(), key=lambda x: x[1][1], reverse=self.high_score_better)
-        #     # select the best 20% of the PSMs
-        #     top_20_percent = int(len(sorted_tolerances) * 0.2)
-        #     top_20_percent_tolerances = sorted_tolerances[:top_20_percent]
-        #     # calculate the average tolerance
-        #     average_tolerance = sum([t[1][0] for t in top_20_percent_tolerances]) / top_20_percent
+        if self._stats.reported_ms_tolerance[1] == "ppm":
+            self._stats.predicted_ms_tolerance = OpenMSHelper.get_predicted_ms_tolerance(
+                exp=self._exp, ppm_tolerance=self._stats.reported_ms_tolerance[0]
+            )
+
         return self._stats
 
     def _process_dissociation_methods(self, spectrum, ms_level):

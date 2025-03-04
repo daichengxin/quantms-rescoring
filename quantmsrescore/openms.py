@@ -559,15 +559,36 @@ class OpenMSHelper:
         return theoretical_mzs
 
     @staticmethod
-    def get_predicted_ms_tolerance(exp_ms: MSSpectrum, peptide_hit: PeptideHit) -> float:
+    def get_predicted_ms_tolerance(
+        exp: oms.MSExperiment, ppm_tolerance: float
+    ) -> Tuple[float, str]:
+        """
+        Calculate the predicted mass tolerance in Daltons for an MS experiment.
 
-        theoretical_mzs = OpenMSHelper.generate_theoretical_spectrum(
-            peptide_hit.getSequence().toString(), peptide_hit.getCharge()
-        )
-        observed_mzs = [peak.getMZ() for peak in exp_ms]
-        error_da = 0.0
-        for theo_mz in theoretical_mzs:
-            # Find the closest observed peak within tolerance
-            closest_mz = min(observed_mzs, key=lambda obs_mz: abs(obs_mz - theo_mz))
-            error_da += abs(closest_mz - theo_mz)
-        return error_da / len(theoretical_mzs)
+        This method computes the maximum fragment mass from the spectra in the
+        given MSExperiment and calculates the mass tolerance in Daltons based
+        on the provided parts-per-million (ppm) tolerance.
+
+        Parameters
+        ----------
+        exp : oms.MSExperiment
+            The MSExperiment object containing the spectra.
+        ppm_tolerance : float
+            The mass tolerance in parts-per-million.
+
+        Returns
+        -------
+        Tuple[float, str]
+            A tuple containing the calculated mass tolerance in Daltons and
+            the unit "Da".
+        """
+        max_frag_mass = 0
+        for spec in exp:
+            if spec.getMSLevel() == 2:
+                spec.updateRanges()
+                if spec.getMaxMZ() > max_frag_mass:
+                    max_frag_mass = spec.getMaxMZ()
+
+        tol_da = max_frag_mass * ppm_tolerance / 1e6
+        tol_da = round(tol_da, 4)
+        return tol_da, "Da"
