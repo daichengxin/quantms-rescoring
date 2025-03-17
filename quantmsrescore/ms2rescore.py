@@ -110,7 +110,6 @@ def msrescore2feature(
     calibration_set_size,
     skip_deeplc_retrain,
     id_decoy_pattern,
-    lower_score_is_better,
     spectrum_id_pattern: str,
     psm_id_pattern: str,
 ):
