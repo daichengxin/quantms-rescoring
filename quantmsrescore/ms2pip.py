@@ -29,7 +29,7 @@ class MS2PIPAnnotator(MS2PIPFeatureGenerator):
         processes: int = 1,
         calibration_set_size: Optional[float] = 0.20,
         correlation_threshold: Optional[float] = 0.6,
-        lower_score_is_better: bool = True,
+        higher_score_better: bool = True,
         annotated_ms_tolerance: Tuple[float, str] = (0.0, None),
         predicted_ms_tolerance: Tuple[float, str] = (0.0, None),
         **kwargs,
@@ -48,7 +48,7 @@ class MS2PIPAnnotator(MS2PIPFeatureGenerator):
         self._predicted_tolerance: Tuple[float, str] = predicted_ms_tolerance
         self._calibration_set_size: float = calibration_set_size
         self._correlation_threshold: float = correlation_threshold
-        self._lower_score_is_better: bool = lower_score_is_better
+        self._higher_score_better: bool = higher_score_better
 
     def add_features(self, psm_list: PSMList) -> None:
         """
@@ -95,7 +95,7 @@ class MS2PIPAnnotator(MS2PIPFeatureGenerator):
                     ms2pip_results=ms2pip_results,
                     calibration_set_size=self._calibration_set_size,
                     correlation_threshold=self._correlation_threshold,
-                    lower_score_is_better=self._lower_score_is_better,
+                    higher_score_better=self._higher_score_better,
                 )
 
                 if not valid_correlation:
@@ -111,7 +111,7 @@ class MS2PIPAnnotator(MS2PIPFeatureGenerator):
 
     @staticmethod
     def _validate_scores(
-        ms2pip_results, calibration_set_size, correlation_threshold, lower_score_is_better
+        ms2pip_results, calibration_set_size, correlation_threshold, higher_score_better
     ) -> bool:
         """
         Validate MS²PIP results based on score and correlation criteria.
@@ -130,8 +130,8 @@ class MS2PIPAnnotator(MS2PIPFeatureGenerator):
             Fraction of the results to use for calibration.
         correlation_threshold : float
             Minimum correlation value required for a result to be considered valid.
-        lower_score_is_better : bool
-            Indicates if a lower PSM score is considered better.
+        higher_score_better : bool
+            Indicates if a higher PSM score is considered better.
 
         Returns
         -------
@@ -149,7 +149,7 @@ class MS2PIPAnnotator(MS2PIPFeatureGenerator):
         ms2pip_results_copy = [result for result in ms2pip_results_copy if not result.psm.is_decoy]
 
         # Sort ms2pip results by PSM score and lower score is better
-        ms2pip_results_copy.sort(key=lambda x: x.psm.score, reverse=not lower_score_is_better)
+        ms2pip_results_copy.sort(key=lambda x: x.psm.score, reverse=higher_score_better)
 
         # Get a calibration set, the % of psms to be used for calibrarion is defined by calibration_set_size
         calibration_set = ms2pip_results_copy[

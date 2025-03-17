@@ -83,12 +83,6 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
     default="^DECOY_",
 )
 @click.option(
-    "--lower_score_is_better",
-    is_flag=True,
-    help="Specify if lower scores are better",
-    default=True,
-)
-@click.option(
     "--spectrum_id_pattern",
     help="Pattern for spectrum identification",
     type=str,
@@ -159,8 +153,6 @@ def msrescore2feature(
         Whether to skip retraining the DeepLC model.
     id_decoy_pattern : str
         The regex pattern to identify decoy IDs.
-    lower_score_is_better : bool
-        Whether a lower score indicates a better match.
     spectrum_id_pattern : str
         The regex pattern for spectrum IDs.
     psm_id_pattern : str
@@ -177,7 +169,6 @@ def msrescore2feature(
         skip_deeplc_retrain=skip_deeplc_retrain,
         processes=processes,
         id_decoy_pattern=id_decoy_pattern,
-        lower_score_is_better=lower_score_is_better,
         log_level=log_level.upper(),
         spectrum_id_pattern=spectrum_id_pattern,
         psm_id_pattern=psm_id_pattern,
