@@ -30,6 +30,7 @@ class Annotator:
         ms2pip_model_path: str = "models",
         ms2_tolerance: float = 0.05,
         calibration_set_size: float = 0.2,
+        valid_correlations_size: float = 0.8,
         skip_deeplc_retrain: bool = False,
         processes: int = 2,
         id_decoy_pattern: str = "^DECOY_",
@@ -110,6 +111,7 @@ class Annotator:
         self._ms2pip_model_path = ms2pip_model_path
         self._ms2_tolerance = ms2_tolerance
         self._calibration_set_size = calibration_set_size
+        self._valid_correlations_size = valid_correlations_size
         self._processes = processes
         self._id_decoy_pattern = id_decoy_pattern
         self._higher_score_better = None
@@ -270,6 +272,7 @@ class Annotator:
             spectrum_id_pattern=self._spectrum_id_pattern,
             model_dir=self._ms2pip_model_path,
             calibration_set_size=self._calibration_set_size,
+            valid_correlations_size=self._valid_correlations_size,
             correlation_threshold=0.7,  # Consider making this configurable
             higher_score_better=self._higher_score_better,
             processes=self._processes,

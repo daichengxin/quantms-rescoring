@@ -73,6 +73,11 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
     default=0.20,
 )
 @click.option(
+    "--valid_correlations_size",
+    help="Percentage of number of psms with correlation above the threshold (default: `0.80)",
+    default=0.80,
+)
+@click.option(
     "--skip_deeplc_retrain",
     help="Skip retraining of DeepLC model (default: `False`)",
     is_flag=True,
@@ -108,6 +113,7 @@ def msrescore2feature(
     ms2pip_model,
     ms2_tolerance,
     calibration_set_size,
+    valid_correlations_size,
     skip_deeplc_retrain,
     id_decoy_pattern,
     spectrum_id_pattern: str,
@@ -148,6 +154,8 @@ def msrescore2feature(
         The tolerance for MS²PIP annotation.
     calibration_set_size : float
         The percentage of PSMs to use for calibration and retraining.
+    valid_correlations_size: float
+        Fraction of the valid PSM.
     skip_deeplc_retrain : bool
         Whether to skip retraining the DeepLC model.
     id_decoy_pattern : str
@@ -165,6 +173,7 @@ def msrescore2feature(
         ms2pip_model_path=ms2pip_model_dir,
         ms2_tolerance=ms2_tolerance,
         calibration_set_size=calibration_set_size,
+        valid_correlations_size=valid_correlations_size,
         skip_deeplc_retrain=skip_deeplc_retrain,
         processes=processes,
         id_decoy_pattern=id_decoy_pattern,
