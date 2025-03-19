@@ -336,6 +336,8 @@ class IdXMLRescoringReader(IdXMLReader):
                 )
                 if psm is not None:
                     psm_list.append(psm)
+                    if psm.spectrum_id == "controllerType=0 controllerNumber=1 scan=325":
+                        logging.info("controllerType=0 controllerNumber=1 scan=325")
 
         self._psms = PSMList(psm_list=psm_list)
         logging.info(f"Loaded {len(self._psms)} PSMs from {self.filename}")

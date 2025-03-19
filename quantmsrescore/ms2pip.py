@@ -4,7 +4,6 @@ import re
 from collections import defaultdict
 from itertools import chain
 
-from duckdb.duckdb import identifier
 from math import ceil
 from pathlib import Path
 from typing import Optional, Tuple, List, Union, Callable, Generator
@@ -19,13 +18,12 @@ from ms2pip._utils.retention_time import RetentionTime
 from ms2pip.constants import MODELS
 from ms2pip.core import _Parallelized, _process_peptidoform
 from ms2pip.exceptions import NoMatchingSpectraFound
-from ms2pip.result import ProcessingResult, calculate_correlations
+from ms2pip.result import ProcessingResult
 from ms2pip.spectrum import ObservedSpectrum
 from ms2rescore.feature_generators import MS2PIPFeatureGenerator
 from ms2rescore.feature_generators.base import FeatureGeneratorException
 from ms2rescore.utils import infer_spectrum_path
 from psm_utils import PSMList, PSM
-from sdrf_pipelines.openms.openms import OpenMS
 
 from quantmsrescore.constants import SUPPORTED_MODELS_MS2PIP
 from quantmsrescore.exceptions import Ms2pipIncorrectModelException
@@ -38,7 +36,10 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 class PatchParallelized(_Parallelized):
     """
     Extended version of _Parallelized that supports custom spectrum file reading using pyopenms instead of
-    ms2rescore_rs.
+    ms2rescore_rs. We need to read the files using OpenMS mzML handler rather than mzdata tools in rust because if
+    the mzML doesn't work on this component, it will not work on quantms but if it not works on mzdata is not in our control
+    to changed and those fails may be supported and OK in quantms.
+    See example in issue:
     """
 
     def __init__(
@@ -161,18 +162,6 @@ class PatchParallelized(_Parallelized):
             mp_results = []
             for psm_list_chunk in chunks:
                 mp_results.append(pool.apply_async(func, args=(psm_list_chunk, *args)))
-
-            # Gather results
-            # results = [
-            #     r.get()
-            #     for r in track(
-            #         mp_results,
-            #         disable=len(chunks) == 1,
-            #         description="Processing chunks...",
-            #         transient=True,
-            #         show_speed=False,
-            #     )
-            # ]
             results = [r.get() for r in mp_results]
 
         # Sort results by input order
@@ -184,9 +173,6 @@ class PatchParallelized(_Parallelized):
         )
 
         return results
-
-    def spectrum_reader(self, spec_file) -> List:
-        logging.info("Reading with Pyopenms")
 
 
 class MS2PIPAnnotator(MS2PIPFeatureGenerator):
@@ -389,7 +375,7 @@ class MS2PIPAnnotator(MS2PIPFeatureGenerator):
         for fragment_types in filtered_models:
             for model in filtered_models[fragment_types]:
                 logging.info(f"Running MS²PIP for model `{model}`...")
-                ms2pip_results = correlate(
+                ms2pip_results = self.custom_correlate(
                     psms=batch_psms,
                     spectrum_file=self.spectrum_path,
                     spectrum_id_pattern=self.spectrum_id_pattern,
@@ -424,7 +410,7 @@ class MS2PIPAnnotator(MS2PIPFeatureGenerator):
         float
             The average correlation score of the provided MS²PIP results.
         """
-        total_correlation = sum([psm.correlation for psm in ms2pip_results])
+        total_correlation = sum([psm.correlation for psm in ms2pip_results if psm.correlation is not None and not np.isnan(psm.correlation)])
         return total_correlation / len(ms2pip_results)
 
     def choose_best_ms2pip_tolerance(
@@ -564,10 +550,20 @@ class MS2PIPAnnotator(MS2PIPFeatureGenerator):
             if compute_correlations:
                 logging.info("Computing correlations")
                 calculate_correlations(results)
-                logging.info(f"Median correlation: {np.median(list(r.correlation for r in results))}")
+                logging.info(f"Median correlation: {np.median([r.correlation for r in results if r.correlation is not None and not np.isnan(r.correlation)])}")
 
             return results
 
+def calculate_correlations(results: List[ProcessingResult]) -> None:
+    """Calculate and add Pearson correlations to list of results."""
+    for result in results:
+        if result.predicted_intensity and result.observed_intensity:
+            pred_int = np.concatenate([i for i in result.predicted_intensity.values()])
+            obs_int = np.concatenate([i for i in result.observed_intensity.values()])
+            result.correlation = np.corrcoef(pred_int, obs_int)[0][1]
+        else:
+            result.correlation = None
+            logging.info("Results {} is empty".format(result))
 
 def read_spectrum_file(spec_file: str) -> Generator[ObservedSpectrum, None, None]:
     """
@@ -612,7 +608,6 @@ def read_spectrum_file(spec_file: str) -> Generator[ObservedSpectrum, None, None
                 precursor_charge=float(charge_state),
                 retention_time=float(rt)
             )
-        # Workaround for mobiusklein/mzdata#3
         if (
             obs_spectrum == None or
             obs_spectrum.identifier == ""
