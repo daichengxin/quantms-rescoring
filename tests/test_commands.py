@@ -248,7 +248,6 @@ def test_idxmlreader_failing_help():
         skip_deeplc_retrain=True,
         processes=2,
         id_decoy_pattern="^DECOY_",
-        lower_score_is_better=True,
         log_level="INFO",
         spectrum_id_pattern="(.*)",
         psm_id_pattern="(.*)",
