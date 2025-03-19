@@ -30,10 +30,10 @@ class Annotator:
         ms2pip_model_path: str = "models",
         ms2_tolerance: float = 0.05,
         calibration_set_size: float = 0.2,
+        valid_correlations_size: float = 0.8,
         skip_deeplc_retrain: bool = False,
         processes: int = 2,
         id_decoy_pattern: str = "^DECOY_",
-        lower_score_is_better: bool = True,
         log_level: str = "INFO",
         spectrum_id_pattern: str = "(.*)",  # default for openms idXML
         psm_id_pattern: str = "(.*)",  # default for openms idXML
@@ -64,8 +64,6 @@ class Annotator:
             Number of parallel processes (default: 2).
         id_decoy_pattern : str, optional
             Pattern for identifying decoy PSMs (default: "^DECOY_").
-        lower_score_is_better : bool, optional
-            Whether lower score indicates better match (default: True).
         log_level : str, optional
             Logging level (default: "INFO").
         spectrum_id_pattern : str, optional
@@ -113,9 +111,10 @@ class Annotator:
         self._ms2pip_model_path = ms2pip_model_path
         self._ms2_tolerance = ms2_tolerance
         self._calibration_set_size = calibration_set_size
+        self._valid_correlations_size = valid_correlations_size
         self._processes = processes
         self._id_decoy_pattern = id_decoy_pattern
-        self._lower_score_is_better = lower_score_is_better
+        self._higher_score_better = None
         self._spectrum_id_pattern = spectrum_id_pattern
         self._psm_id_pattern = psm_id_pattern
         self._skip_deeplc_retrain = skip_deeplc_retrain
@@ -155,6 +154,7 @@ class Annotator:
                 only_ms2=self._ms2_only,
                 remove_missing_spectrum=self._remove_missing_spectra,
             )
+            self._higher_score_better = self._idxml_reader.high_score_better
 
             # Log statistics about loaded data
             psm_list = self._idxml_reader.psms
@@ -272,8 +272,9 @@ class Annotator:
             spectrum_id_pattern=self._spectrum_id_pattern,
             model_dir=self._ms2pip_model_path,
             calibration_set_size=self._calibration_set_size,
+            valid_correlations_size=self._valid_correlations_size,
             correlation_threshold=0.7,  # Consider making this configurable
-            lower_score_is_better=self._lower_score_is_better,
+            higher_score_better=self._higher_score_better,
             processes=self._processes,
             annotated_ms_tolerance=self._idxml_reader.stats.reported_ms_tolerance,
             predicted_ms_tolerance=self._idxml_reader.stats.predicted_ms_tolerance,
@@ -360,7 +361,7 @@ class Annotator:
             calibration_set_size = self._calibration_set_size
 
         return DeepLCAnnotator(
-            self._lower_score_is_better,
+            not self._higher_score_better,
             calibration_set_size=calibration_set_size,
             processes=self._processes,
             **kwargs,
@@ -516,7 +517,7 @@ class Annotator:
             return PSMList(psm_list=[])
 
         # Sort by score
-        non_decoy_psms.sort(key=lambda x: x.score, reverse=not self._lower_score_is_better)
+        non_decoy_psms.sort(key=lambda x: x.score, reverse=self._higher_score_better)
 
         # Select top 60% for calibration
         calibration_size = max(1, int(len(non_decoy_psms) * 0.6))
