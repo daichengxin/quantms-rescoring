@@ -598,7 +598,7 @@ class OpenMSHelper:
         """
         Get the mslevel spectra from an mzML file.
         """
-        exp, lookup = OpenMSHelper.get_spectrum_lookup_indexer(file_name)
+        exp = OpenMSHelper.get_spectrum_lookup_indexer(file_name)[0]
         spectra = []
         for spec in exp:
             if spec.getMSLevel() == ms_level:

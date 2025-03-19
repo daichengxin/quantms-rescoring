@@ -609,7 +609,7 @@ def read_spectrum_file(spec_file: str) -> Generator[ObservedSpectrum, None, None
                 retention_time=float(rt)
             )
         if (
-            obs_spectrum == None or
+            obs_spectrum is None or
             obs_spectrum.identifier == ""
             or obs_spectrum.mz.shape[0] == 0
             or obs_spectrum.intensity.shape[0] == 0
