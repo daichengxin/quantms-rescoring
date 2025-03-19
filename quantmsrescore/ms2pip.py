@@ -103,11 +103,13 @@ class MS2PIPAnnotator(MS2PIPFeatureGenerator):
 
                 if not valid_correlation:
                     logging.error(
-                        f"The number of valid correlations doesn't exceed the threshold for current the calibration set."
-                        f"Please try a different model or adjust the valid_correlations_size or calibration_set_size."
+                        "The number of valid correlations doesn't exceed the threshold for current the calibration set."
+                        "Please try a different model or adjust the valid_correlations_size or calibration_set_size."
                     )
                     raise Ms2pipIncorrectModelException(
-                        message="The number of valid correlations doesn't exceed the threshold for current the calibration set. Please try a different model or adjust the valid_correlations_size or calibration_set_size.",
+                        message="The number of valid correlations doesn't exceed the threshold for current the "
+                                "calibration set. Please try a different model or adjust the valid_correlations_size "
+                                "or calibration_set_size.",
                         model=self.model,
                     )
                 self._calculate_features(psm_list_run, ms2pip_results)
@@ -167,7 +169,8 @@ class MS2PIPAnnotator(MS2PIPFeatureGenerator):
         ]
 
         logging.info(
-            f"The number of valid correlations is {int(len(valid_correlation)/len(calibration_set)*100)}% of the calibration set top {calibration_set_size*100}% PSMs"
+            f"The number of valid correlations is {int(len(valid_correlation)/len(calibration_set)*100)}% of the "
+            f"calibration set top {calibration_set_size*100}% PSMs"
         )
 
         # If the number of valid correlations is less than 80% of the calibration set, return False
