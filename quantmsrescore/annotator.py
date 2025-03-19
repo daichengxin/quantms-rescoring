@@ -1,5 +1,4 @@
 import copy
-import logging
 from pathlib import Path
 from typing import Optional, Set, Union
 
@@ -8,10 +7,12 @@ from psm_utils import PSMList
 from quantmsrescore.deeplc import DeepLCAnnotator
 from quantmsrescore.exceptions import Ms2pipIncorrectModelException
 from quantmsrescore.idxmlreader import IdXMLRescoringReader
+from quantmsrescore.logging_config import get_logger
 from quantmsrescore.ms2pip import MS2PIPAnnotator
 from quantmsrescore.openms import OpenMSHelper
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+# Get logger for this module
+logger = get_logger(__name__)
 
 
 class FeatureAnnotator:
@@ -83,10 +84,8 @@ class FeatureAnnotator:
             If no feature generators are provided or if neither ms2pip nor deeplc is specified.
         """
         # Set up logging
-
-        numeric_level = getattr(logging, log_level.upper(), None)
-        if isinstance(numeric_level, int):
-            logging.getLogger().setLevel(numeric_level)
+        from quantmsrescore.logging_config import configure_logging
+        configure_logging(log_level)
 
         # Validate inputs
         if not feature_generators:
@@ -140,7 +139,7 @@ class FeatureAnnotator:
         Exception
             If loading the files fails.
         """
-        logging.info(f"Loading data from: {idxml_file}")
+        logger.info(f"Loading data from: {idxml_file}")
 
         try:
             # Convert paths to Path objects for consistency
@@ -161,12 +160,12 @@ class FeatureAnnotator:
             openms_helper = OpenMSHelper()
             decoys, targets = openms_helper.count_decoys_targets(self._idxml_reader.oms_peptides)
 
-            logging.info(
+            logger.info(
                 f"Loaded {len(psm_list)} PSMs from {idxml_path.name}: {decoys} decoys and {targets} targets"
             )
 
         except Exception as e:
-            logging.error(f"Failed to load input files: {str(e)}")
+            logger.error(f"Failed to load input files: {str(e)}")
             raise
 
     def annotate(self) -> None:
@@ -184,7 +183,7 @@ class FeatureAnnotator:
         if not self._idxml_reader:
             raise ValueError("No idXML data loaded. Call build_idxml_data() first.")
 
-        logging.debug(f"Running annotations with configuration: {self.__dict__}")
+        logger.debug(f"Running annotations with configuration: {self.__dict__}")
 
         # Run MS2PIP annotation if enabled
         if self._ms2pip:
@@ -198,7 +197,7 @@ class FeatureAnnotator:
         if self._ms2pip or self._deepLC:
             self._convert_features_psms_to_oms_peptides()
 
-        logging.info("Annotation complete")
+        logger.info("Annotation complete")
 
     def write_idxml_file(self, filename: Union[str, Path]) -> None:
         """
@@ -221,20 +220,20 @@ class FeatureAnnotator:
                 protein_ids=self._idxml_reader.openms_proteins,
                 peptide_ids=self._idxml_reader.openms_peptides,
             )
-            logging.info(f"Annotated idXML file written to {out_path}")
+            logger.info(f"Annotated idXML file written to {out_path}")
         except Exception as e:
-            logging.error(f"Failed to write annotated idXML file: {str(e)}")
+            logger.error(f"Failed to write annotated idXML file: {str(e)}")
             raise
 
     def _run_ms2pip_annotation(self) -> None:
         """Run MS2PIP annotation on the loaded PSMs."""
-        logging.info("Running MS2PIP annotation")
+        logger.info("Running MS2PIP annotation")
 
         # Initialize MS2PIP annotator
         try:
             ms2pip_generator = self._create_ms2pip_annotator()
         except Exception as e:
-            logging.error(f"Failed to initialize MS2PIP: {e}")
+            logger.error(f"Failed to initialize MS2PIP: {e}")
             raise
 
         # Apply MS2PIP annotation
@@ -242,14 +241,14 @@ class FeatureAnnotator:
         try:
             ms2pip_generator.add_features(psm_list)
             self._idxml_reader.psms = psm_list
-            logging.info("MS2PIP annotations added to PSMs")
+            logger.info("MS2PIP annotations added to PSMs")
         except Ms2pipIncorrectModelException:
             if self._find_best_ms2pip_model:
                 self._find_and_apply_best_ms2pip_model(psm_list)
             else:
-                logging.error("MS2PIP model not suitable for this data")
+                logger.error("MS2PIP model not suitable for this data")
         except Exception as e:
-            logging.error(f"Failed to add MS2PIP features: {e}")
+            logger.error(f"Failed to add MS2PIP features: {e}")
 
     def _create_ms2pip_annotator(self, model: Optional[str] = None, tolerance: Optional[float] = None) -> MS2PIPAnnotator:
         """
@@ -289,7 +288,7 @@ class FeatureAnnotator:
         psm_list : PSMList
             List of PSMs to annotate.
         """
-        logging.info("Finding best MS2PIP model for the dataset")
+        logger.info("Finding best MS2PIP model for the dataset")
 
         # Get top scoring PSMs for model selection
         batch_psms = self._get_top_batch_psms(psm_list)
@@ -305,7 +304,7 @@ class FeatureAnnotator:
         )
 
         if model:
-            logging.info(f"Best model found: {model} with average correlation {corr}")
+            logger.info(f"Best model found: {model} with average correlation {corr}")
 
             # Create new annotator with best model
             ms2pip_generator = self._create_ms2pip_annotator(model=model, tolerance = tolerance)
@@ -313,13 +312,13 @@ class FeatureAnnotator:
             # Apply annotation with best model
             ms2pip_generator.add_features(psm_list)
             self._idxml_reader.psms = psm_list
-            logging.info("MS2PIP annotations added using best model")
+            logger.info("MS2PIP annotations added using best model")
         else:
-            logging.error("No suitable MS2PIP model found for this dataset")
+            logger.error("No suitable MS2PIP model found for this dataset")
 
     def _run_deeplc_annotation(self) -> None:
         """Run DeepLC annotation on the loaded PSMs."""
-        logging.info("Running DeepLC annotation")
+        logger.info("Running DeepLC annotation")
 
         try:
             if self._skip_deeplc_retrain:
@@ -333,10 +332,10 @@ class FeatureAnnotator:
             psm_list = self._idxml_reader.psms
             deeplc_annotator.add_features(psm_list)
             self._idxml_reader.psms = psm_list
-            logging.info("DeepLC annotations added to PSMs")
+            logger.info("DeepLC annotations added to PSMs")
 
         except Exception as e:
-            logging.error(f"Failed to apply DeepLC annotation: {e}")
+            logger.error(f"Failed to apply DeepLC annotation: {e}")
             raise
 
     def _create_deeplc_annotator(
@@ -396,12 +395,12 @@ class FeatureAnnotator:
 
         # Select model with lower MAE
         if mae_retrained < mae_pretrained:
-            logging.info(
+            logger.info(
                 f"Retrained DeepLC model has lower MAE ({mae_retrained:.4f} vs {mae_pretrained:.4f}), using it: {retrained_model.selected_model}"
             )
             return retrained_model
         else:
-            logging.info(
+            logger.info(
                 f"Pretrained DeepLC model has lower/equal MAE ({mae_pretrained:.4f} vs {mae_retrained:.4f}), using it: {pretrained_model.selected_model}"
             )
             return pretrained_model
@@ -428,7 +427,7 @@ class FeatureAnnotator:
 
                 psm = psm_dict.get(psm_hash)
                 if psm is None:
-                    logging.warning(f"PSM not found for peptide {oms_peptide.getMetaValue('id')}")
+                    logger.warning(f"PSM not found for peptide {oms_peptide.getMetaValue('id')}")
                 else:
                     # Add features to the OpenMS PSM
                     for feature, value in psm.rescoring_features.items():
@@ -446,7 +445,7 @@ class FeatureAnnotator:
                             )
                             added_features.add(canonical_feature)
                         else:
-                            logging.debug(f"Feature {feature} not supported by quantms rescoring")
+                            logger.debug(f"Feature {feature} not supported by quantms rescoring")
 
                 hits.append(oms_psm)
 
@@ -471,7 +470,7 @@ class FeatureAnnotator:
         if not features:
             return
 
-        logging.info(f"Adding features to search parameters: {', '.join(sorted(features))}")
+        logger.info(f"Adding features to search parameters: {', '.join(sorted(features))}")
 
         # Get search parameters
         search_parameters = self._idxml_reader.oms_proteins[0].getSearchParameters()
@@ -507,13 +506,13 @@ class FeatureAnnotator:
         PSMList
             Filtered list containing top-scoring PSMs.
         """
-        logging.info("Selecting top PSMs for calibration")
+        logger.info("Selecting top PSMs for calibration")
 
         # Filter non-decoy PSMs
         non_decoy_psms = [result for result in psm_list.psm_list if not result.is_decoy]
 
         if not non_decoy_psms:
-            logging.warning("No non-decoy PSMs found for calibration")
+            logger.warning("No non-decoy PSMs found for calibration")
             return PSMList(psm_list=[])
 
         # Sort by score
@@ -536,7 +535,7 @@ class FeatureAnnotator:
         """
         stats = self._idxml_reader.stats
         if not stats or not stats.ms_level_dissociation_method:
-            logging.warning("No fragmentation method statistics available")
+            logger.warning("No fragmentation method statistics available")
             return None
 
         # Find the most common fragmentation method
@@ -567,7 +566,7 @@ class FeatureAnnotator:
         best_scored_psms = self._get_top_batch_psms(psm_list)
 
         if not best_scored_psms.psm_list:
-            logging.warning("No PSMs available for MAE calculation")
+            logger.warning("No PSMs available for MAE calculation")
             return float("inf")
 
         total_error = 0.0
@@ -579,7 +578,7 @@ class FeatureAnnotator:
                 count += 1
 
         if count == 0:
-            logging.warning("No valid retention time differences for MAE calculation")
+            logger.warning("No valid retention time differences for MAE calculation")
             return float("inf")
 
         return total_error / count

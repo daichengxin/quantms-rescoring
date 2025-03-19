@@ -1,25 +1,19 @@
-import logging
 import re
 from dataclasses import dataclass
-from warnings import filterwarnings
 
 import click
 import numpy as np
 from scipy.stats import entropy
 
 from quantmsrescore.idxmlreader import IdXMLReader
+from quantmsrescore.logging_config import get_logger, configure_logging
 from quantmsrescore.openms import OpenMSHelper
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+# Configure logging with default settings
+configure_logging()
 
-# Suppress OpenMS warning about a deeplc_models path
-filterwarnings(
-    "ignore",
-    message="OPENMS_DATA_PATH environment variable already exists",
-    category=UserWarning,
-    module="pyopenms",
-)
+# Get logger for this module
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -175,7 +169,7 @@ def spectrum2feature(ctx, mzml: str, idxml: str, output: str) -> None:
     ValueError
         If no protein identifications are found in the idXML file.
     """
-    logging.info(f"Processing mzML file: {mzml}")
+    logger.info(f"Processing mzML file: {mzml}")
     exp, lookup = OpenMSHelper.get_spectrum_lookup_indexer(mzml)
 
     idxml_reader = IdXMLReader(idexml_filename=idxml)
@@ -191,7 +185,7 @@ def spectrum2feature(ctx, mzml: str, idxml: str, output: str) -> None:
         scan_matches = re.findall(r"(spectrum|scan)=(\d+)", spectrum_reference)
 
         if not scan_matches:
-            logging.warning(f"Could not parse scan number from reference: {spectrum_reference}")
+            logger.warning(f"Could not parse scan number from reference: {spectrum_reference}")
             continue
 
         scan_number = int(scan_matches[0][1])
@@ -215,7 +209,7 @@ def spectrum2feature(ctx, mzml: str, idxml: str, output: str) -> None:
             result_peptides.append(peptide)
 
         except ValueError as e:
-            logging.error(f"Error processing scan {scan_number}: {str(e)}")
+            logger.error(f"Error processing scan {scan_number}: {str(e)}")
             continue
 
     # Update search parameters with new features
@@ -230,4 +224,4 @@ def spectrum2feature(ctx, mzml: str, idxml: str, output: str) -> None:
     OpenMSHelper.write_idxml_file(
         filename=output, protein_ids=protein_ids, peptide_ids=result_peptides
     )
-    logging.info(f"Results saved to: {output}")
+    logger.info(f"Results saved to: {output}")

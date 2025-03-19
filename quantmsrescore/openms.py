@@ -1,4 +1,3 @@
-import logging
 import re
 from pathlib import Path
 from typing import List, Union, Optional, Tuple
@@ -23,6 +22,10 @@ from quantmsrescore.constants import (
     OPENMS_DISSOCIATION_METHODS_PATCH_3_1_0,
 )
 from quantmsrescore.exceptions import MzMLNotUnixException
+from quantmsrescore.logging_config import get_logger
+
+# Get logger for this module
+logger = get_logger(__name__)
 
 OPENMS_DECOY_FIELD = "target_decoy"
 SPECTRUM_PATTERN = r"(spectrum|scan)=(\d+)"
@@ -79,10 +82,10 @@ class OpenMSHelper:
                             openms_count_target += 1
 
         if openms_count_decoy + openms_count_target == 0:
-            logging.warning("No PSMs found; decoy percentage cannot be computed.")
+            logger.warning("No PSMs found; decoy percentage cannot be computed.")
             return 0, 0
         percentage_decoy = (openms_count_decoy / (openms_count_decoy + openms_count_target)) * 100
-        logging.info(
+        logger.info(
             "Decoy percentage: %s, targets %s and decoys %s",
             percentage_decoy,
             openms_count_target,
@@ -114,7 +117,7 @@ class OpenMSHelper:
                 openms_count += 1
             else:
                 openms_count += len(pep.getHits())
-        logging.info("Total PSMs: %s", openms_count)
+        logger.info("Total PSMs: %s", openms_count)
         return openms_count
 
     @staticmethod
@@ -203,7 +206,7 @@ class OpenMSHelper:
         spectrum_reference = OpenMSHelper.get_spectrum_reference(psm)
         if spectrum_reference is None:
             psm_info = psm.provenance_data if hasattr(psm, "provenance_data") else "N/A"
-            logging.warning(
+            logger.warning(
                 f"Missing spectrum reference for PSM {psm_info}, skipping spectrum retrieval."
             )
             return None
@@ -211,7 +214,7 @@ class OpenMSHelper:
         matches = re.findall(r"(spectrum|scan)=(\d+)", spectrum_reference)
         if not matches:
             psm_info = psm.provenance_data if hasattr(psm, "provenance_data") else "N/A"
-            logging.warning(
+            logger.warning(
                 f"Missing or invalid spectrum reference for PSM {psm_info}, "
                 f"skipping spectrum retrieval."
             )
@@ -224,7 +227,7 @@ class OpenMSHelper:
             return spectrum
         except Exception as e:
             psm_info = psm.provenance_data if hasattr(psm, "provenance_data") else "N/A"
-            logging.error(
+            logger.error(
                 "Error while retrieving spectrum for PSM %s spectrum_ref %s: %s",
                 psm_info,
                 spectrum_reference,
@@ -280,7 +283,7 @@ class OpenMSHelper:
             spectrum = exp.getSpectrum(index)
             return spectrum.get_peaks()
         except IndexError:
-            logging.warning(f"Scan number {scan_number} not found")
+            logger.warning(f"Scan number {scan_number} not found")
             return None
 
     @staticmethod
@@ -396,7 +399,7 @@ class OpenMSHelper:
             if feature in DEEPLC_FEATURES.values() or feature in MS2PIP_FEATURES.values():
                 validated_features.append(feature)
             else:
-                logging.warning(f"Feature {feature} not supported by quantms rescoring")
+                logger.warning(f"Feature {feature} not supported by quantms rescoring")
         return validated_features
 
     @staticmethod
@@ -435,7 +438,7 @@ class OpenMSHelper:
         if oms_version >= version.parse("3.2.0"):
             dissociation_methods = OPENMS_DISSOCIATION_METHODS_PATCH_3_3_0
         if not dissociation_methods:
-            logging.warning("OpenMS version not supported, can't find the dissociation method.")
+            logger.warning("OpenMS version not supported, can't find the dissociation method.")
             return None
         return dissociation_methods
 
@@ -468,7 +471,7 @@ class OpenMSHelper:
         if dissociation_methods is None:
             return None
         if method_index < 0 or method_index >= len(dissociation_methods):
-            logging.warning("Invalid dissociation method index.")
+            logger.warning("Invalid dissociation method index.")
             return None
         return list(dissociation_methods[method_index].keys())[0]
 
@@ -505,7 +508,7 @@ class OpenMSHelper:
                     f"File {mzml_path} has Windows-style CRLF line endings. Please convert to LF (Unix-style) using `dos2unix` or similar."
                 )
             else:
-                logging.info(f"File {mzml_path} has the correct Unix-style LF line endings.")
+                logger.info(f"File {mzml_path} has the correct Unix-style LF line endings.")
 
     @staticmethod
     def get_ms_tolerance(

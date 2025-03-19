@@ -1,8 +1,6 @@
-import logging
 from collections import defaultdict
 from pathlib import Path
 from typing import Union, List, Optional, Dict, Tuple, DefaultDict
-from warnings import filterwarnings
 
 import psm_utils
 import pyopenms as oms
@@ -10,18 +8,11 @@ from psm_utils import PSM, PSMList
 from pyopenms import IDFilter
 
 from quantmsrescore.exceptions import MS3NotSupportedException
+from quantmsrescore.logging_config import get_logger
 from quantmsrescore.openms import OpenMSHelper
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-
-# Suppress OpenMS warning about deeplc_models path
-filterwarnings(
-    "ignore",
-    message="OPENMS_DATA_PATH environment variable already exists",
-    category=UserWarning,
-    module="pyopenms",
-)
+# Get logger for this module
+logger = get_logger(__name__)
 
 
 class ScoreStats:
@@ -134,7 +125,7 @@ class IdXMLReader:
         if check_unix_compatibility:
             OpenMSHelper.check_unix_compatibility(self._mzml_path)
         self._exp, self._spec_lookup = OpenMSHelper.get_spectrum_lookup_indexer(self._mzml_path)
-        logging.info(f"Built SpectrumLookup from {self._mzml_path}")
+        logger.info(f"Built SpectrumLookup from {self._mzml_path}")
 
 
 class IdXMLRescoringReader(IdXMLReader):
@@ -233,12 +224,12 @@ class IdXMLRescoringReader(IdXMLReader):
         for score, stats in score_stats.items():
             if stats.missing_count > 0:
                 percentage = stats.missing_percentage
-                logging.warning(
+                logger.warning(
                     f"Score {score} is missing in {stats.missing_count} PSMs "
                     f"({percentage:.1f}% of total)"
                 )
                 if percentage > 10:
-                    logging.error(f"Score {score} is missing in more than 10% of PSMs")
+                    logger.error(f"Score {score} is missing in more than 10% of PSMs")
 
     @staticmethod
     def _parse_psm(
@@ -292,7 +283,7 @@ class IdXMLRescoringReader(IdXMLReader):
                 provenance_data={provenance_key: ""},  # We use only the key for provenance
             )
         except Exception as e:
-            logging.error(f"Failed to parse PSM: {e}")
+            logger.error(f"Failed to parse PSM: {e}")
             return None
 
     def _build_psm_index(self, only_ms2: bool = True) -> PSMList:
@@ -312,14 +303,14 @@ class IdXMLRescoringReader(IdXMLReader):
         psm_list = []
 
         if only_ms2 and self._spec_lookup is None:
-            logging.warning("Spectrum lookup not initialized, cannot filter for MS2 spectra")
+            logger.warning("Spectrum lookup not initialized, cannot filter for MS2 spectra")
             only_ms2 = False
 
         for peptide_id in self.oms_peptides:
             if self.high_score_better is None:
                 self.high_score_better = peptide_id.isHigherScoreBetter()
             elif self.high_score_better != peptide_id.isHigherScoreBetter():
-                logging.warning("Inconsistent score direction found in idXML file")
+                logger.warning("Inconsistent score direction found in idXML file")
 
             for psm_hit in peptide_id.getHits():
                 if (
@@ -336,11 +327,9 @@ class IdXMLRescoringReader(IdXMLReader):
                 )
                 if psm is not None:
                     psm_list.append(psm)
-                    if psm.spectrum_id == "controllerType=0 controllerNumber=1 scan=325":
-                        logging.info("controllerType=0 controllerNumber=1 scan=325")
 
         self._psms = PSMList(psm_list=psm_list)
-        logging.info(f"Loaded {len(self._psms)} PSMs from {self.filename}")
+        logger.info(f"Loaded {len(self._psms)} PSMs from {self.filename}")
         return self._psms
 
     def _validate_psm_spectrum_references(
@@ -400,7 +389,7 @@ class IdXMLRescoringReader(IdXMLReader):
 
             if spectrum is None:
 
-                logging.error(
+                logger.error(
                     f"Spectrum not found for PeptideIdentification with {spectrum_reference}"
                 )
                 self._stats.missing_spectra += 1
@@ -408,7 +397,7 @@ class IdXMLRescoringReader(IdXMLReader):
             else:
                 peaks = spectrum.get_peaks()[0]
                 if peaks is None or len(peaks) == 0:
-                    logging.warning(f"Empty spectrum found for PSM {spectrum_reference}")
+                    logger.warning(f"Empty spectrum found for PSM {spectrum_reference}")
                     empty_spectrum = True
                     self._stats.empty_spectra += 1
 
@@ -418,7 +407,7 @@ class IdXMLRescoringReader(IdXMLReader):
                 self._process_dissociation_methods(spectrum, ms_level)
 
                 if ms_level != 2 and only_ms2:
-                    logging.info(
+                    logger.info(
                         f"MS level {ms_level} spectrum found for PSM {spectrum_reference}. "
                         "MS2pip models are not trained on MS3 spectra"
                     )
@@ -426,13 +415,13 @@ class IdXMLRescoringReader(IdXMLReader):
             if (remove_missing_spectrum and (missing_spectrum or empty_spectrum)) or (
                 only_ms2 and ms_level != 2
             ):
-                logging.debug(f"Removing PSM {spectrum_reference}")
+                logger.debug(f"Removing PSM {spectrum_reference}")
                 peptide_removed += 1
             else:
                 new_peptide_ids.append(peptide_id)
 
         if peptide_removed > 0:
-            logging.warning(
+            logger.warning(
                 f"Removed {peptide_removed} PSMs with missing or empty spectra or MS3 spectra"
             )
             self.oms_peptides = new_peptide_ids
@@ -448,7 +437,7 @@ class IdXMLRescoringReader(IdXMLReader):
 
         if only_ms2 and self._stats.ms_level_counts.get(3, 0) > 0:
             ms2_dissociation_methods = self._stats.ms_level_dissociation_method.get((2, "HCD"), 0)
-            logging.error(
+            logger.error(
                 "MS3 spectra found in MS2-only mode, please filter your search for MS2 or dissociation method: {}".format(
                     ms2_dissociation_methods
                 )
@@ -480,23 +469,23 @@ class IdXMLRescoringReader(IdXMLReader):
                         self._stats.ms_level_dissociation_method.get(method, 0) + 1
                     )
                 else:
-                    logging.warning(f"Unknown dissociation method index {method_index}")
+                    logger.warning(f"Unknown dissociation method index {method_index}")
 
     def _log_spectrum_statistics(self):
         """Log statistics about spectrum validation."""
         if self._stats.missing_spectra or self._stats.empty_spectra:
-            logging.error(
+            logger.error(
                 f"Found {self._stats.missing_spectra} PSMs with missing spectra and "
                 f"{self._stats.empty_spectra} PSMs with empty spectra"
             )
 
         if len({k[1] for k in self._stats.ms_level_dissociation_method}) > 1:
-            logging.error(
+            logger.error(
                 "Found multiple dissociation methods in the same MS level. "
                 "MS2pip models are not trained for multiple dissociation methods"
             )
 
-        logging.info(f"MS level distribution: {dict(self._stats.ms_level_counts)}")
-        logging.info(
+        logger.info(f"MS level distribution: {dict(self._stats.ms_level_counts)}")
+        logger.info(
             f"Dissociation Method Distribution: {self._stats.ms_level_dissociation_method}"
         )
