@@ -592,3 +592,15 @@ class OpenMSHelper:
         tol_da = max_frag_mass * ppm_tolerance / 1e6
         tol_da = round(tol_da, 4)
         return tol_da, "Da"
+
+    @staticmethod
+    def get_mslevel_spectra(file_name, ms_level):
+        """
+        Get the mslevel spectra from an mzML file.
+        """
+        exp, lookup = OpenMSHelper.get_spectrum_lookup_indexer(file_name)
+        spectra = []
+        for spec in exp:
+            if spec.getMSLevel() == ms_level:
+                spectra.append(spec)
+        return spectra

@@ -5,7 +5,7 @@
 import logging
 import click
 
-from quantmsrescore.annotator import Annotator
+from quantmsrescore.annotator import FeatureAnnotator
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
@@ -167,7 +167,7 @@ def msrescore2feature(
         The regex pattern for PSM IDs.
     """
 
-    annotator = Annotator(
+    annotator = FeatureAnnotator(
         feature_generators=feature_generators,
         only_features=only_features,
         ms2pip_model=ms2pip_model,

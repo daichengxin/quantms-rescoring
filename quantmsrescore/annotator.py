@@ -14,7 +14,7 @@ from quantmsrescore.openms import OpenMSHelper
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
 
-class Annotator:
+class FeatureAnnotator:
     """
     Annotator for peptide-spectrum matches (PSMs) using MS2PIP and DeepLC models.
 
