@@ -657,10 +657,8 @@ def _preprocess_spectrum(spectrum: ObservedSpectrum, model: str) -> None:
         if label_type in model:
             spectrum.remove_reporter_ions(label_type)
     
-    # Normalize and transform
     spectrum.tic_norm()
     spectrum.log2_transform()
-
 
 def _get_targets_for_psm(
     psm: PSM,
