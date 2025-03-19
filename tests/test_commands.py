@@ -126,7 +126,6 @@ def test_annotator_train_rt():
         skip_deeplc_retrain=False,
         processes=2,
         id_decoy_pattern="^DECOY_",
-        lower_score_is_better=True,
         log_level="INFO",
         spectrum_id_pattern="(.*)",
         psm_id_pattern="(.*)",
@@ -141,7 +140,6 @@ def test_annotator_train_rt():
     )
 
     annotator.write_idxml_file(output_file)
-
 
 def test_idxmlreader_filtering():
 
@@ -165,7 +163,6 @@ def test_idxmlreader_filtering():
         skip_deeplc_retrain=True,
         processes=2,
         id_decoy_pattern="^DECOY_",
-        lower_score_is_better=True,
         log_level="INFO",
         spectrum_id_pattern="(.*)",
         psm_id_pattern="(.*)",
@@ -204,7 +201,6 @@ def test_idxmlreader_wrong_model():
         skip_deeplc_retrain=True,
         processes=2,
         id_decoy_pattern="^DECOY_",
-        lower_score_is_better=True,
         log_level="INFO",
         spectrum_id_pattern="(.*)",
         psm_id_pattern="(.*)",
@@ -222,7 +218,7 @@ def test_idxmlreader_wrong_model():
     annotator.write_idxml_file(output_file)
 
 
-# @pytest.mark.skip(reason="This is for local test in big datasets, kipping for now")
+@pytest.mark.skip(reason="This is for local test in big datasets, kipping for now")
 def test_idxmlreader_failing_help():
     idxml_file = (
         TESTS_DIR
