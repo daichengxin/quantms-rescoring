@@ -656,7 +656,7 @@ def _preprocess_spectrum(spectrum: ObservedSpectrum, model: str) -> None:
     for label_type in ["iTRAQ", "TMT"]:
         if label_type in model:
             spectrum.remove_reporter_ions(label_type)
-    
+
     spectrum.tic_norm()
     spectrum.log2_transform()
 
