@@ -54,6 +54,8 @@ def configure_logging(log_level: str = "INFO") -> None:
     warnings.filterwarnings("ignore", module="ms2rescore")
     warnings.filterwarnings("ignore", module="xgboost")
     warnings.filterwarnings("ignore", module="tensorflow")
+    warnings.filterwarnings("ignore", module="deeplc")
+
 
     # Ignore anoying warning from ms2pip
     root_logger.addFilter(IgnoreSpecificWarnings())
