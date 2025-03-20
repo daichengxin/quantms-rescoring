@@ -50,6 +50,9 @@ def configure_logging(log_level: str = "INFO") -> None:
 
     # Suppress all warnings from pyopenms
     warnings.filterwarnings("ignore", module="pyopenms")
+    warnings.filterwarnings("ignore", module="ms2pip")
+    warnings.filterwarnings("ignore", module="ms2rescore")
+    warnings.filterwarnings("ignore", module="xgboost")
 
     # Ignore anoying warning from ms2pip
     root_logger.addFilter(IgnoreSpecificWarnings())
