@@ -572,7 +572,7 @@ def read_spectrum_file(spec_file: str) -> Generator[ObservedSpectrum, None, None
 
     Parameters
     ----------
-    spectrum_file
+    spec_file:
         Path to MGF or mzML file.
 
     Yields
@@ -695,7 +695,7 @@ def _get_targets_for_psm(
         enc_peptidoform = encoder.encode_peptidoform(psm.peptidoform)
     except exceptions.InvalidAminoAcidError:
         return None, {}
-    
+
     # Get targets
     targets = ms2pip_pyx.get_targets(
         enc_peptidoform,
