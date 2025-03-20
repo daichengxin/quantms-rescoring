@@ -11,7 +11,6 @@ from pyopenms import (
     ProteinIdentification,
     SpectrumLookup,
     PeptideHit,
-    MSSpectrum,
     TheoreticalSpectrumGenerator,
 )
 

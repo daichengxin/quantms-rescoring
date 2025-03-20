@@ -2,13 +2,12 @@ import itertools
 import re
 from collections import defaultdict
 from itertools import chain
-
-from math import ceil
 from pathlib import Path
 from typing import Optional, Tuple, List, Union, Callable, Generator, Dict
 
+import ms2pip.exceptions as exceptions
 import numpy as np
-from ms2pip import correlate
+from math import ceil
 from ms2pip._cython_modules import ms2pip_pyx
 from ms2pip._utils.encoder import Encoder
 from ms2pip._utils.ion_mobility import IonMobility
@@ -26,8 +25,6 @@ from psm_utils import PSMList, PSM
 
 from quantmsrescore.constants import SUPPORTED_MODELS_MS2PIP
 from quantmsrescore.exceptions import Ms2pipIncorrectModelException
-import ms2pip.exceptions as exceptions
-
 from quantmsrescore.logging_config import get_logger
 from quantmsrescore.openms import OpenMSHelper
 
@@ -624,12 +621,12 @@ def _organize_psms_by_spectrum_id(
 ) -> Dict[str, List[Tuple[int, PSM]]]:
     """
     Organize PSMs by spectrum ID for efficient lookup.
-    
+
     Parameters
     ----------
     enumerated_psm_list
         List of tuples of (index, PSM) for each PSM in the input file.
-        
+
     Returns
     -------
     Dict[str, List[Tuple[int, PSM]]]
@@ -644,7 +641,7 @@ def _organize_psms_by_spectrum_id(
 def _preprocess_spectrum(spectrum: ObservedSpectrum, model: str) -> None:
     """
     Preprocess a spectrum by removing reporter ions, normalizing, and transforming.
-    
+
     Parameters
     ----------
     spectrum
@@ -670,7 +667,7 @@ def _get_targets_for_psm(
 ) -> Tuple[Optional[np.ndarray], Dict[str, np.ndarray]]:
     """
     Get targets for a PSM from a spectrum.
-    
+
     Parameters
     ----------
     psm
@@ -685,7 +682,7 @@ def _get_targets_for_psm(
         The model name.
     ion_types
         The ion types to use.
-        
+
     Returns
     -------
     Tuple[Optional[np.ndarray], Dict[str, np.ndarray]]
@@ -705,11 +702,11 @@ def _get_targets_for_psm(
         MODELS[model]["peaks_version"],
     )
     targets = {i: np.array(t, dtype=np.float32) for i, t in zip(ion_types, targets)}
-    
+
     # Set precursor charge if not set
     if not psm.peptidoform.precursor_charge:
         psm.peptidoform.precursor_charge = spectrum.precursor_charge
-        
+
     return enc_peptidoform, targets
 
 
@@ -726,7 +723,7 @@ def _create_result_for_mode(
 ) -> ProcessingResult:
     """
     Create a ProcessingResult based on the processing mode.
-    
+
     Parameters
     ----------
     psm_index
@@ -747,7 +744,7 @@ def _create_result_for_mode(
         The encoder.
     ion_types
         The ion types.
-        
+
     Returns
     -------
     ProcessingResult
@@ -775,7 +772,7 @@ def _create_result_for_mode(
         # Extract only annotations
         mz = ms2pip_pyx.get_mzs(enc_peptidoform, MODELS[model]["peaks_version"])
         mz = {i: np.array(mz, dtype=np.float32) for i, mz in zip(ion_types, mz)}
-        
+
         return ProcessingResult(
             psm_index=psm_index,
             psm=psm,
@@ -796,7 +793,7 @@ def _create_result_for_mode(
             result = ProcessingResult(psm_index=psm_index, psm=psm)
         else:
             result.observed_intensity = targets
-            
+
         return result
 
 
@@ -878,21 +875,19 @@ def _custom_process_spectra(
             enc_peptidoform, targets = _get_targets_for_psm(
                 psm, spectrum, encoder, ms2_tolerance, model, ion_types
             )
-            
+
             # Skip if encoding failed
             if enc_peptidoform is None:
                 result = ProcessingResult(psm_index=psm_index, psm=psm)
                 results.append(result)
                 continue
-            
+
             # Create result based on processing mode
             result = _create_result_for_mode(
                 psm_index, psm, enc_peptidoform, targets,
                 vector_file, annotations_only, model, encoder, ion_types
             )
-            
+
             results.append(result)
 
     return results
-
-
