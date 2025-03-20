@@ -8,11 +8,17 @@ with customizable log levels and formatters.
 import logging
 import sys
 import warnings
+import io
+import re
 from typing import Optional
 
 class IgnoreSpecificWarnings(logging.Filter):
     def filter(self, record):
-        return not ("Could not add the following atom" in record.getMessage())
+        # Check for any isotope-related atom warnings
+        message = record.getMessage()
+        if "Could not add the following atom:" in message:
+            return False
+        return True
 
 def configure_logging(log_level: str = "INFO") -> None:
     """
@@ -56,11 +62,36 @@ def configure_logging(log_level: str = "INFO") -> None:
     warnings.filterwarnings("ignore", module="tensorflow")
     warnings.filterwarnings("ignore", module="deeplc")
 
-
-    # Ignore anoying warning from ms2pip
+    # Ignore annoying warning from ms2pip
     root_logger.addFilter(IgnoreSpecificWarnings())
-    # Suppress specific warnings using a more direct approach
+
+    # Apply filter to all loggers, not just root
+    for logger_name in logging.root.manager.loggerDict:
+        logger = logging.getLogger(logger_name)
+        logger.addFilter(IgnoreSpecificWarnings())
+    
+    # Suppress specific warnings using multiple approaches
     warnings.filterwarnings("ignore", message=".*Could not add the following atom.*")
+    warnings.filterwarnings("ignore", message=".*\\[[0-9]+\\].*")  # Match any isotope notation like [13], [15], etc.
+
+    # Reduce the log level for this specific warning pattern
+    logging.getLogger("ms2pip").setLevel(logging.ERROR)
+
+    # Capture warnings and redirect them to the logging system
+    # This helps catch warnings that might bypass the regular filters
+    original_showwarning = warnings.showwarning
+
+    def custom_showwarning(message, category, filename, lineno, file=None, line=None):
+        # Check if this is the specific warning we want to ignore
+        msg_str = str(message)
+        # Match any "Could not add the following atom" warning or any isotope notation
+        if "Could not add the following atom" in msg_str or re.search(r'\[[0-9]+\]', msg_str):
+            return  # Completely suppress the warning
+        # For all other warnings, use the original handler
+        return original_showwarning(message, category, filename, lineno, file, line)
+
+    warnings.showwarning = custom_showwarning
+
 
 
 def get_logger(name: Optional[str] = None) -> logging.Logger:
