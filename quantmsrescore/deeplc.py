@@ -1,5 +1,4 @@
 import contextlib
-import logging
 import os
 from collections import defaultdict
 from itertools import chain
@@ -8,7 +7,10 @@ import numpy as np
 from ms2rescore.feature_generators import DeepLCFeatureGenerator
 from psm_utils import PSMList
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+from quantmsrescore.logging_config import get_logger
+
+# Get logger for this module
+logger = get_logger(__name__)
 
 
 class DeepLCAnnotator(DeepLCFeatureGenerator):
@@ -16,7 +18,7 @@ class DeepLCAnnotator(DeepLCFeatureGenerator):
     def add_features(self, psm_list: PSMList) -> None:
         """Add DeepLC-derived features to PSMs."""
 
-        logging.info("Adding DeepLC-derived features to PSMs.")
+        logger.info("Adding DeepLC-derived features to PSMs.")
 
         # Get easy-access nested version of PSMList
         psm_dict = psm_list.get_psm_dict()
@@ -37,7 +39,7 @@ class DeepLCAnnotator(DeepLCFeatureGenerator):
                         "rt_diff_best": np.inf,
                     }
                 )
-                logging.info(
+                logger.info(
                     f"Running DeepLC for PSMs from run ({current_run}/{total_runs}): `{run}`..."
                 )
 
@@ -51,7 +53,7 @@ class DeepLCAnnotator(DeepLCFeatureGenerator):
                     psm_list_run = PSMList(psm_list=list(chain.from_iterable(psms.values())))
 
                     psm_list_calibration = self._get_calibration_psms(psm_list_run)
-                    logging.debug(f"Calibrating DeepLC with {len(psm_list_calibration)} PSMs...")
+                    logger.debug(f"Calibrating DeepLC with {len(psm_list_calibration)} PSMs...")
                     self.deeplc_predictor = self.DeepLC(
                         n_jobs=self.processes,
                         verbose=self._verbose,
@@ -64,17 +66,17 @@ class DeepLCAnnotator(DeepLCFeatureGenerator):
                     # Still calibrate for each run, but do not try out all model options.
                     # Just use the model that was selected based on the first run
                     self.selected_model = list(self.deeplc_predictor.model.keys())
-                    logging.debug(
+                    logger.debug(
                         f"Selected DeepLC model {self.selected_model} based on "
                         "calibration of first run. Using this model (after new "
                         "calibrations) for the remaining runs."
                     )
-                    logging.debug("Predicting retention times...")
+                    logger.debug("Predicting retention times...")
                     predictions = np.array(self.deeplc_predictor.make_preds(psm_list_run))
                     observations = psm_list_run["retention_time"]
                     rt_diffs_run = np.abs(predictions - observations)
 
-                    logging.debug("Adding features to PSMs...")
+                    logger.debug("Adding features to PSMs...")
                     for i, psm in enumerate(psm_list_run):
                         psm["rescoring_features"].update(
                             {

@@ -2,12 +2,13 @@
 # Contributions by Yasset Perez-Riverol and Dai Chengxin
 # This script is part of the quantmsutils package
 
-import logging
 import click
 
-from quantmsrescore.annotator import Annotator
+from quantmsrescore.annotator import FeatureAnnotator
+from quantmsrescore.logging_config import configure_logging
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+# Configure logging with default settings
+configure_logging()
 
 
 @click.command(
@@ -166,7 +167,7 @@ def msrescore2feature(
         The regex pattern for PSM IDs.
     """
 
-    annotator = Annotator(
+    annotator = FeatureAnnotator(
         feature_generators=feature_generators,
         only_features=only_features,
         ms2pip_model=ms2pip_model,

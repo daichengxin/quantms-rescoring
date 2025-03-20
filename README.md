@@ -7,13 +7,13 @@
 
 quantms-rescoring is a Python tool that aims to add features to peptide-spectrum matches (PSMs) in idXML files using multiple tools including SAGE features, quantms spectrum features, MS2PIP and DeepLC. It is part of the quantms ecosystem package and leverages the MS²Rescore framework to improve identification confidence in proteomics data analysis.
 
-### Core Components
+## Core Components
 
 - **Annotator Engine**: Integrates [MS2PIP](https://github.com/compomics/ms2pip) and [DeepLC](https://github.com/compomics/DeepLC) models to improve peptide-spectrum match (PSM) confidence. 
 - **Feature Generation**: Extracts signal-to-noise ratios, spectrum metrics, SAGE extra features and add them to each PSM for posterior downstream with Percolator.
 - **OpenMS Integration**: Processes idXML and mzML files with custom validation methods.
 
-### CLI Tools
+## CLI Tools
 
 ```sh
  quantms-rescoring msrescore2feature --help
@@ -30,7 +30,45 @@ Incorporates additional features from SAGE into idXML files.
 ```
 Add additional spectrum feature like signal-to-noise to each PSM in the idXML.
 
-### Technical Implementation Details
+## Advanced Algorithms and Improvements
+
+quantms-rescoring significantly enhances the capabilities of MS2PIP, DeepLC, and MS2Rescore through several innovative approaches:
+
+### MS2PIP Integration Enhancements
+
+- **Intelligent Model Selection**: Automatically evaluates and selects the optimal MS2PIP model for each dataset based on fragmentation type and correlation quality. If the user-selected model performs poorly, the system will intelligently search for a better alternative.
+- **Adaptive MS2 Tolerance**: Dynamically adjusts MS2 tolerance based on the dataset characteristics, analyzing both reported and predicted tolerances to find the optimal setting.
+- **Correlation Validation**: Implements a robust validation system that ensures the selected model achieves sufficient correlation with experimental spectra, preventing the use of inappropriate models.
+- **Enhanced Spectrum Processing**: Uses OpenMS for spectrum file reading instead of ms2rescore_rs, providing better compatibility with a wider range of mzML files and formats.
+
+### DeepLC Innovations
+
+- **Model Optimization**: Automatically benchmarks pretrained vs. retrained DeepLC models for each dataset, selecting the one with the lowest Mean Absolute Error (MAE) for retention time prediction.
+- **Per-Run Calibration**: Calibrates DeepLC models for each run to account for chromatographic variations between experiments, improving prediction accuracy.
+- **Best Peptide Retention Time**: Tracks the best retention time prediction for each peptide across multiple PSMs, providing more reliable retention time features.
+- **Transfer Learning**: Leverages transfer learning to adapt models to specific experimental conditions, improving prediction accuracy for challenging datasets.
+
+### Spectrum Feature Analysis
+
+Unlike traditional rescoring approaches, quantms-rescoring incorporates advanced spectrum quality metrics:
+
+- **Signal-to-Noise Ratio (SNR)**: Calculates the ratio of maximum intensity to background noise, providing a robust measure of spectrum quality.
+- **Spectral Entropy**: Quantifies the uniformity of peak distribution, helping to distinguish between high and low-quality spectra.
+- **TIC Distribution Analysis**: Analyzes the distribution of Total Ion Current across peaks, identifying spectra with concentrated signal in top peaks.
+- **Weighted m/z Standard Deviation**: Estimates spectral complexity by calculating the intensity-weighted standard deviation of m/z values.
+
+### SAGE Feature Integration
+
+- **Seamless Integration**: Incorporates additional features from SAGE (Spectrum Agnostic Generation of Embeddings) into the rescoring pipeline.
+- **Feature Validation**: Ensures all features are properly validated and formatted for compatibility with OpenMS and downstream tools.
+
+### Advantages Over Existing Tools
+
+- **Compared to MS2PIP**: Adds automatic model selection, validation, and tolerance optimization, eliminating the need for manual parameter tuning.
+- **Compared to DeepLC**: Provides automatic model selection between pretrained and retrained models, with per-run calibration for improved accuracy.
+- **Compared to MS2Rescore**: Offers a more comprehensive feature set including spectrum quality metrics, better integration with OpenMS, and improved handling of different fragmentation methods and MS levels.
+
+## Technical Implementation Details
 
 #### Model Selection and Optimization
 
@@ -227,5 +265,4 @@ Install quantms-rescoring using one of the following methods:
 
 ### Issues and Contributions
 
-For any issues or contributions, please open an issue in the [GitHub repository](https://github.com/bigbio/quantms/issues) - we use the quantms repo to control all issues—or PR in the [GitHub repository](https://github.com/bigbio/quantms-rescoring/pulls). 
-
+For any issues or contributions, please open an issue in the [GitHub repository](https://github.com/bigbio/quantms/issues) - we use the quantms repo to control all issues—or PR in the [GitHub repository](https://github.com/bigbio/quantms-rescoring/pulls).
