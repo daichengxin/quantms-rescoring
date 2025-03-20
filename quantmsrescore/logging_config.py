@@ -8,7 +8,6 @@ with customizable log levels and formatters.
 import logging
 import sys
 import warnings
-import io
 import re
 from typing import Optional
 
@@ -69,11 +68,10 @@ def configure_logging(log_level: str = "INFO") -> None:
     for logger_name in logging.root.manager.loggerDict:
         logger = logging.getLogger(logger_name)
         logger.addFilter(IgnoreSpecificWarnings())
-    
+
     # Suppress specific warnings using multiple approaches
     warnings.filterwarnings("ignore", message=".*Could not add the following atom.*")
     warnings.filterwarnings("ignore", message=".*\\[[0-9]+\\].*")  # Match any isotope notation like [13], [15], etc.
-
     # Reduce the log level for this specific warning pattern
     logging.getLogger("ms2pip").setLevel(logging.ERROR)
 
