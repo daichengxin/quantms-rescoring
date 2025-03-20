@@ -50,8 +50,12 @@ def configure_logging(log_level: str = "INFO") -> None:
 
     # Suppress all warnings from pyopenms
     warnings.filterwarnings("ignore", module="pyopenms")
+
     # Ignore anoying warning from ms2pip
     root_logger.addFilter(IgnoreSpecificWarnings())
+    # Suppress specific warnings using a more direct approach
+    warnings.filterwarnings("ignore", message=".*Could not add the following atom.*")
+
 
 def get_logger(name: Optional[str] = None) -> logging.Logger:
     """
