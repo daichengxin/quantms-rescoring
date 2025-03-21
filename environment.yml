@@ -18,4 +18,3 @@ dependencies:
   - protobuf
   - pytest
   - ms2pip>=4.0
-  - ms2rescore-rs
