@@ -1,7 +1,6 @@
 import re
 from pathlib import Path
 from typing import List, Union, Optional, Tuple
-import os
 
 import numpy as np
 import pyopenms as oms
