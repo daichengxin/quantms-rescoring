@@ -8,11 +8,33 @@ with customizable log levels and formatters.
 import logging
 import sys
 import warnings
+import re
 from typing import Optional
 
 class IgnoreSpecificWarnings(logging.Filter):
     def filter(self, record):
-        return not ("Could not add the following atom" in record.getMessage())
+        # Check for any warnings we want to ignore
+        message = record.getMessage()
+        
+        # Isotope-related atom warnings
+        if "Could not add the following atom:" in message:
+            return False
+            
+        # OpenMS environment variable warning
+        if "OPENMS_DATA_PATH environment variable already exists" in message:
+            return False
+            
+        # CUDA and TensorFlow warnings
+        if any(pattern in message for pattern in [
+            "Unable to register cuDNN factory",
+            "Unable to register cuBLAS factory",
+            "computation placer already registered",
+            "failed call to cuInit",
+            "CUDA error"
+        ]):
+            return False
+            
+        return True
 
 def configure_logging(log_level: str = "INFO") -> None:
     """
@@ -50,11 +72,60 @@ def configure_logging(log_level: str = "INFO") -> None:
 
     # Suppress all warnings from pyopenms
     warnings.filterwarnings("ignore", module="pyopenms")
+    warnings.filterwarnings("ignore", module="ms2pip")
+    warnings.filterwarnings("ignore", module="ms2rescore")
+    warnings.filterwarnings("ignore", module="xgboost")
+    warnings.filterwarnings("ignore", module="tensorflow")
+    warnings.filterwarnings("ignore", module="deeplc")
 
-    # Ignore anoying warning from ms2pip
+    # Ignore annoying warning from ms2pip
     root_logger.addFilter(IgnoreSpecificWarnings())
-    # Suppress specific warnings using a more direct approach
+
+    # Apply filter to all loggers, not just root
+    for logger_name in logging.root.manager.loggerDict:
+        logger = logging.getLogger(logger_name)
+        logger.addFilter(IgnoreSpecificWarnings())
+
+    # Suppress specific warnings using multiple approaches
     warnings.filterwarnings("ignore", message=".*Could not add the following atom.*")
+    warnings.filterwarnings("ignore", message=".*\\[[0-9]+\\].*")  # Match any isotope notation like [13], [15], etc.
+    warnings.filterwarnings("ignore", message=".*OPENMS_DATA_PATH environment variable already exists.*")
+    
+    # Suppress CUDA and TensorFlow warnings
+    warnings.filterwarnings("ignore", message=".*Unable to register cuDNN factory.*")
+    warnings.filterwarnings("ignore", message=".*Unable to register cuBLAS factory.*")
+    warnings.filterwarnings("ignore", message=".*computation placer already registered.*")
+    warnings.filterwarnings("ignore", message=".*failed call to cuInit.*")
+    warnings.filterwarnings("ignore", message=".*CUDA error.*")
+    # Reduce the log level for this specific warning pattern
+    logging.getLogger("ms2pip").setLevel(logging.ERROR)
+
+    # Capture warnings and redirect them to the logging system
+    # This helps catch warnings that might bypass the regular filters
+    original_showwarning = warnings.showwarning
+
+    def custom_showwarning(message, category, filename, lineno, file=None, line=None):
+        # Check if this is the specific warning we want to ignore
+        msg_str = str(message)
+        # Match any warnings we want to suppress
+        cuda_tf_patterns = [
+            "Unable to register cuDNN factory",
+            "Unable to register cuBLAS factory",
+            "computation placer already registered",
+            "failed call to cuInit",
+            "CUDA error"
+        ]
+        
+        if ("Could not add the following atom" in msg_str or
+            re.search(r'\[[0-9]+\]', msg_str) or
+            "OPENMS_DATA_PATH environment variable already exists" in msg_str or
+            any(pattern in msg_str for pattern in cuda_tf_patterns)):
+            return  # Completely suppress the warning
+        # For all other warnings, use the original handler
+        return original_showwarning(message, category, filename, lineno, file, line)
+
+    warnings.showwarning = custom_showwarning
+
 
 
 def get_logger(name: Optional[str] = None) -> logging.Logger:
