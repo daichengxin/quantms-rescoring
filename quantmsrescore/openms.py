@@ -1,6 +1,7 @@
 import re
 from pathlib import Path
 from typing import List, Union, Optional, Tuple
+import os
 
 import numpy as np
 import pyopenms as oms
@@ -28,6 +29,8 @@ logger = get_logger(__name__)
 
 OPENMS_DECOY_FIELD = "target_decoy"
 SPECTRUM_PATTERN = r"(spectrum|scan)=(\d+)"
+if 'OPENMS_DATA_PATH' in os.environ:
+    del os.environ['OPENMS_DATA_PATH']
 
 
 class OpenMSHelper:
