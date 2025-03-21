@@ -73,7 +73,12 @@ def configure_logging(log_level: str = "INFO") -> None:
     root_logger.addHandler(console_handler)
 
     # Suppress all warnings from pyopenms
-    warnings.filterwarnings("ignore", module="pyopenms")
+    warnings.filterwarnings(
+        "ignore",
+        message="OPENMS_DATA_PATH environment variable already exists",
+        category=UserWarning,
+        module="pyopenms",
+    )
     warnings.filterwarnings("ignore", module="ms2pip")
     warnings.filterwarnings("ignore", module="ms2rescore")
     warnings.filterwarnings("ignore", module="xgboost")
