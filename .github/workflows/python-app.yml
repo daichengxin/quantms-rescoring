@@ -41,7 +41,7 @@ jobs:
       env:
         CUDA_VISIBLE_DEVICES: "-1"
       run: |
-        poetry run pytest
+        poetry run pytest -vv
     - name: Download test files
       env:
         CUDA_VISIBLE_DEVICES: "-1"
