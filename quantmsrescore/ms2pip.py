@@ -32,6 +32,7 @@ from quantmsrescore.openms import OpenMSHelper
 # Get logger for this module
 logger = get_logger(__name__)
 
+
 class PatchParallelized(_Parallelized):
     """
     Extended version of _Parallelized that supports custom spectrum file reading using pyopenms instead of
@@ -41,14 +42,7 @@ class PatchParallelized(_Parallelized):
     See example in issue:
     """
 
-    def __init__(
-            self,
-            encoder,
-            model=None,
-            model_dir=None,
-            ms2_tolerance=0.02,
-            processes=None
-    ):
+    def __init__(self, encoder, model=None, model_dir=None, ms2_tolerance=0.02, processes=None):
         """
         Initialize with all original parameters plus a custom spectrum reader.
 
@@ -74,12 +68,12 @@ class PatchParallelized(_Parallelized):
         )
 
     def process_spectra(
-            self,
-            psm_list,
-            spectrum_file,
-            spectrum_id_pattern,
-            vector_file=False,
-            annotations_only=False,
+        self,
+        psm_list,
+        spectrum_file,
+        spectrum_id_pattern,
+        vector_file=False,
+        annotations_only=False,
     ):
         """
         Override process_spectra to use our custom spectrum reader
@@ -111,8 +105,8 @@ class PatchParallelized(_Parallelized):
 
         # Add XGBoost predictions if required
         if (
-                not (vector_file or annotations_only)
-                and "xgboost_model_files" in MODELS[self.model].keys()
+            not (vector_file or annotations_only)
+            and "xgboost_model_files" in MODELS[self.model].keys()
         ):
             results = self._add_xgboost_predictions(results)
 
@@ -148,7 +142,11 @@ class PatchParallelized(_Parallelized):
                 logger.warning("No PSMs to process.")
                 return []
 
-            logger.info("The Pool number of process {} and CPUs {}".format(pool._processes, multiprocessing.cpu_count()))
+            logger.info(
+                "The Pool number of process {} and CPUs {}".format(
+                    pool._processes, multiprocessing.cpu_count()
+                )
+            )
 
             # Split PSMList into chunks
             if func == _custom_process_spectra:
@@ -167,14 +165,18 @@ class PatchParallelized(_Parallelized):
             logger.info(f"Processing {len(chunks)} chunk(s) of ~{chunk_size} entries each.")
 
             # Add jobs to pool
-            mp_results = [pool.apply_async(func, args=(psm_list_chunk, *args)) for psm_list_chunk in chunks]
+            mp_results = [
+                pool.apply_async(func, args=(psm_list_chunk, *args)) for psm_list_chunk in chunks
+            ]
             results = [r.get() for r in mp_results]
 
             pool.close()
             pool.join()
 
         # Sort results by input order
-        results = sorted(itertools.chain.from_iterable(results), key=lambda result: result.psm_index)
+        results = sorted(
+            itertools.chain.from_iterable(results), key=lambda result: result.psm_index
+        )
 
         return results
 
@@ -194,7 +196,9 @@ class PatchParallelized(_Parallelized):
 
         # Check if already inside a worker process
         if multiprocessing.parent_process() is not None:
-            logger.warning("Attempting to create a pool inside a worker process! Returning a dummy pool instead.")
+            logger.warning(
+                "Attempting to create a pool inside a worker process! Returning a dummy pool instead."
+            )
             return multiprocessing.dummy.Pool(1)
 
         return multiprocessing.get_context("spawn").Pool(self.processes)
@@ -292,8 +296,8 @@ class MS2PIPAnnotator(MS2PIPFeatureGenerator):
                     )
                     raise Ms2pipIncorrectModelException(
                         message="The number of valid correlations doesn't exceed the threshold for current the "
-                                "calibration set. Please try a different model or adjust the valid_correlations_size "
-                                "or calibration_set_size.",
+                        "calibration set. Please try a different model or adjust the valid_correlations_size "
+                        "or calibration_set_size.",
                         model=self.model,
                     )
                 self._calculate_features(psm_list_run, ms2pip_results)
@@ -301,7 +305,11 @@ class MS2PIPAnnotator(MS2PIPFeatureGenerator):
 
     @staticmethod
     def _validate_scores(
-        ms2pip_results, calibration_set_size, valid_correlations_size, correlation_threshold, higher_score_better
+        ms2pip_results,
+        calibration_set_size,
+        valid_correlations_size,
+        correlation_threshold,
+        higher_score_better,
     ) -> bool:
         """
         Validate MS²PIP results based on score and correlation criteria.
@@ -338,7 +346,11 @@ class MS2PIPAnnotator(MS2PIPFeatureGenerator):
         )  # Copy ms2pip results to avoid modifying the original list
 
         # Select only PSMs that are target and not decoys
-        ms2pip_results_copy = [result for result in ms2pip_results_copy if not result.psm.is_decoy]
+        ms2pip_results_copy = [
+            result
+            for result in ms2pip_results_copy
+            if not result.psm.is_decoy and result.psm.rank == 1
+        ]
         # Sort ms2pip results by PSM score and lower score is better
         ms2pip_results_copy.sort(key=lambda x: x.psm.score, reverse=higher_score_better)
 
@@ -353,8 +365,8 @@ class MS2PIPAnnotator(MS2PIPFeatureGenerator):
         ]
 
         logger.info(
-            f"The number of valid correlations is {int(len(valid_correlation)/len(calibration_set)*100)}% of the "
-            f"calibration set top {calibration_set_size*100}% PSMs"
+            f"The percentage of PSMs in the top {calibration_set_size * 100}% with a correlation greater than {correlation_threshold} is: "
+            f"{(len(valid_correlation) / len(calibration_set)) * 100:.2f}%"
         )
 
         # If the number of valid correlations is less than 80% of the calibration set, return False
@@ -393,8 +405,9 @@ class MS2PIPAnnotator(MS2PIPFeatureGenerator):
             }
 
         self.ms2_tolerance = self.choose_best_ms2pip_tolerance(
-            ms2_tolerance=self.ms2_tolerance, reported_tolerance=self._reported_tolerance
-            , predicted_tolerance=self._predicted_tolerance
+            ms2_tolerance=self.ms2_tolerance,
+            reported_tolerance=self._reported_tolerance,
+            predicted_tolerance=self._predicted_tolerance,
         )
 
         for fragment_types in filtered_models:
@@ -435,7 +448,13 @@ class MS2PIPAnnotator(MS2PIPFeatureGenerator):
         float
             The average correlation score of the provided MS²PIP results.
         """
-        total_correlation = sum([psm.correlation for psm in ms2pip_results if psm.correlation is not None and not np.isnan(psm.correlation)])
+        total_correlation = sum(
+            [
+                psm.correlation
+                for psm in ms2pip_results
+                if psm.correlation is not None and not np.isnan(psm.correlation)
+            ]
+        )
         return total_correlation / len(ms2pip_results)
 
     def choose_best_ms2pip_tolerance(
@@ -487,7 +506,7 @@ class MS2PIPAnnotator(MS2PIPFeatureGenerator):
                 predicted_tolerance is not None
                 and predicted_tolerance[1] == "Da"
                 and ms2_tolerance < predicted_tolerance[0]
-                and (predicted_tolerance[0]/ms2_tolerance) > 0.1
+                and (predicted_tolerance[0] / ms2_tolerance) > 0.1
             ):
                 logger.warning(
                     f"Reported MS²PIP tolerance is in ppm. Using the predicted Da equivalent: "
@@ -527,18 +546,18 @@ class MS2PIPAnnotator(MS2PIPFeatureGenerator):
         return ms2_tolerance
 
     def custom_correlate(
-            self,
-            psms: Union[PSMList, str, Path],
-            spectrum_file: Union[str, Path],
-            psm_filetype: Optional[str] = None,
-            spectrum_id_pattern: Optional[str] = None,
-            compute_correlations: bool = False,
-            add_retention_time: bool = False,
-            add_ion_mobility: bool = False,
-            model: Optional[str] = "HCD",
-            model_dir: Optional[Union[str, Path]] = None,
-            ms2_tolerance: float = 0.02,
-            processes: Optional[int] = None,
+        self,
+        psms: Union[PSMList, str, Path],
+        spectrum_file: Union[str, Path],
+        psm_filetype: Optional[str] = None,
+        spectrum_id_pattern: Optional[str] = None,
+        compute_correlations: bool = False,
+        add_retention_time: bool = False,
+        add_ion_mobility: bool = False,
+        model: Optional[str] = "HCD",
+        model_dir: Optional[Union[str, Path]] = None,
+        ms2_tolerance: float = 0.02,
+        processes: Optional[int] = None,
     ) -> List[ProcessingResult]:
         """
         Custom implementation of correlate that uses our custom spectrum reader.
@@ -563,7 +582,7 @@ class MS2PIPAnnotator(MS2PIPFeatureGenerator):
                 model=model,
                 model_dir=model_dir,
                 ms2_tolerance=ms2_tolerance,
-                processes=processes
+                processes=processes,
             )
 
             logger.info("Processing spectra and peptides with custom reader...")
@@ -573,11 +592,13 @@ class MS2PIPAnnotator(MS2PIPFeatureGenerator):
 
             # Correlations also requested
             if compute_correlations:
-                logger.info("Computing correlations")
                 calculate_correlations(results)
-                logger.info(f"Median correlation: {np.median([r.correlation for r in results if r.correlation is not None and not np.isnan(r.correlation)])}")
+                logger.info(
+                    f"Median correlation: {np.median([r.correlation for r in results if r.correlation is not None and not np.isnan(r.correlation)])}, model {model}"
+                )
 
             return results
+
 
 def calculate_correlations(results: List[ProcessingResult]) -> None:
     """Calculate and add Pearson correlations to list of results."""
@@ -589,6 +610,7 @@ def calculate_correlations(results: List[ProcessingResult]) -> None:
         else:
             result.correlation = None
             logger.info("Results {} is empty".format(result))
+
 
 def read_spectrum_file(spec_file: str) -> Generator[ObservedSpectrum, None, None]:
     """
@@ -631,11 +653,11 @@ def read_spectrum_file(spec_file: str) -> Generator[ObservedSpectrum, None, None
                 identifier=str(spec_id),
                 precursor_mz=float(exp_mz),
                 precursor_charge=float(charge_state),
-                retention_time=float(rt)
+                retention_time=float(rt),
             )
         if (
-            obs_spectrum is None or
-            obs_spectrum.identifier == ""
+            obs_spectrum is None
+            or obs_spectrum.identifier == ""
             or obs_spectrum.mz.shape[0] == 0
             or obs_spectrum.intensity.shape[0] == 0
         ):
@@ -684,13 +706,14 @@ def _preprocess_spectrum(spectrum: ObservedSpectrum, model: str) -> None:
     spectrum.tic_norm()
     spectrum.log2_transform()
 
+
 def _get_targets_for_psm(
     psm: PSM,
     spectrum: ObservedSpectrum,
     encoder: Encoder,
     ms2_tolerance: float,
     model: str,
-    ion_types: List[str]
+    ion_types: List[str],
 ) -> Tuple[Optional[np.ndarray], Dict[str, np.ndarray]]:
     """
     Get targets for a PSM from a spectrum.
@@ -746,7 +769,7 @@ def _create_result_for_mode(
     annotations_only: bool,
     model: str,
     encoder: Encoder,
-    ion_types: List[str]
+    ion_types: List[str],
 ) -> ProcessingResult:
     """
     Create a ProcessingResult based on the processing mode.
@@ -781,9 +804,7 @@ def _create_result_for_mode(
         # Extract feature vectors
         enc_peptide = encoder.encode_peptide(psm.peptidoform)
         feature_vectors = np.array(
-            ms2pip_pyx.get_vector(
-                enc_peptide, enc_peptidoform, psm.peptidoform.precursor_charge
-            ),
+            ms2pip_pyx.get_vector(enc_peptide, enc_peptidoform, psm.peptidoform.precursor_charge),
             dtype=np.uint16,
         )
         return ProcessingResult(
@@ -911,8 +932,15 @@ def _custom_process_spectra(
 
             # Create result based on processing mode
             result = _create_result_for_mode(
-                psm_index, psm, enc_peptidoform, targets,
-                vector_file, annotations_only, model, encoder, ion_types
+                psm_index,
+                psm,
+                enc_peptidoform,
+                targets,
+                vector_file,
+                annotations_only,
+                model,
+                encoder,
+                ion_types,
             )
 
             results.append(result)

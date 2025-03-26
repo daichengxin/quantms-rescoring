@@ -82,6 +82,7 @@ class FeatureAnnotator:
         """
         # Set up logging
         from quantmsrescore.logging_config import configure_logging
+
         configure_logging(log_level)
 
         # Validate inputs
@@ -246,7 +247,9 @@ class FeatureAnnotator:
         except Exception as e:
             logger.error(f"Failed to add MS2PIP features: {e}")
 
-    def _create_ms2pip_annotator(self, model: Optional[str] = None, tolerance: Optional[float] = None) -> MS2PIPAnnotator:
+    def _create_ms2pip_annotator(
+        self, model: Optional[str] = None, tolerance: Optional[float] = None
+    ) -> MS2PIPAnnotator:
         """
         Create an MS2PIP annotator with the specified or default model.
 
@@ -303,7 +306,7 @@ class FeatureAnnotator:
             logger.info(f"Best model found: {model} with average correlation {corr}")
 
             # Create new annotator with best model
-            ms2pip_generator = self._create_ms2pip_annotator(model=model, tolerance = tolerance)
+            ms2pip_generator = self._create_ms2pip_annotator(model=model, tolerance=tolerance)
 
             # Apply annotation with best model
             ms2pip_generator.add_features(psm_list)

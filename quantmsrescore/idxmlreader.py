@@ -278,7 +278,7 @@ class IdXMLRescoringReader(IdXMLReader):
                 score=peptide_hit.getScore(),
                 precursor_mz=peptide_id.getMZ(),
                 retention_time=rt,
-                rank=peptide_hit.getRank() + 1,
+                rank=peptide_hit.getRank() + 1,  # Ranks in idXML start at 0
                 source="idXML",
                 provenance_data={provenance_key: ""},  # We use only the key for provenance
             )

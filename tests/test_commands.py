@@ -14,6 +14,7 @@ TESTS_DIR = Path(__file__).parent
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
+
 @pytest.mark.skip(reason="This is for local test in big datasets, kipping for now")
 def test_ms2rescore():
     runner = CliRunner()
@@ -34,7 +35,7 @@ def test_ms2rescore():
             "--ms2pip_model",
             "HCD2021",
             "--feature_generators",
-            "'ms2pip,deeplc'"
+            "'ms2pip,deeplc'",
         ],
     )
     assert result.exit_code == 0
@@ -135,6 +136,7 @@ def test_annotator_train_rt():
     )
 
     annotator.write_idxml_file(output_file)
+
 
 def test_idxmlreader_filtering():
 
@@ -244,11 +246,7 @@ def test_idxmlreader_failing_help():
     annotator.build_idxml_data(idxml_file, mzml_file)
     annotator.annotate()
 
-    output_file = (
-            TESTS_DIR
-            / "test_data"
-            / "01321_E03_P013560_B00_N21_R1_rescored.idXML"
-    )
+    output_file = TESTS_DIR / "test_data" / "01321_E03_P013560_B00_N21_R1_rescored.idXML"
 
     annotator.write_idxml_file(output_file)
 
@@ -308,6 +306,7 @@ def test_add_sage_feature_help():
     result = runner.invoke(cli, ["sage2feature", "--help"])
 
     assert result.exit_code == 0
+
 
 def test_version():
     runner = CliRunner()
