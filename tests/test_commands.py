@@ -34,9 +34,7 @@ def test_ms2rescore():
             "--ms2pip_model",
             "HCD2021",
             "--feature_generators",
-            "'ms2pip,deeplc'",
-            "--id_decoy_pattern",
-            "^rev",
+            "'ms2pip,deeplc'"
         ],
     )
     assert result.exit_code == 0
@@ -61,8 +59,6 @@ def test_ms2rescore_failing():
             "2",
             "--ms2pip_model",
             "TMT",
-            "--id_decoy_pattern",
-            "^DECOY_",
             "--ms2_tolerance",
             "0.4",
             "--calibration_set_size",
@@ -125,7 +121,6 @@ def test_annotator_train_rt():
         calibration_set_size=0.15,
         skip_deeplc_retrain=False,
         processes=2,
-        id_decoy_pattern="^DECOY_",
         log_level="INFO",
         spectrum_id_pattern="(.*)",
         psm_id_pattern="(.*)",
@@ -162,7 +157,6 @@ def test_idxmlreader_filtering():
         calibration_set_size=0.15,
         skip_deeplc_retrain=True,
         processes=2,
-        id_decoy_pattern="^DECOY_",
         log_level="INFO",
         spectrum_id_pattern="(.*)",
         psm_id_pattern="(.*)",
@@ -200,7 +194,6 @@ def test_idxmlreader_wrong_model():
         calibration_set_size=0.15,
         skip_deeplc_retrain=True,
         processes=2,
-        id_decoy_pattern="^DECOY_",
         log_level="INFO",
         spectrum_id_pattern="(.*)",
         psm_id_pattern="(.*)",
@@ -243,7 +236,6 @@ def test_idxmlreader_failing_help():
         calibration_set_size=0.15,
         skip_deeplc_retrain=True,
         processes=2,
-        id_decoy_pattern="^DECOY_",
         log_level="INFO",
         spectrum_id_pattern="(.*)",
         psm_id_pattern="(.*)",
@@ -342,8 +334,6 @@ def test_local_file():
             "CID",
             "--feature_generators",
             "ms2pip,deeplc",
-            "--id_decoy_pattern",
-            "^DECOY_",
             "--output",
             "{}/UPS1_50amol_R1_rescored.idXML".format(local_folder),
             "--ms2_tolerance",
@@ -351,4 +341,3 @@ def test_local_file():
         ],
     )
     assert result.exit_code == 0
-

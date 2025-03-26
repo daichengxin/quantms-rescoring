@@ -34,7 +34,6 @@ class FeatureAnnotator:
         valid_correlations_size: float = 0.8,
         skip_deeplc_retrain: bool = False,
         processes: int = 2,
-        id_decoy_pattern: str = "^DECOY_",
         log_level: str = "INFO",
         spectrum_id_pattern: str = "(.*)",  # default for openms idXML
         psm_id_pattern: str = "(.*)",  # default for openms idXML
@@ -63,8 +62,6 @@ class FeatureAnnotator:
             Skip retraining the deepLC model (default: False).
         processes : int, optional
             Number of parallel processes (default: 2).
-        id_decoy_pattern : str, optional
-            Pattern for identifying decoy PSMs (default: "^DECOY_").
         log_level : str, optional
             Logging level (default: "INFO").
         spectrum_id_pattern : str, optional
@@ -112,7 +109,6 @@ class FeatureAnnotator:
         self._calibration_set_size = calibration_set_size
         self._valid_correlations_size = valid_correlations_size
         self._processes = processes
-        self._id_decoy_pattern = id_decoy_pattern
         self._higher_score_better = None
         self._spectrum_id_pattern = spectrum_id_pattern
         self._psm_id_pattern = psm_id_pattern

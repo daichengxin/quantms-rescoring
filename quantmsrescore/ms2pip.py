@@ -1,4 +1,5 @@
 import itertools
+import multiprocessing
 import re
 from collections import defaultdict
 from itertools import chain
@@ -53,8 +54,16 @@ class PatchParallelized(_Parallelized):
 
         Parameters
         ----------
-        spectrum_reader : Callable
-            Function that reads spectrum files and yields spectrum objects
+        encoder:
+            Encoder object to use for encoding peptides.
+        model:
+            MS²PIP model to use for scoring.
+        model_dir:
+            Directory containing model files.
+        ms2_tolerance:
+            MS² tolerance in Da.
+        processes:
+            Number of processes to use for parallelization.
         """
         super().__init__(
             encoder=encoder,
@@ -116,10 +125,9 @@ class PatchParallelized(_Parallelized):
             """Get optimal chunk size for multiprocessing."""
             if n_items < 5000:
                 return n_items
-            else:
-                max_chunk_size = 50000
-                n_chunks = ceil(ceil(n_items / n_processes) / max_chunk_size) * n_processes
-                return ceil(n_items / n_chunks)
+            max_chunk_size = 50000
+            n_chunks = ceil(ceil(n_items / n_processes) / max_chunk_size) * n_processes
+            return ceil(n_items / n_chunks)
 
         def to_chunks(_list, chunk_size):
             """Split _list into chunks of size chunk_size."""
@@ -140,6 +148,8 @@ class PatchParallelized(_Parallelized):
                 logger.warning("No PSMs to process.")
                 return []
 
+            logger.info("The Pool number of process {} and CPUs {}".format(pool._processes, multiprocessing.cpu_count()))
+
             # Split PSMList into chunks
             if func == _custom_process_spectra:
                 # Split by spectrum_id to keep PSMs for same spectrum together
@@ -154,23 +164,40 @@ class PatchParallelized(_Parallelized):
                 chunk_size = get_chunk_size(len(psm_list), pool._processes)
                 chunks = to_chunks(list(enumerate(psm_list)), chunk_size)
 
-            logger.debug(f"Processing {len(chunks)} chunk(s) of ~{chunk_size} entries each.")
+            logger.info(f"Processing {len(chunks)} chunk(s) of ~{chunk_size} entries each.")
 
             # Add jobs to pool
-            mp_results = []
-            for psm_list_chunk in chunks:
-                mp_results.append(pool.apply_async(func, args=(psm_list_chunk, *args)))
+            mp_results = [pool.apply_async(func, args=(psm_list_chunk, *args)) for psm_list_chunk in chunks]
             results = [r.get() for r in mp_results]
 
+            pool.close()
+            pool.join()
+
         # Sort results by input order
-        results = list(
-            sorted(
-                itertools.chain.from_iterable(results),
-                key=lambda result: result.psm_index,
-            )
-        )
+        results = sorted(itertools.chain.from_iterable(results), key=lambda result: result.psm_index)
 
         return results
+
+    def _get_pool(self):
+        """Get multiprocessing pool with recursion protection."""
+        logger.debug(f"Starting workers (processes={self.processes})...")
+
+        if multiprocessing.current_process().daemon:
+            logger.warning(
+                "Running in a daemon process. Disabling multiprocessing as daemonic processes cannot have children."
+            )
+            return multiprocessing.dummy.Pool(1)
+
+        if self.processes == 1:
+            logger.debug("Using dummy multiprocessing pool.")
+            return multiprocessing.dummy.Pool(1)
+
+        # Check if already inside a worker process
+        if multiprocessing.parent_process() is not None:
+            logger.warning("Attempting to create a pool inside a worker process! Returning a dummy pool instead.")
+            return multiprocessing.dummy.Pool(1)
+
+        return multiprocessing.get_context("spawn").Pool(self.processes)
 
 
 class MS2PIPAnnotator(MS2PIPFeatureGenerator):
