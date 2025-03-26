@@ -79,6 +79,12 @@ def configure_logging(log_level: str = "INFO") -> None:
         category=UserWarning,
         module="pyopenms",
     )
+    warnings.filterwarnings(
+        action="ignore",
+        message=".*OPENMS_DATA_PATH.*",
+        category=UserWarning,
+        module="pyopenms",
+    )
     warnings.filterwarnings("ignore", module="ms2pip")
     warnings.filterwarnings("ignore", module="ms2rescore")
     warnings.filterwarnings("ignore", module="xgboost")
@@ -95,6 +101,8 @@ def configure_logging(log_level: str = "INFO") -> None:
 
     # Suppress specific warnings using multiple approaches
     warnings.filterwarnings("ignore", message=".*Could not add the following atom.*")
+    warnings.filterwarnings("ignore", message=".*Could not add the following value*.")
+    warnings.filterwarnings("ignore", message=".*Skipping the following (not in library).*")
     warnings.filterwarnings("ignore", message=".*\\[[0-9]+\\].*")  # Match any isotope notation like [13], [15], etc.
     warnings.filterwarnings("ignore", message=".*OPENMS_DATA_PATH environment variable already exists.*")
 
