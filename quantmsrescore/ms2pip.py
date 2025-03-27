@@ -216,7 +216,7 @@ class MS2PIPAnnotator(MS2PIPFeatureGenerator):
         model_dir: Optional[str] = None,
         processes: int = 1,
         calibration_set_size: Optional[float] = 0.20,
-        valid_correlations_size: Optional[float] = 0.80,
+        valid_correlations_size: Optional[float] = 0.70,
         correlation_threshold: Optional[float] = 0.6,
         higher_score_better: bool = True,
         annotated_ms_tolerance: Tuple[float, str] = (0.0, None),

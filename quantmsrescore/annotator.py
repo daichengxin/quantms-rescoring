@@ -31,7 +31,7 @@ class FeatureAnnotator:
         ms2pip_model_path: str = "models",
         ms2_tolerance: float = 0.05,
         calibration_set_size: float = 0.2,
-        valid_correlations_size: float = 0.8,
+        valid_correlations_size: float = 0.7,
         skip_deeplc_retrain: bool = False,
         processes: int = 2,
         log_level: str = "INFO",

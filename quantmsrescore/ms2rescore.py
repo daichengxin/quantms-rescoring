@@ -75,8 +75,8 @@ configure_logging()
 )
 @click.option(
     "--valid_correlations_size",
-    help="Percentage of number of psms with correlation above the threshold (default: `0.80)",
-    default=0.80,
+    help="Percentage of number of psms with correlation above the threshold (default: `0.70)",
+    default=0.70,
 )
 @click.option(
     "--skip_deeplc_retrain",
