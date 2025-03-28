@@ -32,7 +32,7 @@ class IgnoreSpecificWarnings(logging.Filter):
             return False
 
         # OpenMS environment variable warning
-        if "OPENMS_DATA_PATH environment variable already exists" in message:
+        if "OPENMS_DATA_PATH" in message:
             return False
 
         # CUDA and TensorFlow warnings
@@ -90,13 +90,15 @@ def configure_logging(log_level: str = "INFO") -> None:
         "ignore",
         message="OPENMS_DATA_PATH environment variable already exists",
         category=UserWarning,
-        module="pyopenms",
     )
     warnings.filterwarnings(
         action="ignore",
         message=".*OPENMS_DATA_PATH.*",
         category=UserWarning,
-        module="pyopenms",
+    )
+    warnings.filterwarnings(
+        "ignore",
+        message="Warning: OPENMS_DATA_PATH environment variable already exists.*",
     )
     warnings.filterwarnings("ignore", module="ms2pip")
     warnings.filterwarnings("ignore", module="ms2rescore")
@@ -121,7 +123,7 @@ def configure_logging(log_level: str = "INFO") -> None:
         "ignore", message=".*\\[[0-9]+\\].*"
     )  # Match any isotope notation like [13], [15], etc.
     warnings.filterwarnings(
-        "ignore", message=".*OPENMS_DATA_PATH environment variable already exists.*"
+        "ignore", message=".*OPENMS_DATA_PATH.*"
     )
 
     # Suppress CUDA and TensorFlow warnings
@@ -155,7 +157,7 @@ def configure_logging(log_level: str = "INFO") -> None:
             or "Skipping the following (not in library)" in msg_str
             or "DeepLC tried to set intra op threads" in msg_str
             or re.search(r"\[[0-9]+\]", msg_str)
-            or "OPENMS_DATA_PATH environment variable already exists" in msg_str
+            or "OPENMS_DATA_PATH" in msg_str
             or any(pattern in msg_str for pattern in cuda_tf_patterns)
         ):
             return  # Completely suppress the warning
