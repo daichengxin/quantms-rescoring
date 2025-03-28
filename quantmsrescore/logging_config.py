@@ -32,7 +32,7 @@ class IgnoreSpecificWarnings(logging.Filter):
             return False
 
         # OpenMS environment variable warning
-        if "OPENMS_DATA_PATH" in message:
+        if re.search(r"Warning: OPENMS_DATA_PATH is not set", message):
             return False
 
         # CUDA and TensorFlow warnings
