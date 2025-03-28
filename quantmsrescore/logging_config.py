@@ -21,8 +21,18 @@ class IgnoreSpecificWarnings(logging.Filter):
         if "Could not add the following atom:" in message:
             return False
 
+        # DeepLC-related warnings
+        if "Could not add the following value:" in message:
+            return False
+
+        if "Skipping the following (not in library):" in message:
+            return False
+
+        if "DeepLC tried to set intra op threads" in message:
+            return False
+
         # OpenMS environment variable warning
-        if "OPENMS_DATA_PATH environment variable already exists" in message:
+        if "OPENMS_DATA_PATH" in message:
             return False
 
         # CUDA and TensorFlow warnings
@@ -80,13 +90,15 @@ def configure_logging(log_level: str = "INFO") -> None:
         "ignore",
         message="OPENMS_DATA_PATH environment variable already exists",
         category=UserWarning,
-        module="pyopenms",
     )
     warnings.filterwarnings(
         action="ignore",
         message=".*OPENMS_DATA_PATH.*",
         category=UserWarning,
-        module="pyopenms",
+    )
+    warnings.filterwarnings(
+        "ignore",
+        message="Warning: OPENMS_DATA_PATH environment variable already exists.*",
     )
     warnings.filterwarnings("ignore", module="ms2pip")
     warnings.filterwarnings("ignore", module="ms2rescore")
@@ -104,14 +116,13 @@ def configure_logging(log_level: str = "INFO") -> None:
 
     # Suppress specific warnings using multiple approaches
     warnings.filterwarnings("ignore", message=".*Could not add the following atom.*")
-    warnings.filterwarnings("ignore", message=".*Could not add the following value*.")
-    warnings.filterwarnings("ignore", message=".*Skipping the following (not in library).*")
+    warnings.filterwarnings("ignore", message=".*Could not add the following value.*")
+    warnings.filterwarnings("ignore", message=".*Skipping the following \(not in library\).*")
+    warnings.filterwarnings("ignore", message=".*DeepLC tried to set intra op threads.*")
     warnings.filterwarnings(
         "ignore", message=".*\\[[0-9]+\\].*"
     )  # Match any isotope notation like [13], [15], etc.
-    warnings.filterwarnings(
-        "ignore", message=".*OPENMS_DATA_PATH environment variable already exists.*"
-    )
+    warnings.filterwarnings("ignore", message=".*OPENMS_DATA_PATH.*")
 
     # Suppress CUDA and TensorFlow warnings
     warnings.filterwarnings("ignore", message=".*Unable to register cuDNN factory.*")
@@ -140,8 +151,11 @@ def configure_logging(log_level: str = "INFO") -> None:
 
         if (
             "Could not add the following atom" in msg_str
+            or "Could not add the following value" in msg_str
+            or "Skipping the following (not in library)" in msg_str
+            or "DeepLC tried to set intra op threads" in msg_str
             or re.search(r"\[[0-9]+\]", msg_str)
-            or "OPENMS_DATA_PATH environment variable already exists" in msg_str
+            or "OPENMS_DATA_PATH" in msg_str
             or any(pattern in msg_str for pattern in cuda_tf_patterns)
         ):
             return  # Completely suppress the warning
