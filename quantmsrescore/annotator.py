@@ -31,10 +31,9 @@ class FeatureAnnotator:
         ms2pip_model_path: str = "models",
         ms2_tolerance: float = 0.05,
         calibration_set_size: float = 0.2,
-        valid_correlations_size: float = 0.8,
+        valid_correlations_size: float = 0.7,
         skip_deeplc_retrain: bool = False,
         processes: int = 2,
-        id_decoy_pattern: str = "^DECOY_",
         log_level: str = "INFO",
         spectrum_id_pattern: str = "(.*)",  # default for openms idXML
         psm_id_pattern: str = "(.*)",  # default for openms idXML
@@ -63,8 +62,6 @@ class FeatureAnnotator:
             Skip retraining the deepLC model (default: False).
         processes : int, optional
             Number of parallel processes (default: 2).
-        id_decoy_pattern : str, optional
-            Pattern for identifying decoy PSMs (default: "^DECOY_").
         log_level : str, optional
             Logging level (default: "INFO").
         spectrum_id_pattern : str, optional
@@ -85,6 +82,7 @@ class FeatureAnnotator:
         """
         # Set up logging
         from quantmsrescore.logging_config import configure_logging
+
         configure_logging(log_level)
 
         # Validate inputs
@@ -112,7 +110,6 @@ class FeatureAnnotator:
         self._calibration_set_size = calibration_set_size
         self._valid_correlations_size = valid_correlations_size
         self._processes = processes
-        self._id_decoy_pattern = id_decoy_pattern
         self._higher_score_better = None
         self._spectrum_id_pattern = spectrum_id_pattern
         self._psm_id_pattern = psm_id_pattern
@@ -250,7 +247,9 @@ class FeatureAnnotator:
         except Exception as e:
             logger.error(f"Failed to add MS2PIP features: {e}")
 
-    def _create_ms2pip_annotator(self, model: Optional[str] = None, tolerance: Optional[float] = None) -> MS2PIPAnnotator:
+    def _create_ms2pip_annotator(
+        self, model: Optional[str] = None, tolerance: Optional[float] = None
+    ) -> MS2PIPAnnotator:
         """
         Create an MS2PIP annotator with the specified or default model.
 
@@ -307,7 +306,7 @@ class FeatureAnnotator:
             logger.info(f"Best model found: {model} with average correlation {corr}")
 
             # Create new annotator with best model
-            ms2pip_generator = self._create_ms2pip_annotator(model=model, tolerance = tolerance)
+            ms2pip_generator = self._create_ms2pip_annotator(model=model, tolerance=tolerance)
 
             # Apply annotation with best model
             ms2pip_generator.add_features(psm_list)

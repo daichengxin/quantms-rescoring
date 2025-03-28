@@ -1,6 +1,14 @@
 import re
 from pathlib import Path
 from typing import List, Union, Optional, Tuple
+from warnings import filterwarnings
+
+filterwarnings(
+    "ignore",
+    message="OPENMS_DATA_PATH environment variable already exists",
+    category=UserWarning,
+    module="pyopenms",
+)
 
 import numpy as np
 import pyopenms as oms

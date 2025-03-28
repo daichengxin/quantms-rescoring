@@ -75,18 +75,13 @@ configure_logging()
 )
 @click.option(
     "--valid_correlations_size",
-    help="Percentage of number of psms with correlation above the threshold (default: `0.80)",
-    default=0.80,
+    help="Percentage of number of psms with correlation above the threshold (default: `0.70)",
+    default=0.70,
 )
 @click.option(
     "--skip_deeplc_retrain",
     help="Skip retraining of DeepLC model (default: `False`)",
     is_flag=True,
-)
-@click.option(
-    "--id_decoy_pattern",
-    help="Regex decoy pattern (default: `DECOY_`)",
-    default="^DECOY_",
 )
 @click.option(
     "--spectrum_id_pattern",
@@ -116,7 +111,6 @@ def msrescore2feature(
     calibration_set_size,
     valid_correlations_size,
     skip_deeplc_retrain,
-    id_decoy_pattern,
     spectrum_id_pattern: str,
     psm_id_pattern: str,
 ):
@@ -159,8 +153,6 @@ def msrescore2feature(
         Fraction of the valid PSM.
     skip_deeplc_retrain : bool
         Whether to skip retraining the DeepLC model.
-    id_decoy_pattern : str
-        The regex pattern to identify decoy IDs.
     spectrum_id_pattern : str
         The regex pattern for spectrum IDs.
     psm_id_pattern : str
@@ -177,7 +169,6 @@ def msrescore2feature(
         valid_correlations_size=valid_correlations_size,
         skip_deeplc_retrain=skip_deeplc_retrain,
         processes=processes,
-        id_decoy_pattern=id_decoy_pattern,
         log_level=log_level.upper(),
         spectrum_id_pattern=spectrum_id_pattern,
         psm_id_pattern=psm_id_pattern,

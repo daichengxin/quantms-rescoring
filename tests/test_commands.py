@@ -14,6 +14,7 @@ TESTS_DIR = Path(__file__).parent
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
+
 @pytest.mark.skip(reason="This is for local test in big datasets, kipping for now")
 def test_ms2rescore():
     runner = CliRunner()
@@ -35,8 +36,6 @@ def test_ms2rescore():
             "HCD2021",
             "--feature_generators",
             "'ms2pip,deeplc'",
-            "--id_decoy_pattern",
-            "^rev",
         ],
     )
     assert result.exit_code == 0
@@ -61,8 +60,6 @@ def test_ms2rescore_failing():
             "2",
             "--ms2pip_model",
             "TMT",
-            "--id_decoy_pattern",
-            "^DECOY_",
             "--ms2_tolerance",
             "0.4",
             "--calibration_set_size",
@@ -125,7 +122,6 @@ def test_annotator_train_rt():
         calibration_set_size=0.15,
         skip_deeplc_retrain=False,
         processes=2,
-        id_decoy_pattern="^DECOY_",
         log_level="INFO",
         spectrum_id_pattern="(.*)",
         psm_id_pattern="(.*)",
@@ -140,6 +136,7 @@ def test_annotator_train_rt():
     )
 
     annotator.write_idxml_file(output_file)
+
 
 def test_idxmlreader_filtering():
 
@@ -162,7 +159,6 @@ def test_idxmlreader_filtering():
         calibration_set_size=0.15,
         skip_deeplc_retrain=True,
         processes=2,
-        id_decoy_pattern="^DECOY_",
         log_level="INFO",
         spectrum_id_pattern="(.*)",
         psm_id_pattern="(.*)",
@@ -200,7 +196,6 @@ def test_idxmlreader_wrong_model():
         calibration_set_size=0.15,
         skip_deeplc_retrain=True,
         processes=2,
-        id_decoy_pattern="^DECOY_",
         log_level="INFO",
         spectrum_id_pattern="(.*)",
         psm_id_pattern="(.*)",
@@ -243,7 +238,6 @@ def test_idxmlreader_failing_help():
         calibration_set_size=0.15,
         skip_deeplc_retrain=True,
         processes=2,
-        id_decoy_pattern="^DECOY_",
         log_level="INFO",
         spectrum_id_pattern="(.*)",
         psm_id_pattern="(.*)",
@@ -252,11 +246,7 @@ def test_idxmlreader_failing_help():
     annotator.build_idxml_data(idxml_file, mzml_file)
     annotator.annotate()
 
-    output_file = (
-            TESTS_DIR
-            / "test_data"
-            / "01321_E03_P013560_B00_N21_R1_rescored.idXML"
-    )
+    output_file = TESTS_DIR / "test_data" / "01321_E03_P013560_B00_N21_R1_rescored.idXML"
 
     annotator.write_idxml_file(output_file)
 
@@ -317,6 +307,7 @@ def test_add_sage_feature_help():
 
     assert result.exit_code == 0
 
+
 def test_version():
     runner = CliRunner()
     result = runner.invoke(cli, ["--version"])
@@ -342,8 +333,6 @@ def test_local_file():
             "CID",
             "--feature_generators",
             "ms2pip,deeplc",
-            "--id_decoy_pattern",
-            "^DECOY_",
             "--output",
             "{}/UPS1_50amol_R1_rescored.idXML".format(local_folder),
             "--ms2_tolerance",
@@ -351,4 +340,3 @@ def test_local_file():
         ],
     )
     assert result.exit_code == 0
-
