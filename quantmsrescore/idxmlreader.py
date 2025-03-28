@@ -1,6 +1,19 @@
+# Get logger for this module
+from quantmsrescore.logging_config import get_logger
+
+logger = get_logger(__name__)
+
 from collections import defaultdict
 from pathlib import Path
 from typing import Union, List, Optional, Dict, Tuple, DefaultDict
+from warnings import filterwarnings
+
+filterwarnings(
+    "ignore",
+    message="OPENMS_DATA_PATH environment variable already exists",
+    category=UserWarning,
+    module="pyopenms",
+)
 
 import psm_utils
 import pyopenms as oms
@@ -8,11 +21,7 @@ from psm_utils import PSM, PSMList
 from pyopenms import IDFilter
 
 from quantmsrescore.exceptions import MS3NotSupportedException
-from quantmsrescore.logging_config import get_logger
 from quantmsrescore.openms import OpenMSHelper
-
-# Get logger for this module
-logger = get_logger(__name__)
 
 
 class ScoreStats:

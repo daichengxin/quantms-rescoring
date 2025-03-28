@@ -20,14 +20,14 @@ class IgnoreSpecificWarnings(logging.Filter):
         # Isotope-related atom warnings
         if "Could not add the following atom:" in message:
             return False
-            
+
         # DeepLC-related warnings
         if "Could not add the following value:" in message:
             return False
-            
+
         if "Skipping the following (not in library):" in message:
             return False
-            
+
         if "DeepLC tried to set intra op threads" in message:
             return False
 
@@ -122,9 +122,7 @@ def configure_logging(log_level: str = "INFO") -> None:
     warnings.filterwarnings(
         "ignore", message=".*\\[[0-9]+\\].*"
     )  # Match any isotope notation like [13], [15], etc.
-    warnings.filterwarnings(
-        "ignore", message=".*OPENMS_DATA_PATH.*"
-    )
+    warnings.filterwarnings("ignore", message=".*OPENMS_DATA_PATH.*")
 
     # Suppress CUDA and TensorFlow warnings
     warnings.filterwarnings("ignore", message=".*Unable to register cuDNN factory.*")
