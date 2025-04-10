@@ -41,8 +41,8 @@ jobs:
       env:
         CUDA_VISIBLE_DEVICES: "-1"
       run: |
-        poetry run pytest
-    - name: Download test deeplc_models
+        poetry run pytest -vv
+    - name: Download test files
       env:
         CUDA_VISIBLE_DEVICES: "-1"
       run: |
@@ -52,7 +52,7 @@ jobs:
       env:
         CUDA_VISIBLE_DEVICES: "-1"
       run: |
-        rescoring msrescore2feature --idxml TMT_Erwinia_1uLSike_Top10HCD_isol2_45stepped_60min_01_comet.idXML --mzml TMT_Erwinia_1uLSike_Top10HCD_isol2_45stepped_60min_01.mzML --processes 2 --ms2pip_model HCD2021 --feature_generators 'ms2pip,deeplc' --id_decoy_pattern ^rev
+        rescoring msrescore2feature --idxml TMT_Erwinia_1uLSike_Top10HCD_isol2_45stepped_60min_01_comet.idXML --mzml TMT_Erwinia_1uLSike_Top10HCD_isol2_45stepped_60min_01.mzML --processes 2 --ms2pip_model HCD2021 --feature_generators 'ms2pip,deeplc'
     - name: Upload coverage reports to Codecov
       uses: codecov/codecov-action@v5
       with:

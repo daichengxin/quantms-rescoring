@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
-from quantmsrescore.annotator import Annotator
+from quantmsrescore.annotator import FeatureAnnotator
 from quantmsrescore.idxmlreader import IdXMLRescoringReader
 from quantmsrescore.openms import OpenMSHelper
 from quantmsrescore.rescoring import cli
@@ -36,8 +36,6 @@ def test_ms2rescore():
             "HCD2021",
             "--feature_generators",
             "'ms2pip,deeplc'",
-            "--id_decoy_pattern",
-            "^rev",
         ],
     )
     assert result.exit_code == 0
@@ -62,8 +60,6 @@ def test_ms2rescore_failing():
             "2",
             "--ms2pip_model",
             "TMT",
-            "--id_decoy_pattern",
-            "^DECOY_",
             "--ms2_tolerance",
             "0.4",
             "--calibration_set_size",
@@ -118,7 +114,7 @@ def test_annotator_train_rt():
         TESTS_DIR / "test_data" / "TMT_Erwinia_1uLSike_Top10HCD_isol2_45stepped_60min_01.mzML"
     )
 
-    annotator = Annotator(
+    annotator = FeatureAnnotator(
         feature_generators="ms2pip,deeplc",
         ms2pip_model="TMT",
         ms2pip_model_path="models",
@@ -126,8 +122,6 @@ def test_annotator_train_rt():
         calibration_set_size=0.15,
         skip_deeplc_retrain=False,
         processes=2,
-        id_decoy_pattern="^DECOY_",
-        lower_score_is_better=True,
         log_level="INFO",
         spectrum_id_pattern="(.*)",
         psm_id_pattern="(.*)",
@@ -156,17 +150,15 @@ def test_idxmlreader_filtering():
         TESTS_DIR / "test_data" / "TMT_Erwinia_1uLSike_Top10HCD_isol2_45stepped_60min_01.mzML"
     )
 
-    annotator = Annotator(
+    annotator = FeatureAnnotator(
         feature_generators="ms2pip,deeplc",
         only_features="DeepLC:RtDiff,DeepLC:PredictedRetentionTimeBest,Ms2pip:DotProd",
         ms2pip_model="TMT",
         ms2pip_model_path="models",
-        ms2_tolerance=0.05,
+        ms2_tolerance=0.2,
         calibration_set_size=0.15,
         skip_deeplc_retrain=True,
         processes=2,
-        id_decoy_pattern="^DECOY_",
-        lower_score_is_better=True,
         log_level="INFO",
         spectrum_id_pattern="(.*)",
         psm_id_pattern="(.*)",
@@ -195,17 +187,15 @@ def test_idxmlreader_wrong_model():
         TESTS_DIR / "test_data" / "TMT_Erwinia_1uLSike_Top10HCD_isol2_45stepped_60min_01.mzML"
     )
 
-    annotator = Annotator(
+    annotator = FeatureAnnotator(
         feature_generators="ms2pip,deeplc",
         only_features="DeepLC:RtDiff,DeepLC:PredictedRetentionTimeBest,Ms2pip:DotProd",
         ms2pip_model="CID-TMT",
         ms2pip_model_path="models",
-        ms2_tolerance=0.05,
+        ms2_tolerance=0.2,
         calibration_set_size=0.15,
         skip_deeplc_retrain=True,
         processes=2,
-        id_decoy_pattern="^DECOY_",
-        lower_score_is_better=True,
         log_level="INFO",
         spectrum_id_pattern="(.*)",
         psm_id_pattern="(.*)",
@@ -229,36 +219,36 @@ def test_idxmlreader_failing_help():
         TESTS_DIR
         / "test_data"
         / "dae1cb16fb57893b94bfcb731b2bf7"
-        / "Instrument1_sample14_S1R10_042116_Fr12_msgf.idXML"
+        / "01321_E03_P013560_B00_N21_R1_comet.idXML"
     )
 
     mzml_file = (
         TESTS_DIR
         / "test_data"
         / "dae1cb16fb57893b94bfcb731b2bf7"
-        / "Instrument1_sample14_S1R10_042116_Fr12.mzML"
+        / "01321_E03_P013560_B00_N21_R1.mzML"
     )
 
-    idexml_reader = IdXMLRescoringReader(idexml_filename=idxml_file)
-    peptide_list = idexml_reader._build_psm_index()
-
-    psm_count = OpenMSHelper.get_psm_count(idexml_reader.oms_peptides)
-
-    logging.info("Loaded %s PSMs from %s", psm_count)
-    assert len(peptide_list) == 66770
-
-    openms_helper = OpenMSHelper()
-    decoys, targets = openms_helper.count_decoys_targets(idexml_reader.oms_peptides)
-    logging.info(
-        "Loaded %s PSMs from %s, %s decoys and %s targets", psm_count, idxml_file, decoys, targets
+    annotator = FeatureAnnotator(
+        feature_generators="ms2pip,deeplc",
+        only_features="DeepLC:RtDiff,DeepLC:PredictedRetentionTimeBest,Ms2pip:DotProd",
+        ms2pip_model="HCD2021",
+        ms2pip_model_path="models",
+        ms2_tolerance=0.05,
+        calibration_set_size=0.15,
+        skip_deeplc_retrain=True,
+        processes=2,
+        log_level="INFO",
+        spectrum_id_pattern="(.*)",
+        psm_id_pattern="(.*)",
+        find_best_ms2pip_model=True,
     )
-    assert decoys == 25171
-    assert targets == 41599
+    annotator.build_idxml_data(idxml_file, mzml_file)
+    annotator.annotate()
 
-    idexml_reader._build_spectrum_lookup(mzml_file)
-    missing_count = idexml_reader.validate_psm_spectrum_references()
+    output_file = TESTS_DIR / "test_data" / "01321_E03_P013560_B00_N21_R1_rescored.idXML"
 
-    assert missing_count == 0
+    annotator.write_idxml_file(output_file)
 
 
 def test_sage_feature_file():
@@ -318,7 +308,11 @@ def test_add_sage_feature_help():
     assert result.exit_code == 0
 
 
-# test for the ms2rescore
+def test_version():
+    runner = CliRunner()
+    result = runner.invoke(cli, ["--version"])
+
+    assert result.exit_code == 0
 
 
 @pytest.mark.skip(reason="This is for local test in big datasets, kipping for now")
@@ -339,8 +333,6 @@ def test_local_file():
             "CID",
             "--feature_generators",
             "ms2pip,deeplc",
-            "--id_decoy_pattern",
-            "^DECOY_",
             "--output",
             "{}/UPS1_50amol_R1_rescored.idXML".format(local_folder),
             "--ms2_tolerance",

@@ -1,5 +1,4 @@
 import copy
-import logging
 from pathlib import Path
 from typing import Optional, Set, Union
 
@@ -8,13 +7,15 @@ from psm_utils import PSMList
 from quantmsrescore.deeplc import DeepLCAnnotator
 from quantmsrescore.exceptions import Ms2pipIncorrectModelException
 from quantmsrescore.idxmlreader import IdXMLRescoringReader
+from quantmsrescore.logging_config import get_logger
 from quantmsrescore.ms2pip import MS2PIPAnnotator
 from quantmsrescore.openms import OpenMSHelper
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+# Get logger for this module
+logger = get_logger(__name__)
 
 
-class Annotator:
+class FeatureAnnotator:
     """
     Annotator for peptide-spectrum matches (PSMs) using MS2PIP and DeepLC models.
 
@@ -30,10 +31,9 @@ class Annotator:
         ms2pip_model_path: str = "models",
         ms2_tolerance: float = 0.05,
         calibration_set_size: float = 0.2,
+        valid_correlations_size: float = 0.7,
         skip_deeplc_retrain: bool = False,
         processes: int = 2,
-        id_decoy_pattern: str = "^DECOY_",
-        lower_score_is_better: bool = True,
         log_level: str = "INFO",
         spectrum_id_pattern: str = "(.*)",  # default for openms idXML
         psm_id_pattern: str = "(.*)",  # default for openms idXML
@@ -62,10 +62,6 @@ class Annotator:
             Skip retraining the deepLC model (default: False).
         processes : int, optional
             Number of parallel processes (default: 2).
-        id_decoy_pattern : str, optional
-            Pattern for identifying decoy PSMs (default: "^DECOY_").
-        lower_score_is_better : bool, optional
-            Whether lower score indicates better match (default: True).
         log_level : str, optional
             Logging level (default: "INFO").
         spectrum_id_pattern : str, optional
@@ -85,10 +81,9 @@ class Annotator:
             If no feature generators are provided or if neither ms2pip nor deeplc is specified.
         """
         # Set up logging
+        from quantmsrescore.logging_config import configure_logging
 
-        numeric_level = getattr(logging, log_level.upper(), None)
-        if isinstance(numeric_level, int):
-            logging.getLogger().setLevel(numeric_level)
+        configure_logging(log_level)
 
         # Validate inputs
         if not feature_generators:
@@ -113,16 +108,15 @@ class Annotator:
         self._ms2pip_model_path = ms2pip_model_path
         self._ms2_tolerance = ms2_tolerance
         self._calibration_set_size = calibration_set_size
+        self._valid_correlations_size = valid_correlations_size
         self._processes = processes
-        self._id_decoy_pattern = id_decoy_pattern
-        self._lower_score_is_better = lower_score_is_better
+        self._higher_score_better = None
         self._spectrum_id_pattern = spectrum_id_pattern
         self._psm_id_pattern = psm_id_pattern
         self._skip_deeplc_retrain = skip_deeplc_retrain
         self._remove_missing_spectra = remove_missing_spectra
         self._ms2_only = ms2_only
         self._find_best_ms2pip_model = find_best_ms2pip_model
-        self.annotated_ms_tolerance = (0.0, None)
 
     def build_idxml_data(
         self, idxml_file: Union[str, Path], spectrum_path: Union[str, Path]
@@ -142,7 +136,7 @@ class Annotator:
         Exception
             If loading the files fails.
         """
-        logging.info(f"Loading data from: {idxml_file}")
+        logger.info(f"Loading data from: {idxml_file}")
 
         try:
             # Convert paths to Path objects for consistency
@@ -156,20 +150,19 @@ class Annotator:
                 only_ms2=self._ms2_only,
                 remove_missing_spectrum=self._remove_missing_spectra,
             )
+            self._higher_score_better = self._idxml_reader.high_score_better
 
             # Log statistics about loaded data
             psm_list = self._idxml_reader.psms
             openms_helper = OpenMSHelper()
             decoys, targets = openms_helper.count_decoys_targets(self._idxml_reader.oms_peptides)
 
-            logging.info(
+            logger.info(
                 f"Loaded {len(psm_list)} PSMs from {idxml_path.name}: {decoys} decoys and {targets} targets"
             )
 
-            self.annotated_ms_tolerance = self._idxml_reader.stats.reported_ms_tolerance
-
         except Exception as e:
-            logging.error(f"Failed to load input files: {str(e)}")
+            logger.error(f"Failed to load input files: {str(e)}")
             raise
 
     def annotate(self) -> None:
@@ -187,7 +180,7 @@ class Annotator:
         if not self._idxml_reader:
             raise ValueError("No idXML data loaded. Call build_idxml_data() first.")
 
-        logging.debug(f"Running annotations with configuration: {self.__dict__}")
+        logger.debug(f"Running annotations with configuration: {self.__dict__}")
 
         # Run MS2PIP annotation if enabled
         if self._ms2pip:
@@ -201,7 +194,7 @@ class Annotator:
         if self._ms2pip or self._deepLC:
             self._convert_features_psms_to_oms_peptides()
 
-        logging.info("Annotation complete")
+        logger.info("Annotation complete")
 
     def write_idxml_file(self, filename: Union[str, Path]) -> None:
         """
@@ -224,20 +217,20 @@ class Annotator:
                 protein_ids=self._idxml_reader.openms_proteins,
                 peptide_ids=self._idxml_reader.openms_peptides,
             )
-            logging.info(f"Annotated idXML file written to {out_path}")
+            logger.info(f"Annotated idXML file written to {out_path}")
         except Exception as e:
-            logging.error(f"Failed to write annotated idXML file: {str(e)}")
+            logger.error(f"Failed to write annotated idXML file: {str(e)}")
             raise
 
     def _run_ms2pip_annotation(self) -> None:
         """Run MS2PIP annotation on the loaded PSMs."""
-        logging.info("Running MS2PIP annotation")
+        logger.info("Running MS2PIP annotation")
 
         # Initialize MS2PIP annotator
         try:
             ms2pip_generator = self._create_ms2pip_annotator()
         except Exception as e:
-            logging.error(f"Failed to initialize MS2PIP: {e}")
+            logger.error(f"Failed to initialize MS2PIP: {e}")
             raise
 
         # Apply MS2PIP annotation
@@ -245,16 +238,18 @@ class Annotator:
         try:
             ms2pip_generator.add_features(psm_list)
             self._idxml_reader.psms = psm_list
-            logging.info("MS2PIP annotations added to PSMs")
+            logger.info("MS2PIP annotations added to PSMs")
         except Ms2pipIncorrectModelException:
             if self._find_best_ms2pip_model:
                 self._find_and_apply_best_ms2pip_model(psm_list)
             else:
-                logging.error("MS2PIP model not suitable for this data")
+                logger.error("MS2PIP model not suitable for this data")
         except Exception as e:
-            logging.error(f"Failed to add MS2PIP features: {e}")
+            logger.error(f"Failed to add MS2PIP features: {e}")
 
-    def _create_ms2pip_annotator(self, model: Optional[str] = None) -> MS2PIPAnnotator:
+    def _create_ms2pip_annotator(
+        self, model: Optional[str] = None, tolerance: Optional[float] = None
+    ) -> MS2PIPAnnotator:
         """
         Create an MS2PIP annotator with the specified or default model.
 
@@ -269,16 +264,18 @@ class Annotator:
             Configured MS2PIP annotator.
         """
         return MS2PIPAnnotator(
-            ms2_tolerance=self._ms2_tolerance,
+            ms2_tolerance=tolerance or self._ms2_tolerance,
             model=model or self._ms2pip_model,
             spectrum_path=self._idxml_reader.spectrum_path,
             spectrum_id_pattern=self._spectrum_id_pattern,
             model_dir=self._ms2pip_model_path,
             calibration_set_size=self._calibration_set_size,
+            valid_correlations_size=self._valid_correlations_size,
             correlation_threshold=0.7,  # Consider making this configurable
-            lower_score_is_better=self._lower_score_is_better,
+            higher_score_better=self._higher_score_better,
             processes=self._processes,
-            annotated_ms_tolerance=self.annotated_ms_tolerance,
+            annotated_ms_tolerance=self._idxml_reader.stats.reported_ms_tolerance,
+            predicted_ms_tolerance=self._idxml_reader.stats.predicted_ms_tolerance,
         )
 
     def _find_and_apply_best_ms2pip_model(self, psm_list: PSMList) -> None:
@@ -290,7 +287,7 @@ class Annotator:
         psm_list : PSMList
             List of PSMs to annotate.
         """
-        logging.info("Finding best MS2PIP model for the dataset")
+        logger.info("Finding best MS2PIP model for the dataset")
 
         # Get top scoring PSMs for model selection
         batch_psms = self._get_top_batch_psms(psm_list)
@@ -300,27 +297,27 @@ class Annotator:
 
         # Find best model based on fragmentation type
         fragmentation = self._get_highest_fragmentation()
-        model, corr = ms2pip_generator._find_best_ms2pip_model(
+        model, corr, tolerance = ms2pip_generator._find_best_ms2pip_model(
             batch_psms=batch_psms,
             knwon_fragmentation=fragmentation,
         )
 
         if model:
-            logging.info(f"Best model found: {model} with average correlation {corr}")
+            logger.info(f"Best model found: {model} with average correlation {corr}")
 
             # Create new annotator with best model
-            ms2pip_generator = self._create_ms2pip_annotator(model=model)
+            ms2pip_generator = self._create_ms2pip_annotator(model=model, tolerance=tolerance)
 
             # Apply annotation with best model
             ms2pip_generator.add_features(psm_list)
             self._idxml_reader.psms = psm_list
-            logging.info("MS2PIP annotations added using best model")
+            logger.info("MS2PIP annotations added using best model")
         else:
-            logging.error("No suitable MS2PIP model found for this dataset")
+            logger.error("No suitable MS2PIP model found for this dataset")
 
     def _run_deeplc_annotation(self) -> None:
         """Run DeepLC annotation on the loaded PSMs."""
-        logging.info("Running DeepLC annotation")
+        logger.info("Running DeepLC annotation")
 
         try:
             if self._skip_deeplc_retrain:
@@ -334,10 +331,10 @@ class Annotator:
             psm_list = self._idxml_reader.psms
             deeplc_annotator.add_features(psm_list)
             self._idxml_reader.psms = psm_list
-            logging.info("DeepLC annotations added to PSMs")
+            logger.info("DeepLC annotations added to PSMs")
 
         except Exception as e:
-            logging.error(f"Failed to apply DeepLC annotation: {e}")
+            logger.error(f"Failed to apply DeepLC annotation: {e}")
             raise
 
     def _create_deeplc_annotator(
@@ -362,7 +359,7 @@ class Annotator:
             calibration_set_size = self._calibration_set_size
 
         return DeepLCAnnotator(
-            self._lower_score_is_better,
+            not self._higher_score_better,
             calibration_set_size=calibration_set_size,
             processes=self._processes,
             **kwargs,
@@ -397,12 +394,12 @@ class Annotator:
 
         # Select model with lower MAE
         if mae_retrained < mae_pretrained:
-            logging.info(
+            logger.info(
                 f"Retrained DeepLC model has lower MAE ({mae_retrained:.4f} vs {mae_pretrained:.4f}), using it: {retrained_model.selected_model}"
             )
             return retrained_model
         else:
-            logging.info(
+            logger.info(
                 f"Pretrained DeepLC model has lower/equal MAE ({mae_pretrained:.4f} vs {mae_retrained:.4f}), using it: {pretrained_model.selected_model}"
             )
             return pretrained_model
@@ -429,7 +426,7 @@ class Annotator:
 
                 psm = psm_dict.get(psm_hash)
                 if psm is None:
-                    logging.warning(f"PSM not found for peptide {oms_peptide.getMetaValue('id')}")
+                    logger.warning(f"PSM not found for peptide {oms_peptide.getMetaValue('id')}")
                 else:
                     # Add features to the OpenMS PSM
                     for feature, value in psm.rescoring_features.items():
@@ -447,7 +444,7 @@ class Annotator:
                             )
                             added_features.add(canonical_feature)
                         else:
-                            logging.debug(f"Feature {feature} not supported by quantms rescoring")
+                            logger.debug(f"Feature {feature} not supported by quantms rescoring")
 
                 hits.append(oms_psm)
 
@@ -472,7 +469,7 @@ class Annotator:
         if not features:
             return
 
-        logging.info(f"Adding features to search parameters: {', '.join(sorted(features))}")
+        logger.info(f"Adding features to search parameters: {', '.join(sorted(features))}")
 
         # Get search parameters
         search_parameters = self._idxml_reader.oms_proteins[0].getSearchParameters()
@@ -508,17 +505,17 @@ class Annotator:
         PSMList
             Filtered list containing top-scoring PSMs.
         """
-        logging.info("Selecting top PSMs for calibration")
+        logger.info("Selecting top PSMs for calibration")
 
         # Filter non-decoy PSMs
         non_decoy_psms = [result for result in psm_list.psm_list if not result.is_decoy]
 
         if not non_decoy_psms:
-            logging.warning("No non-decoy PSMs found for calibration")
+            logger.warning("No non-decoy PSMs found for calibration")
             return PSMList(psm_list=[])
 
         # Sort by score
-        non_decoy_psms.sort(key=lambda x: x.score, reverse=not self._lower_score_is_better)
+        non_decoy_psms.sort(key=lambda x: x.score, reverse=self._higher_score_better)
 
         # Select top 60% for calibration
         calibration_size = max(1, int(len(non_decoy_psms) * 0.6))
@@ -537,7 +534,7 @@ class Annotator:
         """
         stats = self._idxml_reader.stats
         if not stats or not stats.ms_level_dissociation_method:
-            logging.warning("No fragmentation method statistics available")
+            logger.warning("No fragmentation method statistics available")
             return None
 
         # Find the most common fragmentation method
@@ -568,7 +565,7 @@ class Annotator:
         best_scored_psms = self._get_top_batch_psms(psm_list)
 
         if not best_scored_psms.psm_list:
-            logging.warning("No PSMs available for MAE calculation")
+            logger.warning("No PSMs available for MAE calculation")
             return float("inf")
 
         total_error = 0.0
@@ -580,7 +577,7 @@ class Annotator:
                 count += 1
 
         if count == 0:
-            logging.warning("No valid retention time differences for MAE calculation")
+            logger.warning("No valid retention time differences for MAE calculation")
             return float("inf")
 
         return total_error / count

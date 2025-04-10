@@ -1,22 +1,15 @@
-import logging
-from warnings import filterwarnings
-
 import click
 import pandas as pd
 
 from quantmsrescore.idxmlreader import IdXMLReader
+from quantmsrescore.logging_config import get_logger, configure_logging
 from quantmsrescore.openms import OpenMSHelper
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+# Configure logging with default settings
+configure_logging()
 
-# Suppress OpenMS warning about a deeplc_models path
-filterwarnings(
-    "ignore",
-    message="OPENMS_DATA_PATH environment variable already exists",
-    category=UserWarning,
-    module="pyopenms",
-)
+# Get logger for this module
+logger = get_logger(__name__)
 
 
 @click.command("sage2feature")
@@ -35,8 +28,8 @@ def add_sage_feature(ctx, idxml: str, output_file: str, feat_file: str):
     :return: None
     """
 
-    logging.info("Starting adding extra feature to {}".format(idxml))
-    logging.info("Reading feature file")
+    logger.info("Starting adding extra feature to {}".format(idxml))
+    logger.info("Reading feature file")
 
     extra_feat = []
     feat = pd.read_csv(feat_file, sep="\t")
@@ -46,7 +39,7 @@ def add_sage_feature(ctx, idxml: str, output_file: str, feat_file: str):
         else:
             extra_feat.append(row["feature_name"])
 
-    logging.info("Reading idXML file")
+    logger.info("Reading idXML file")
 
     try:
         idxml_reader = IdXMLReader(idexml_filename=idxml)
@@ -54,7 +47,7 @@ def add_sage_feature(ctx, idxml: str, output_file: str, feat_file: str):
         peptide_ids = idxml_reader.oms_peptides
     except Exception as e:
         raise click.ClickException(f"Failed to read idXML file: {str(e)}")
-    logging.info("Adding extra feature to idXML file")
+    logger.info("Adding extra feature to idXML file")
     search_parameters = protein_ids[0].getSearchParameters()
     try:
         features = search_parameters.getMetaValue("extra_features")
@@ -64,8 +57,8 @@ def add_sage_feature(ctx, idxml: str, output_file: str, feat_file: str):
     search_parameters.setMetaValue("extra_features", extra_features)
     protein_ids[0].setSearchParameters(search_parameters)
 
-    logging.info("Writing idXML file")
+    logger.info("Writing idXML file")
     OpenMSHelper.write_idxml_file(
         filename=output_file, protein_ids=protein_ids, peptide_ids=peptide_ids
     )
-    logging.info("Done")
+    logger.info("Done")

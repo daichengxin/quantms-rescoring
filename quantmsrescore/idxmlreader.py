@@ -1,8 +1,19 @@
-import logging
+# Get logger for this module
+from quantmsrescore.logging_config import get_logger
+
+logger = get_logger(__name__)
+
 from collections import defaultdict
 from pathlib import Path
 from typing import Union, List, Optional, Dict, Tuple, DefaultDict
 from warnings import filterwarnings
+
+filterwarnings(
+    "ignore",
+    message="OPENMS_DATA_PATH environment variable already exists",
+    category=UserWarning,
+    module="pyopenms",
+)
 
 import psm_utils
 import pyopenms as oms
@@ -11,17 +22,6 @@ from pyopenms import IDFilter
 
 from quantmsrescore.exceptions import MS3NotSupportedException
 from quantmsrescore.openms import OpenMSHelper
-
-# Configure logging
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-
-# Suppress OpenMS warning about deeplc_models path
-filterwarnings(
-    "ignore",
-    message="OPENMS_DATA_PATH environment variable already exists",
-    category=UserWarning,
-    module="pyopenms",
-)
 
 
 class ScoreStats:
@@ -45,7 +45,7 @@ class SpectrumStats:
         self.empty_spectra: int = 0
         self.ms_level_counts: DefaultDict[int, int] = defaultdict(int)
         self.ms_level_dissociation_method: Dict[Tuple[int, str], int] = {}
-        # self.predicted_ms_tolerance: Tuple[float, Optional[str]] = (0.0, None)
+        self.predicted_ms_tolerance: Tuple[float, Optional[str]] = (0.0, None)
         self.reported_ms_tolerance: Tuple[float, Optional[str]] = (0.0, None)
 
 
@@ -134,7 +134,7 @@ class IdXMLReader:
         if check_unix_compatibility:
             OpenMSHelper.check_unix_compatibility(self._mzml_path)
         self._exp, self._spec_lookup = OpenMSHelper.get_spectrum_lookup_indexer(self._mzml_path)
-        logging.info(f"Built SpectrumLookup from {self._mzml_path}")
+        logger.info(f"Built SpectrumLookup from {self._mzml_path}")
 
 
 class IdXMLRescoringReader(IdXMLReader):
@@ -233,12 +233,12 @@ class IdXMLRescoringReader(IdXMLReader):
         for score, stats in score_stats.items():
             if stats.missing_count > 0:
                 percentage = stats.missing_percentage
-                logging.warning(
+                logger.warning(
                     f"Score {score} is missing in {stats.missing_count} PSMs "
                     f"({percentage:.1f}% of total)"
                 )
                 if percentage > 10:
-                    logging.error(f"Score {score} is missing in more than 10% of PSMs")
+                    logger.error(f"Score {score} is missing in more than 10% of PSMs")
 
     @staticmethod
     def _parse_psm(
@@ -287,12 +287,12 @@ class IdXMLRescoringReader(IdXMLReader):
                 score=peptide_hit.getScore(),
                 precursor_mz=peptide_id.getMZ(),
                 retention_time=rt,
-                rank=peptide_hit.getRank() + 1,
+                rank=peptide_hit.getRank() + 1,  # Ranks in idXML start at 0
                 source="idXML",
                 provenance_data={provenance_key: ""},  # We use only the key for provenance
             )
         except Exception as e:
-            logging.error(f"Failed to parse PSM: {e}")
+            logger.error(f"Failed to parse PSM: {e}")
             return None
 
     def _build_psm_index(self, only_ms2: bool = True) -> PSMList:
@@ -312,14 +312,14 @@ class IdXMLRescoringReader(IdXMLReader):
         psm_list = []
 
         if only_ms2 and self._spec_lookup is None:
-            logging.warning("Spectrum lookup not initialized, cannot filter for MS2 spectra")
+            logger.warning("Spectrum lookup not initialized, cannot filter for MS2 spectra")
             only_ms2 = False
 
         for peptide_id in self.oms_peptides:
             if self.high_score_better is None:
                 self.high_score_better = peptide_id.isHigherScoreBetter()
             elif self.high_score_better != peptide_id.isHigherScoreBetter():
-                logging.warning("Inconsistent score direction found in idXML file")
+                logger.warning("Inconsistent score direction found in idXML file")
 
             for psm_hit in peptide_id.getHits():
                 if (
@@ -338,7 +338,7 @@ class IdXMLRescoringReader(IdXMLReader):
                     psm_list.append(psm)
 
         self._psms = PSMList(psm_list=psm_list)
-        logging.info(f"Loaded {len(self._psms)} PSMs from {self.filename}")
+        logger.info(f"Loaded {len(self._psms)} PSMs from {self.filename}")
         return self._psms
 
     def _validate_psm_spectrum_references(
@@ -393,18 +393,12 @@ class IdXMLRescoringReader(IdXMLReader):
             spectrum = OpenMSHelper.get_spectrum_for_psm(peptide_id, self._exp, self._spec_lookup)
             spectrum_reference = OpenMSHelper.get_spectrum_reference(peptide_id)
 
-            # TODO: Predict MS tolerance for PSMs, in the future would be good.
-            # for hit in peptide_id.getHits():
-            #     predicted_ms_tolerance = OpenMSHelper.get_predicted_ms_tolerance(spectrum, hit)
-            #     psm_ui = OpenMSHelper.get_psm_hash_unique_id(peptide_id, hit)
-            #     tolerances[psm_ui] = (predicted_ms_tolerance, hit.getScore())
-
             missing_spectrum, empty_spectrum = False, False
             ms_level = 2
 
             if spectrum is None:
 
-                logging.error(
+                logger.error(
                     f"Spectrum not found for PeptideIdentification with {spectrum_reference}"
                 )
                 self._stats.missing_spectra += 1
@@ -412,7 +406,7 @@ class IdXMLRescoringReader(IdXMLReader):
             else:
                 peaks = spectrum.get_peaks()[0]
                 if peaks is None or len(peaks) == 0:
-                    logging.warning(f"Empty spectrum found for PSM {spectrum_reference}")
+                    logger.warning(f"Empty spectrum found for PSM {spectrum_reference}")
                     empty_spectrum = True
                     self._stats.empty_spectra += 1
 
@@ -422,7 +416,7 @@ class IdXMLRescoringReader(IdXMLReader):
                 self._process_dissociation_methods(spectrum, ms_level)
 
                 if ms_level != 2 and only_ms2:
-                    logging.info(
+                    logger.info(
                         f"MS level {ms_level} spectrum found for PSM {spectrum_reference}. "
                         "MS2pip models are not trained on MS3 spectra"
                     )
@@ -430,13 +424,13 @@ class IdXMLRescoringReader(IdXMLReader):
             if (remove_missing_spectrum and (missing_spectrum or empty_spectrum)) or (
                 only_ms2 and ms_level != 2
             ):
-                logging.debug(f"Removing PSM {spectrum_reference}")
+                logger.debug(f"Removing PSM {spectrum_reference}")
                 peptide_removed += 1
             else:
                 new_peptide_ids.append(peptide_id)
 
         if peptide_removed > 0:
-            logging.warning(
+            logger.warning(
                 f"Removed {peptide_removed} PSMs with missing or empty spectra or MS3 spectra"
             )
             self.oms_peptides = new_peptide_ids
@@ -452,22 +446,18 @@ class IdXMLRescoringReader(IdXMLReader):
 
         if only_ms2 and self._stats.ms_level_counts.get(3, 0) > 0:
             ms2_dissociation_methods = self._stats.ms_level_dissociation_method.get((2, "HCD"), 0)
-            logging.error(
+            logger.error(
                 "MS3 spectra found in MS2-only mode, please filter your search for MS2 or dissociation method: {}".format(
                     ms2_dissociation_methods
                 )
             )
             raise MS3NotSupportedException("MS3 spectra found in MS2-only mode")
 
-        # if len(tolerances) > 0:
-        # TODO: would be good to predict the tolerance for PSMs in a good accurate way.
-        #     # Sort by score depending on high_score_better
-        #     sorted_tolerances = sorted(tolerances.items(), key=lambda x: x[1][1], reverse=self.high_score_better)
-        #     # select the best 20% of the PSMs
-        #     top_20_percent = int(len(sorted_tolerances) * 0.2)
-        #     top_20_percent_tolerances = sorted_tolerances[:top_20_percent]
-        #     # calculate the average tolerance
-        #     average_tolerance = sum([t[1][0] for t in top_20_percent_tolerances]) / top_20_percent
+        if self._stats.reported_ms_tolerance[1] == "ppm":
+            self._stats.predicted_ms_tolerance = OpenMSHelper.get_predicted_ms_tolerance(
+                exp=self._exp, ppm_tolerance=self._stats.reported_ms_tolerance[0]
+            )
+
         return self._stats
 
     def _process_dissociation_methods(self, spectrum, ms_level):
@@ -488,23 +478,23 @@ class IdXMLRescoringReader(IdXMLReader):
                         self._stats.ms_level_dissociation_method.get(method, 0) + 1
                     )
                 else:
-                    logging.warning(f"Unknown dissociation method index {method_index}")
+                    logger.warning(f"Unknown dissociation method index {method_index}")
 
     def _log_spectrum_statistics(self):
         """Log statistics about spectrum validation."""
         if self._stats.missing_spectra or self._stats.empty_spectra:
-            logging.error(
+            logger.error(
                 f"Found {self._stats.missing_spectra} PSMs with missing spectra and "
                 f"{self._stats.empty_spectra} PSMs with empty spectra"
             )
 
         if len({k[1] for k in self._stats.ms_level_dissociation_method}) > 1:
-            logging.error(
+            logger.error(
                 "Found multiple dissociation methods in the same MS level. "
                 "MS2pip models are not trained for multiple dissociation methods"
             )
 
-        logging.info(f"MS level distribution: {dict(self._stats.ms_level_counts)}")
-        logging.info(
+        logger.info(f"MS level distribution: {dict(self._stats.ms_level_counts)}")
+        logger.info(
             f"Dissociation Method Distribution: {self._stats.ms_level_dissociation_method}"
         )
