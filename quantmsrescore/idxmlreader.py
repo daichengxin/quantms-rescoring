@@ -45,8 +45,6 @@ class SpectrumStats:
         self.empty_spectra: int = 0
         self.ms_level_counts: DefaultDict[int, int] = defaultdict(int)
         self.ms_level_dissociation_method: Dict[Tuple[int, str], int] = {}
-        self.predicted_ms_tolerance: Tuple[float, Optional[str]] = (0.0, None)
-        self.reported_ms_tolerance: Tuple[float, Optional[str]] = (0.0, None)
 
 
 class IdXMLReader:
@@ -439,9 +437,6 @@ class IdXMLRescoringReader(IdXMLReader):
             oms_filter.removeEmptyIdentifications(self.oms_peptides)
             oms_filter.removeUnreferencedProteins(self.oms_proteins, self.oms_peptides)
 
-        ms_tolerance, ms_unit = OpenMSHelper.get_ms_tolerance(self.oms_proteins)
-        self._stats.reported_ms_tolerance = (ms_tolerance, ms_unit)
-
         self._log_spectrum_statistics()
 
         if only_ms2 and self._stats.ms_level_counts.get(3, 0) > 0:
@@ -452,11 +447,6 @@ class IdXMLRescoringReader(IdXMLReader):
                 )
             )
             raise MS3NotSupportedException("MS3 spectra found in MS2-only mode")
-
-        if self._stats.reported_ms_tolerance[1] == "ppm":
-            self._stats.predicted_ms_tolerance = OpenMSHelper.get_predicted_ms_tolerance(
-                exp=self._exp, ppm_tolerance=self._stats.reported_ms_tolerance[0]
-            )
 
         return self._stats
 
