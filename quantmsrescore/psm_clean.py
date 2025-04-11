@@ -44,7 +44,7 @@ configure_logging()
 @click.option(
     "-o",
     "--output",
-    help="Path the output idxml for the annotated PSMs",
+    help="Path the output idxml for the processed PSMs",
 )
 @click.pass_context
 def psm_feature_clean(
@@ -56,10 +56,7 @@ def psm_feature_clean(
     """
     Annotate PSMs in an idXML file with additional features using specified models.
 
-    This command-line interface (CLI) command processes a PSM file by adding
-    annotations from the MS²PIP and DeepLC models, among others, while preserving
-    existing information. It supports various options for specifying input and
-    output paths, logging levels, and feature generation configurations.
+    This command-line interface (CLI) command processes a PSM file by remove invalid PSMs
 
     Parameters
     ----------

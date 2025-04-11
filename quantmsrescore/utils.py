@@ -118,9 +118,9 @@ class IdXMLReader:
         Validate spectrum references for peptide identifications and filter based on criteria.
 
         This method validates each peptide identification by checking if its referenced
-        spectrum exists and has peaks. It also tracks MS level statistics and dissociation
-        methods. Optionally, removes peptide identifications with missing/empty spectra or
-        those that are not MS2 level.
+        spectrum exists and has peaks. It also tracks MS level statistics, dissociation
+        methods and removes peptide identifications with missing/empty spectra or
+        those that are not MS2 level and invalid score.
 
         Parameters
         ----------
