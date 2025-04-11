@@ -17,7 +17,7 @@ filterwarnings(
 import click
 
 from quantmsrescore.logging_config import configure_logging
-from utils import IdXMLReader
+from quantmsrescore.utils import IdXMLReader
 
 # Configure logging with default settings
 configure_logging()
