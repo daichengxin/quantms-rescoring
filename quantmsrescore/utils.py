@@ -200,6 +200,7 @@ class IdXMLReader:
                     score = hit.getMetaValue("SAGE:ln(-poisson)")
                     if score == "inf":
                         hits_number -= 1
+                        logger.warning(f"Invalid PSM score found for PSM {spectrum_reference}")
                     else:
                         new_hits.append(hit)
                 if hits_number == 0:
