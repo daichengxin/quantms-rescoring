@@ -210,7 +210,7 @@ class IdXMLRescoringReader(IdXMLReader):
         """
         psm_list = []
 
-        if only_ms2 and self._spec_lookup is None:
+        if only_ms2 and self.spec_lookup is None:
             logger.warning("Spectrum lookup not initialized, cannot filter for MS2 spectra")
             only_ms2 = False
 
@@ -223,8 +223,8 @@ class IdXMLRescoringReader(IdXMLReader):
             for psm_hit in peptide_id.getHits():
                 if (
                     only_ms2
-                    and self._spec_lookup is not None
-                    and OpenMSHelper.get_ms_level(peptide_id, self._spec_lookup, self._exp) != 2
+                    and self.spec_lookup is not None
+                    and OpenMSHelper.get_ms_level(peptide_id, self.spec_lookup, self.exp) != 2
                 ):
                     continue
                 psm = self._parse_psm(
