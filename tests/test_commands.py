@@ -83,7 +83,7 @@ def test_idxmlreader():
         TESTS_DIR / "test_data" / "TMT_Erwinia_1uLSike_Top10HCD_isol2_45stepped_60min_01.mzML"
     )
 
-    idxml_reader = IdXMLRescoringReader(idexml_filename=idxml_file, mzml_file=mzml_file)
+    idxml_reader = IdXMLRescoringReader(idxml_filename=idxml_file, mzml_file=mzml_file)
     logging.info("Loaded %s PSMs from %s", len(idxml_reader.psms), idxml_file)
     assert len(idxml_reader.psms) == 5346
 

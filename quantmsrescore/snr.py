@@ -171,7 +171,8 @@ def spectrum2feature(ctx, mzml: str, idxml: str, output: str) -> None:
     """
     logger.info(f"Processing mzML file: {mzml}")
 
-    idxml_reader = IdXMLReader(idexml_filename=idxml, mzml_file=mzml)
+    idxml_reader = IdXMLReader(idxml_filename=idxml)
+    idxml_reader.build_spectrum_lookup(mzml, check_unix_compatibility=True)
     protein_ids = idxml_reader.oms_proteins
     peptide_ids = idxml_reader.oms_peptides
 

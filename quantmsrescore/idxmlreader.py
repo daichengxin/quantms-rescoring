@@ -53,7 +53,7 @@ class IdXMLRescoringReader(IdXMLReader):
 
     def __init__(
         self,
-        idexml_filename: Union[Path, str],
+        idxml_filename: Union[Path, str],
         mzml_file: Union[str, Path],
         only_ms2: bool = True,
         remove_missing_spectrum: bool = True,
@@ -72,7 +72,8 @@ class IdXMLRescoringReader(IdXMLReader):
         remove_missing_spectrum : bool, optional
             Flag to remove PSMs with missing spectra, by default True.
         """
-        super().__init__(idexml_filename, mzml_file)
+        super().__init__(idxml_filename)
+        self.build_spectrum_lookup(mzml_file)
         self.high_score_better: Optional[bool] = None
 
         # Private attributes

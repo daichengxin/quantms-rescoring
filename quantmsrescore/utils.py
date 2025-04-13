@@ -37,17 +37,16 @@ class IdXMLReader:
         List of peptide identifications parsed from the idXML file.
     """
 
-    def __init__(self, idexml_filename: Union[Path, str],
-                 mzml_file: Union[str, Path], ) -> None:
+    def __init__(self, idxml_filename: Union[Path, str]) -> None:
         """
         Initialize IdXMLReader with the specified idXML file.
 
         Parameters
         ----------
-        idexml_filename : Union[Path, str]
+        idxml_filename : Union[Path, str]
             Path to the idXML file to be read and parsed.
         """
-        self.filename = Path(idexml_filename)
+        self.filename = Path(idxml_filename)
         self.oms_proteins, self.oms_peptides = self._parse_idxml()
         self.spec_lookup = None
         self.exp = None
@@ -55,8 +54,6 @@ class IdXMLReader:
         # Private properties for spectrum lookup
         self._mzml_path = None
         self._stats = None  # IdXML stats
-
-        self.build_spectrum_lookup(mzml_file, check_unix_compatibility=True)
 
     def _parse_idxml(
             self,
