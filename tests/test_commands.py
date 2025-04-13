@@ -341,6 +341,12 @@ def test_local_file():
 
 
 def test_psm_clean():
+    output_file = (
+        TESTS_DIR
+        / "test_data"
+        / "TMT_Erwinia_1uLSike_Top10HCD_isol2_45stepped_60min_01_comet_clean.idXML"
+    )
+
     runner = CliRunner()
     result = runner.invoke(
         cli,
@@ -354,6 +360,8 @@ def test_psm_clean():
             "{}/test_data/TMT_Erwinia_1uLSike_Top10HCD_isol2_45stepped_60min_01.mzML".format(
                 TESTS_DIR
             ),
+            "--output",
+            output_file,
         ],
     )
     assert result.exit_code == 0
