@@ -28,6 +28,7 @@ class FeatureAnnotator:
         feature_generators: str,
         only_features: Optional[str] = None,
         ms2pip_model: str = "HCD2021",
+        force_model: bool = False,
         ms2pip_model_path: str = "models",
         ms2_tolerance: float = 0.05,
         calibration_set_size: float = 0.2,
@@ -38,8 +39,7 @@ class FeatureAnnotator:
         spectrum_id_pattern: str = "(.*)",  # default for openms idXML
         psm_id_pattern: str = "(.*)",  # default for openms idXML
         remove_missing_spectra: bool = True,
-        ms2_only: bool = True,
-        find_best_ms2pip_model: bool = True,
+        ms2_only: bool = True
     ):
         """
         Initialize the Annotator with configuration parameters.
@@ -116,7 +116,7 @@ class FeatureAnnotator:
         self._skip_deeplc_retrain = skip_deeplc_retrain
         self._remove_missing_spectra = remove_missing_spectra
         self._ms2_only = ms2_only
-        self._find_best_ms2pip_model = find_best_ms2pip_model
+        self._force_model = force_model
 
     def build_idxml_data(
         self, idxml_file: Union[str, Path], spectrum_path: Union[str, Path]
@@ -240,10 +240,11 @@ class FeatureAnnotator:
             self._idxml_reader.psms = psm_list
             logger.info("MS2PIP annotations added to PSMs")
         except Ms2pipIncorrectModelException:
-            if self._find_best_ms2pip_model:
+            if not self._force_model:
                 self._find_and_apply_best_ms2pip_model(psm_list)
             else:
-                logger.error("MS2PIP model not suitable for this data")
+                logger.error("MS2PIP model not suitable for this data. Skip MS2PIP annotations.")
+
         except Exception as e:
             logger.error(f"Failed to add MS2PIP features: {e}")
 
@@ -274,8 +275,7 @@ class FeatureAnnotator:
             correlation_threshold=0.7,  # Consider making this configurable
             higher_score_better=self._higher_score_better,
             processes=self._processes,
-            annotated_ms_tolerance=self._idxml_reader.stats.reported_ms_tolerance,
-            predicted_ms_tolerance=self._idxml_reader.stats.predicted_ms_tolerance,
+            force_model=self._force_model
         )
 
     def _find_and_apply_best_ms2pip_model(self, psm_list: PSMList) -> None:
@@ -297,7 +297,7 @@ class FeatureAnnotator:
 
         # Find best model based on fragmentation type
         fragmentation = self._get_highest_fragmentation()
-        model, corr, tolerance = ms2pip_generator._find_best_ms2pip_model(
+        model, corr = ms2pip_generator._find_best_ms2pip_model(
             batch_psms=batch_psms,
             knwon_fragmentation=fragmentation,
         )
@@ -306,14 +306,14 @@ class FeatureAnnotator:
             logger.info(f"Best model found: {model} with average correlation {corr}")
 
             # Create new annotator with best model
-            ms2pip_generator = self._create_ms2pip_annotator(model=model, tolerance=tolerance)
+            ms2pip_generator = self._create_ms2pip_annotator(model=model, tolerance=self._ms2_tolerance)
 
             # Apply annotation with best model
             ms2pip_generator.add_features(psm_list)
             self._idxml_reader.psms = psm_list
             logger.info("MS2PIP annotations added using best model")
         else:
-            logger.error("No suitable MS2PIP model found for this dataset")
+            logger.error("No suitable MS2PIP model found for this dataset. Skip MS2PIP annotations.")
 
     def _run_deeplc_annotation(self) -> None:
         """Run DeepLC annotation on the loaded PSMs."""
