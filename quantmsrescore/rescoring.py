@@ -12,6 +12,7 @@ from quantmsrescore import __version__
 from quantmsrescore.ms2rescore import msrescore2feature
 from quantmsrescore.sage_feature import add_sage_feature
 from quantmsrescore.snr import spectrum2feature
+from quantmsrescore.psm_clean import psm_feature_clean
 
 # Restore the environment variable
 if openms_data_path:
@@ -31,6 +32,7 @@ def cli():
 cli.add_command(msrescore2feature)
 cli.add_command(add_sage_feature)
 cli.add_command(spectrum2feature)
+cli.add_command(psm_feature_clean)
 
 
 def main():

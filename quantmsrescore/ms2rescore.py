@@ -47,6 +47,11 @@ configure_logging()
     default="ms2pip,deeplc",
 )
 @click.option(
+    "--force_model",
+    help="Force to run with provided MS2PIP model. Don't look for the best model and validation. Default False",
+    is_flag=True,
+)
+@click.option(
     "--only_features",
     help="Comma-separated list of features to use for annotation (read docs for default)",
 )
@@ -107,6 +112,7 @@ def msrescore2feature(
     only_features,
     ms2pip_model_dir,
     ms2pip_model,
+    force_model,
     ms2_tolerance,
     calibration_set_size,
     valid_correlations_size,
@@ -163,6 +169,7 @@ def msrescore2feature(
         feature_generators=feature_generators,
         only_features=only_features,
         ms2pip_model=ms2pip_model,
+        force_model=force_model,
         ms2pip_model_path=ms2pip_model_dir,
         ms2_tolerance=ms2_tolerance,
         calibration_set_size=calibration_set_size,

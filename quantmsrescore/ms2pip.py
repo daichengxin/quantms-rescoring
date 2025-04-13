@@ -219,8 +219,7 @@ class MS2PIPAnnotator(MS2PIPFeatureGenerator):
         valid_correlations_size: Optional[float] = 0.70,
         correlation_threshold: Optional[float] = 0.6,
         higher_score_better: bool = True,
-        annotated_ms_tolerance: Tuple[float, str] = (0.0, None),
-        predicted_ms_tolerance: Tuple[float, str] = (0.0, None),
+        force_model: bool = False,
         **kwargs,
     ):
         super().__init__(
@@ -233,12 +232,11 @@ class MS2PIPAnnotator(MS2PIPFeatureGenerator):
             processes=processes,
             kwargs=kwargs,
         )
-        self._reported_tolerance: Tuple[float, str] = annotated_ms_tolerance
-        self._predicted_tolerance: Tuple[float, str] = predicted_ms_tolerance
         self._calibration_set_size: float = calibration_set_size
         self._valid_correlations_size: float = valid_correlations_size
         self._correlation_threshold: float = correlation_threshold
         self._higher_score_better: bool = higher_score_better
+        self._force_model: bool = force_model
 
     def add_features(self, psm_list: PSMList) -> None:
         """
@@ -303,8 +301,8 @@ class MS2PIPAnnotator(MS2PIPFeatureGenerator):
                 self._calculate_features(psm_list_run, ms2pip_results)
                 current_run += 1
 
-    @staticmethod
     def _validate_scores(
+        self,
         ms2pip_results,
         calibration_set_size,
         valid_correlations_size,
@@ -369,15 +367,16 @@ class MS2PIPAnnotator(MS2PIPFeatureGenerator):
             f"{(len(valid_correlation) / len(calibration_set)) * 100:.2f}%"
         )
 
-        # If the number of valid correlations is less than 80% of the calibration set, return False
-        if len(valid_correlation) < len(calibration_set) * valid_correlations_size:
-            return False
+        if not self._force_model:
+            # If the number of valid correlations is less than 80% of the calibration set, return False
+            if len(valid_correlation) < len(calibration_set) * valid_correlations_size:
+                return False
 
         return True
 
     def _find_best_ms2pip_model(
         self, batch_psms: PSMList, knwon_fragmentation: Optional[str] = None
-    ) -> Tuple[str, float, float]:
+    ) -> Tuple[str, float]:
         """
         Find the best MS²PIP model for a batch of PSMs.
 
@@ -404,12 +403,6 @@ class MS2PIPAnnotator(MS2PIPFeatureGenerator):
                 knwon_fragmentation: SUPPORTED_MODELS_MS2PIP.get(knwon_fragmentation)
             }
 
-        self.ms2_tolerance = self.choose_best_ms2pip_tolerance(
-            ms2_tolerance=self.ms2_tolerance,
-            reported_tolerance=self._reported_tolerance,
-            predicted_tolerance=self._predicted_tolerance,
-        )
-
         for fragment_types in filtered_models:
             for model in filtered_models[fragment_types]:
                 logger.info(f"Running MS²PIP for model `{model}`...")
@@ -428,7 +421,7 @@ class MS2PIPAnnotator(MS2PIPFeatureGenerator):
                     best_model = model
                     best_correlation = correlation
 
-        return best_model, best_correlation, self.ms2_tolerance
+        return best_model, best_correlation
 
     @staticmethod
     def _calculate_correlation(ms2pip_results: List[ProcessingResult]) -> float:
@@ -456,94 +449,6 @@ class MS2PIPAnnotator(MS2PIPFeatureGenerator):
             ]
         )
         return total_correlation / len(ms2pip_results)
-
-    def choose_best_ms2pip_tolerance(
-        self,
-        ms2_tolerance: float,
-        reported_tolerance: Tuple[float, str],
-        predicted_tolerance: Tuple[float, str] = None,
-    ) -> float:
-        """
-        Determine the best MS²PIP tolerance to use by comparing tolerances in Da.
-
-        Logic:
-          - If reported tolerance is None: use the command line tolerance
-          - If reported tolerance is in ppm: try to use the predicted Da equivalent if available
-            and if it's not too different from the command line value
-          - If command line tolerance is less restrictive (higher): use command line value
-          - If command line tolerance is more restrictive (lower):
-          - Use reported tolerance if command line is at least 10% of reported value
-          - Otherwise use command line tolerance
-          - Log all decisions for transparency
-
-          Parameters
-          ----------
-          ms2_tolerance : float
-              The MS²PIP tolerance specified in the command line (in Da).
-          reported_tolerance : tuple(float, str)
-              The tolerance reported in the idXML as (value, unit).
-              Unit can be 'Da', 'ppm', or None.
-          predicted_tolerance : tuple(float, str), optional
-             The tolerance predicted in Da if the reported one is in ppm.
-             Format is (value, unit) where unit should be 'Da' if provided.
-
-          Returns
-          -------
-          float
-             The best tolerance value to use (in Da).
-        """
-
-        # Case 1: No reported tolerance
-        if reported_tolerance[1] is None:
-            logger.info(
-                f"No MS²PIP tolerance reported in the idXML. Using command line value ({ms2_tolerance} Da)."
-            )
-            return ms2_tolerance
-
-        # Case 2: Reported tolerance is in ppm
-        if reported_tolerance[1] == "ppm":
-            if (
-                predicted_tolerance is not None
-                and predicted_tolerance[1] == "Da"
-                and ms2_tolerance < predicted_tolerance[0]
-                and (predicted_tolerance[0] / ms2_tolerance) > 0.1
-            ):
-                logger.warning(
-                    f"Reported MS²PIP tolerance is in ppm. Using the predicted Da equivalent: "
-                    f"{predicted_tolerance[0]} Da (instead of command line value: {ms2_tolerance} Da)."
-                )
-                return predicted_tolerance[0]
-            else:
-                logger.warning(
-                    f"Reported MS²PIP tolerance is in ppm and no suitable Da prediction available. "
-                    f"Using command line value ({ms2_tolerance} Da)."
-                )
-                return ms2_tolerance
-
-        # Command line value is more restrictive (lower)
-        if ms2_tolerance < reported_tolerance[0]:
-            ratio = ms2_tolerance / reported_tolerance[0]
-            if ratio > 0.1:
-                logger.warning(
-                    f"Command line MS²PIP tolerance ({ms2_tolerance} Da) is more restrictive "
-                    f"by {(1 - ratio) * 100:.1f}% than reported value ({reported_tolerance[0]} Da). "
-                    f"Using reported value for better model compatibility."
-                )
-                return reported_tolerance[0]
-
-            else:
-                logger.warning(
-                    f"Command line MS²PIP tolerance ({ms2_tolerance} Da) is significantly more restrictive "
-                    f"({ratio * 100:.1f}% of reported value: {reported_tolerance[0]} Da). "
-                    f"Using command line value as specified."
-                )
-                return ms2_tolerance
-
-        # Values are the same
-        logger.info(
-            f"MS²PIP tolerance in command line ({ms2_tolerance} Da) will continue be used instead of any reported idXML value."
-        )
-        return ms2_tolerance
 
     def custom_correlate(
         self,
