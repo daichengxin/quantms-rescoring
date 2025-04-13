@@ -170,9 +170,8 @@ def spectrum2feature(ctx, mzml: str, idxml: str, output: str) -> None:
         If no protein identifications are found in the idXML file.
     """
     logger.info(f"Processing mzML file: {mzml}")
-    exp, lookup = OpenMSHelper.get_spectrum_lookup_indexer(mzml)
 
-    idxml_reader = IdXMLReader(idexml_filename=idxml)
+    idxml_reader = IdXMLReader(idexml_filename=idxml, mzml_file=mzml)
     protein_ids = idxml_reader.oms_proteins
     peptide_ids = idxml_reader.oms_peptides
 
@@ -189,7 +188,7 @@ def spectrum2feature(ctx, mzml: str, idxml: str, output: str) -> None:
             continue
 
         scan_number = int(scan_matches[0][1])
-        spectrum_data = OpenMSHelper.get_peaks_by_scan(scan_number, exp, lookup)
+        spectrum_data = OpenMSHelper.get_peaks_by_scan(scan_number, idxml_reader.exp, idxml_reader.spec_lookup)
 
         if spectrum_data is None:
             continue
