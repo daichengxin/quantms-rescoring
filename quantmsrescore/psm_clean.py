@@ -71,7 +71,8 @@ def psm_feature_clean(
         Path to the output idXML file with processed PSMs.
     """
 
-    id_reader = IdXMLReader(idxml, mzml)
+    id_reader = IdXMLReader(idxml)
+    id_reader.build_spectrum_lookup(mzml, check_unix_compatibility=True)
     id_reader.psm_clean()
     id_reader.write_idxml_file(output)
 
