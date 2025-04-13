@@ -145,7 +145,7 @@ class FeatureAnnotator:
 
             # Load the idXML file and corresponding mzML file
             self._idxml_reader = IdXMLRescoringReader(
-                idexml_filename=idxml_path,
+                idxml_filename=idxml_path,
                 mzml_file=spectrum_path,
                 only_ms2=self._ms2_only,
                 remove_missing_spectrum=self._remove_missing_spectra,

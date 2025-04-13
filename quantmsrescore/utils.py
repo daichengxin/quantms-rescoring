@@ -37,26 +37,23 @@ class IdXMLReader:
         List of peptide identifications parsed from the idXML file.
     """
 
-    def __init__(self, idexml_filename: Union[Path, str],
-                 mzml_file: Union[str, Path], ) -> None:
+    def __init__(self, idxml_filename: Union[Path, str]) -> None:
         """
         Initialize IdXMLReader with the specified idXML file.
 
         Parameters
         ----------
-        idexml_filename : Union[Path, str]
+        idxml_filename : Union[Path, str]
             Path to the idXML file to be read and parsed.
         """
-        self.filename = Path(idexml_filename)
+        self.filename = Path(idxml_filename)
         self.oms_proteins, self.oms_peptides = self._parse_idxml()
+        self.spec_lookup = None
+        self.exp = None
 
         # Private properties for spectrum lookup
-        self._spec_lookup = None
-        self._exp = None
         self._mzml_path = None
         self._stats = None  # IdXML stats
-
-        self.build_spectrum_lookup(mzml_file, check_unix_compatibility=True)
 
     def _parse_idxml(
             self,
@@ -110,7 +107,7 @@ class IdXMLReader:
         self._mzml_path = str(mzml_file) if isinstance(mzml_file, Path) else mzml_file
         if check_unix_compatibility:
             OpenMSHelper.check_unix_compatibility(self._mzml_path)
-        self._exp, self._spec_lookup = OpenMSHelper.get_spectrum_lookup_indexer(self._mzml_path)
+        self.exp, self.spec_lookup = OpenMSHelper.get_spectrum_lookup_indexer(self._mzml_path)
         logger.info(f"Built SpectrumLookup from {self._mzml_path}")
 
     def psm_clean(self, remove_missing_spectrum: bool = True, only_ms2: bool = True) -> SpectrumStats:
@@ -151,7 +148,7 @@ class IdXMLReader:
         identifications to remove entries that no longer have associated peptides.
         """
 
-        if self._spec_lookup is None or self._exp is None:
+        if self.spec_lookup is None or self.exp is None:
             raise ValueError("Spectrum lookup or PSMs not initialized")
 
         self._stats = SpectrumStats()
@@ -161,7 +158,7 @@ class IdXMLReader:
         search_engine = self.oms_proteins[0].getSearchEngine()
 
         for peptide_id in self.oms_peptides:
-            spectrum = OpenMSHelper.get_spectrum_for_psm(peptide_id, self._exp, self._spec_lookup)
+            spectrum = OpenMSHelper.get_spectrum_for_psm(peptide_id, self.exp, self.spec_lookup)
             spectrum_reference = OpenMSHelper.get_spectrum_reference(peptide_id)
 
             missing_spectrum, empty_spectrum, invalid_score = False, False, False

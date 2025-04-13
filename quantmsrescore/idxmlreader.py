@@ -53,7 +53,7 @@ class IdXMLRescoringReader(IdXMLReader):
 
     def __init__(
         self,
-        idexml_filename: Union[Path, str],
+        idxml_filename: Union[Path, str],
         mzml_file: Union[str, Path],
         only_ms2: bool = True,
         remove_missing_spectrum: bool = True,
@@ -72,7 +72,8 @@ class IdXMLRescoringReader(IdXMLReader):
         remove_missing_spectrum : bool, optional
             Flag to remove PSMs with missing spectra, by default True.
         """
-        super().__init__(idexml_filename, mzml_file)
+        super().__init__(idxml_filename)
+        self.build_spectrum_lookup(mzml_file)
         self.high_score_better: Optional[bool] = None
 
         # Private attributes
@@ -209,7 +210,7 @@ class IdXMLRescoringReader(IdXMLReader):
         """
         psm_list = []
 
-        if only_ms2 and self._spec_lookup is None:
+        if only_ms2 and self.spec_lookup is None:
             logger.warning("Spectrum lookup not initialized, cannot filter for MS2 spectra")
             only_ms2 = False
 
@@ -222,8 +223,8 @@ class IdXMLRescoringReader(IdXMLReader):
             for psm_hit in peptide_id.getHits():
                 if (
                     only_ms2
-                    and self._spec_lookup is not None
-                    and OpenMSHelper.get_ms_level(peptide_id, self._spec_lookup, self._exp) != 2
+                    and self.spec_lookup is not None
+                    and OpenMSHelper.get_ms_level(peptide_id, self.spec_lookup, self.exp) != 2
                 ):
                     continue
                 psm = self._parse_psm(
