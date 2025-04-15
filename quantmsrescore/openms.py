@@ -176,7 +176,11 @@ class OpenMSHelper:
         oms.MzMLFile().load(mzml_file, exp)
 
         lookup = SpectrumLookup()
-        lookup.readSpectra(exp, "scan=(?<SCAN>\\d+)")
+        if "spectrum=" in exp.getSpectrum(0).getNativeID():
+            lookup.readSpectra(exp, "spectrum=(?<SCAN>\\d+)")
+        else:
+            lookup.readSpectra(exp, "scan=(?<SCAN>\\d+)")
+
         return exp, lookup
 
     @staticmethod
@@ -232,6 +236,7 @@ class OpenMSHelper:
             index = lookup.findByScanNumber(scan_number)
             spectrum = exp.getSpectrum(index)
             return spectrum
+
         except Exception as e:
             psm_info = psm.provenance_data if hasattr(psm, "provenance_data") else "N/A"
             logger.error(
