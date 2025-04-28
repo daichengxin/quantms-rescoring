@@ -52,6 +52,11 @@ configure_logging()
     is_flag=True,
 )
 @click.option(
+    "--find_best_model",
+    help="Find the best model with the best performance. Default True",
+    is_flag=True,
+)
+@click.option(
     "--only_features",
     help="Comma-separated list of features to use for annotation (read docs for default)",
 )
@@ -113,6 +118,7 @@ def msrescore2feature(
     ms2pip_model_dir,
     ms2pip_model,
     force_model,
+    find_best_model,
     ms2_tolerance,
     calibration_set_size,
     valid_correlations_size,
@@ -151,6 +157,10 @@ def msrescore2feature(
         Path to the directory containing the MS²PIP models.
     ms2pip_model : str
         The MS²PIP model to use for annotation.
+    force_model : bool
+        Whether to force the use of the provided MS²PIP model.
+    find_best_model : bool
+        Whether to find the model with the best performance.
     ms2_tolerance : float
         The tolerance for MS²PIP annotation.
     calibration_set_size : float
@@ -170,6 +180,7 @@ def msrescore2feature(
         only_features=only_features,
         ms2pip_model=ms2pip_model,
         force_model=force_model,
+        find_best_model=find_best_model,
         ms2pip_model_path=ms2pip_model_dir,
         ms2_tolerance=ms2_tolerance,
         calibration_set_size=calibration_set_size,

@@ -42,7 +42,11 @@ class PatchParallelized(_Parallelized):
     See example in issue:
     """
 
-    def __init__(self, encoder, model=None, model_dir=None, ms2_tolerance=0.02, processes=None):
+    def __init__(self, encoder,
+                 model=None,
+                 model_dir=None,
+                 ms2_tolerance=0.02,
+                 processes=None):
         """
         Initialize with all original parameters plus a custom spectrum reader.
 
@@ -68,12 +72,12 @@ class PatchParallelized(_Parallelized):
         )
 
     def process_spectra(
-        self,
-        psm_list,
-        spectrum_file,
-        spectrum_id_pattern,
-        vector_file=False,
-        annotations_only=False,
+            self,
+            psm_list,
+            spectrum_file,
+            spectrum_id_pattern,
+            vector_file=False,
+            annotations_only=False,
     ):
         """
         Override process_spectra to use our custom spectrum reader
@@ -105,8 +109,8 @@ class PatchParallelized(_Parallelized):
 
         # Add XGBoost predictions if required
         if (
-            not (vector_file or annotations_only)
-            and "xgboost_model_files" in MODELS[self.model].keys()
+                not (vector_file or annotations_only)
+                and "xgboost_model_files" in MODELS[self.model].keys()
         ):
             results = self._add_xgboost_predictions(results)
 
@@ -128,7 +132,7 @@ class PatchParallelized(_Parallelized):
 
             def _generate_chunks():
                 for i in range(0, len(_list), chunk_size):
-                    yield _list[i : i + chunk_size]
+                    yield _list[i: i + chunk_size]
 
             _list = list(_list)
             return list(_generate_chunks())
@@ -207,20 +211,20 @@ class PatchParallelized(_Parallelized):
 class MS2PIPAnnotator(MS2PIPFeatureGenerator):
 
     def __init__(
-        self,
-        *args,
-        model: str = "HCD",
-        ms2_tolerance: float = 0.02,
-        spectrum_path: Optional[str] = None,
-        spectrum_id_pattern: str = "(.*)",
-        model_dir: Optional[str] = None,
-        processes: int = 1,
-        calibration_set_size: Optional[float] = 0.20,
-        valid_correlations_size: Optional[float] = 0.70,
-        correlation_threshold: Optional[float] = 0.6,
-        higher_score_better: bool = True,
-        force_model: bool = False,
-        **kwargs,
+            self,
+            *args,
+            model: str = "HCD",
+            ms2_tolerance: float = 0.02,
+            spectrum_path: Optional[str] = None,
+            spectrum_id_pattern: str = "(.*)",
+            model_dir: Optional[str] = None,
+            processes: int = 1,
+            calibration_set_size: Optional[float] = 0.20,
+            valid_correlations_size: Optional[float] = 0.70,
+            correlation_threshold: Optional[float] = 0.6,
+            higher_score_better: bool = True,
+            force_model: bool = False,
+            **kwargs,
     ):
         super().__init__(
             args,
@@ -237,6 +241,59 @@ class MS2PIPAnnotator(MS2PIPFeatureGenerator):
         self._correlation_threshold: float = correlation_threshold
         self._higher_score_better: bool = higher_score_better
         self._force_model: bool = force_model
+
+    def validate_features(self, psm_list: PSMList, model: str = None) -> bool:
+        """
+        This method is used to validate a model for a given PSM list.
+        It checks if the model is valid for the given PSM list and returns a boolean value.
+
+        Parameters
+        ----------
+        psm_list : PSMList
+            The PSM list to validate the model for.
+        model : str, optional
+            The model to validate. If not provided, the default model is used.
+
+        """
+        logger.info("Adding MS²PIP-derived features to PSMs.")
+        psm_dict = psm_list.get_psm_dict()
+        current_run = 1
+        valid_correlation = None
+        if model is None:
+            model = self.model
+        for runs in psm_dict.values():
+            for run, psms in runs.items():
+                psm_list_run = PSMList(psm_list=list(chain.from_iterable(psms.values())))
+                spectrum_filename = infer_spectrum_path(self.spectrum_path, run)
+                logger.debug(f"Using spectrum file `{spectrum_filename}`")
+                try:
+                    ms2pip_results = self.custom_correlate(
+                        psms=psm_list_run,
+                        spectrum_file=str(spectrum_filename),
+                        spectrum_id_pattern=self.spectrum_id_pattern,
+                        model=model,
+                        ms2_tolerance=self.ms2_tolerance,
+                        compute_correlations=True,
+                        model_dir=self.model_dir,
+                        processes=self.processes,
+                    )
+                except NoMatchingSpectraFound as e:
+                    raise FeatureGeneratorException(
+                        f"Could not find any matching spectra for PSMs from run `{run}`. "
+                        "Please check that the `spectrum_id_pattern` and `psm_id_pattern` "
+                        "options are configured correctly. See "
+                        "https://ms2rescore.readthedocs.io/en/latest/userguide/configuration/#mapping-psms-to-spectra"
+                        " for more information."
+                    ) from e
+                valid_correlation = self._validate_scores(
+                    ms2pip_results=ms2pip_results,
+                    calibration_set_size=self._calibration_set_size,
+                    valid_correlations_size=self._valid_correlations_size,
+                    correlation_threshold=self._correlation_threshold,
+                    higher_score_better=self._higher_score_better,
+                )
+                current_run += 1
+        return valid_correlation
 
     def add_features(self, psm_list: PSMList) -> None:
         """
@@ -279,35 +336,16 @@ class MS2PIPAnnotator(MS2PIPFeatureGenerator):
                         "https://ms2rescore.readthedocs.io/en/latest/userguide/configuration/#mapping-psms-to-spectra"
                         " for more information."
                     ) from e
-                valid_correlation = self._validate_scores(
-                    ms2pip_results=ms2pip_results,
-                    calibration_set_size=self._calibration_set_size,
-                    valid_correlations_size=self._valid_correlations_size,
-                    correlation_threshold=self._correlation_threshold,
-                    higher_score_better=self._higher_score_better,
-                )
-
-                if not valid_correlation:
-                    logger.error(
-                        "The number of valid correlations doesn't exceed the threshold for current the calibration set."
-                        "Please try a different model or adjust the valid_correlations_size or calibration_set_size."
-                    )
-                    raise Ms2pipIncorrectModelException(
-                        message="The number of valid correlations doesn't exceed the threshold for current the "
-                        "calibration set. Please try a different model or adjust the valid_correlations_size "
-                        "or calibration_set_size.",
-                        model=self.model,
-                    )
                 self._calculate_features(psm_list_run, ms2pip_results)
                 current_run += 1
 
     def _validate_scores(
-        self,
-        ms2pip_results,
-        calibration_set_size,
-        valid_correlations_size,
-        correlation_threshold,
-        higher_score_better,
+            self,
+            ms2pip_results,
+            calibration_set_size,
+            valid_correlations_size,
+            correlation_threshold,
+            higher_score_better,
     ) -> bool:
         """
         Validate MS²PIP results based on score and correlation criteria.
@@ -354,8 +392,8 @@ class MS2PIPAnnotator(MS2PIPFeatureGenerator):
 
         # Get a calibration set, the % of psms to be used for calibrarion is defined by calibration_set_size
         calibration_set = ms2pip_results_copy[
-            : int(len(ms2pip_results_copy) * calibration_set_size)
-        ]
+                          : int(len(ms2pip_results_copy) * calibration_set_size)
+                          ]
 
         # Select the results with correlation above the threshold
         valid_correlation = [
@@ -367,15 +405,13 @@ class MS2PIPAnnotator(MS2PIPFeatureGenerator):
             f"{(len(valid_correlation) / len(calibration_set)) * 100:.2f}%"
         )
 
-        if not self._force_model:
-            # If the number of valid correlations is less than 80% of the calibration set, return False
-            if len(valid_correlation) < len(calibration_set) * valid_correlations_size:
-                return False
+        if len(valid_correlation) < len(calibration_set) * valid_correlations_size:
+            return False
 
         return True
 
     def _find_best_ms2pip_model(
-        self, batch_psms: PSMList, knwon_fragmentation: Optional[str] = None
+            self, batch_psms: PSMList, knwon_fragmentation: Optional[str] = None
     ) -> Tuple[str, float]:
         """
         Find the best MS²PIP model for a batch of PSMs.
@@ -451,18 +487,18 @@ class MS2PIPAnnotator(MS2PIPFeatureGenerator):
         return total_correlation / len(ms2pip_results)
 
     def custom_correlate(
-        self,
-        psms: Union[PSMList, str, Path],
-        spectrum_file: Union[str, Path],
-        psm_filetype: Optional[str] = None,
-        spectrum_id_pattern: Optional[str] = None,
-        compute_correlations: bool = False,
-        add_retention_time: bool = False,
-        add_ion_mobility: bool = False,
-        model: Optional[str] = "HCD",
-        model_dir: Optional[Union[str, Path]] = None,
-        ms2_tolerance: float = 0.02,
-        processes: Optional[int] = None,
+            self,
+            psms: Union[PSMList, str, Path],
+            spectrum_file: Union[str, Path],
+            psm_filetype: Optional[str] = None,
+            spectrum_id_pattern: Optional[str] = None,
+            compute_correlations: bool = False,
+            add_retention_time: bool = False,
+            add_ion_mobility: bool = False,
+            model: Optional[str] = "HCD",
+            model_dir: Optional[Union[str, Path]] = None,
+            ms2_tolerance: float = 0.02,
+            processes: Optional[int] = None,
     ) -> List[ProcessingResult]:
         """
         Custom implementation of correlate that uses our custom spectrum reader.
@@ -561,17 +597,17 @@ def read_spectrum_file(spec_file: str) -> Generator[ObservedSpectrum, None, None
                 retention_time=float(rt),
             )
         if (
-            obs_spectrum is None
-            or obs_spectrum.identifier == ""
-            or obs_spectrum.mz.shape[0] == 0
-            or obs_spectrum.intensity.shape[0] == 0
+                obs_spectrum is None
+                or obs_spectrum.identifier == ""
+                or obs_spectrum.mz.shape[0] == 0
+                or obs_spectrum.intensity.shape[0] == 0
         ):
             continue
         yield obs_spectrum
 
 
 def _organize_psms_by_spectrum_id(
-    enumerated_psm_list: List[Tuple[int, PSM]]
+        enumerated_psm_list: List[Tuple[int, PSM]]
 ) -> Dict[str, List[Tuple[int, PSM]]]:
     """
     Organize PSMs by spectrum ID for efficient lookup.
@@ -613,12 +649,12 @@ def _preprocess_spectrum(spectrum: ObservedSpectrum, model: str) -> None:
 
 
 def _get_targets_for_psm(
-    psm: PSM,
-    spectrum: ObservedSpectrum,
-    encoder: Encoder,
-    ms2_tolerance: float,
-    model: str,
-    ion_types: List[str],
+        psm: PSM,
+        spectrum: ObservedSpectrum,
+        encoder: Encoder,
+        ms2_tolerance: float,
+        model: str,
+        ion_types: List[str],
 ) -> Tuple[Optional[np.ndarray], Dict[str, np.ndarray]]:
     """
     Get targets for a PSM from a spectrum.
@@ -666,15 +702,15 @@ def _get_targets_for_psm(
 
 
 def _create_result_for_mode(
-    psm_index: int,
-    psm: PSM,
-    enc_peptidoform: np.ndarray,
-    targets: Dict[str, np.ndarray],
-    vector_file: bool,
-    annotations_only: bool,
-    model: str,
-    encoder: Encoder,
-    ion_types: List[str],
+        psm_index: int,
+        psm: PSM,
+        enc_peptidoform: np.ndarray,
+        targets: Dict[str, np.ndarray],
+        vector_file: bool,
+        annotations_only: bool,
+        model: str,
+        encoder: Encoder,
+        ion_types: List[str],
 ) -> ProcessingResult:
     """
     Create a ProcessingResult based on the processing mode.
@@ -740,8 +776,8 @@ def _create_result_for_mode(
         try:
             result = _process_peptidoform(psm_index, psm, model, encoder, ion_types)
         except (
-            exceptions.InvalidPeptidoformError,
-            exceptions.InvalidAminoAcidError,
+                exceptions.InvalidPeptidoformError,
+                exceptions.InvalidAminoAcidError,
         ):
             result = ProcessingResult(psm_index=psm_index, psm=psm)
         else:
@@ -751,14 +787,14 @@ def _create_result_for_mode(
 
 
 def _custom_process_spectra(
-    enumerated_psm_list: List[Tuple[int, PSM]],
-    spec_file: str,
-    vector_file: bool,
-    encoder: Encoder,
-    model: str,
-    ms2_tolerance: float,
-    spectrum_id_pattern: str,
-    annotations_only: bool = False,
+        enumerated_psm_list: List[Tuple[int, PSM]],
+        spec_file: str,
+        vector_file: bool,
+        encoder: Encoder,
+        model: str,
+        ms2_tolerance: float,
+        spectrum_id_pattern: str,
+        annotations_only: bool = False,
 ) -> List[ProcessingResult]:
     """
     Perform requested tasks for each spectrum in spectrum file.
