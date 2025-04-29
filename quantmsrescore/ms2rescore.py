@@ -37,9 +37,9 @@ configure_logging()
 @click.option("--log_level", help="Logging level (default: `info`)", default="info")
 @click.option(
     "--processes",
-    help="Number of parallel processes available to MS²Rescore",
+    help="Number of parallel processes available to MS²Rescore (default: 4)",
     type=int,
-    default=16,
+    default=4,
 )
 @click.option(
     "--feature_generators",

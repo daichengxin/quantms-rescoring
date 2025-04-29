@@ -243,10 +243,10 @@ class FeatureAnnotator:
 
             # Case 2: Find best model if requested and not forcing original
             elif self._find_best_model:
-                best_model = ms2pip_generator._find_best_ms2pip_model(psm_list)
-                if ms2pip_generator.validate_features(psm_list=psm_list, model=best_model[0]):
-                    model_to_use = best_model[0]
-                    logger.info(f"Using best model: {model_to_use}")
+                best_model, best_corr = ms2pip_generator._find_best_ms2pip_model(psm_list)
+                if best_model and ms2pip_generator.validate_features(psm_list=psm_list, model=best_model):
+                    model_to_use = best_model
+                    logger.info(f"Using best model: {model_to_use} with correlation: {best_corr:.4f}")
                 else:
                     # Fallback to original model if best model doesn't validate
                     if ms2pip_generator.validate_features(psm_list, model=original_model):
@@ -325,7 +325,7 @@ class FeatureAnnotator:
         fragmentation = self._get_highest_fragmentation()
         model, corr = ms2pip_generator._find_best_ms2pip_model(
             batch_psms=batch_psms,
-            knwon_fragmentation=fragmentation,
+            known_fragmentation=fragmentation,
         )
 
         if model:

@@ -411,7 +411,7 @@ class MS2PIPAnnotator(MS2PIPFeatureGenerator):
         return True
 
     def _find_best_ms2pip_model(
-            self, batch_psms: PSMList, knwon_fragmentation: Optional[str] = None
+            self, batch_psms: PSMList, known_fragmentation: Optional[str] = None
     ) -> Tuple[str, float]:
         """
         Find the best MS²PIP model for a batch of PSMs.
@@ -434,9 +434,9 @@ class MS2PIPAnnotator(MS2PIPFeatureGenerator):
 
         filtered_models = SUPPORTED_MODELS_MS2PIP
 
-        if knwon_fragmentation:
+        if known_fragmentation:
             filtered_models = {
-                knwon_fragmentation: SUPPORTED_MODELS_MS2PIP.get(knwon_fragmentation)
+                known_fragmentation: SUPPORTED_MODELS_MS2PIP.get(known_fragmentation)
             }
 
         for fragment_types in filtered_models:
