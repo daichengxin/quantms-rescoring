@@ -42,7 +42,7 @@ def add_sage_feature(ctx, idxml: str, output_file: str, feat_file: str):
     logger.info("Reading idXML file")
 
     try:
-        idxml_reader = IdXMLReader(idexml_filename=idxml)
+        idxml_reader = IdXMLReader(idxml_filename=idxml)
         protein_ids = idxml_reader.oms_proteins
         peptide_ids = idxml_reader.oms_peptides
     except Exception as e:

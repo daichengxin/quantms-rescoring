@@ -3,7 +3,7 @@
 [![Python package](https://github.com/bigbio/quantms-rescoring/actions/workflows/python-package.yml/badge.svg)](https://github.com/bigbio/quantms-rescoring/actions/workflows/python-package.yml)
 [![codecov](https://codecov.io/gh/bigbio/quantms-rescoring/branch/main/graph/badge.svg?token=3ZQZQ2ZQ2D)](https://codecov.io/gh/bigbio/quantms-rescoring)
 [![PyPI version](https://badge.fury.io/py/quantms-rescoring.svg)](https://badge.fury.io/py/quantms-rescoring)
-[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
 quantms-rescoring is a Python tool that aims to add features to peptide-spectrum matches (PSMs) in idXML files using multiple tools including SAGE features, quantms spectrum features, MS2PIP and DeepLC. It is part of the quantms ecosystem package and leverages the MS²Rescore framework to improve identification confidence in proteomics data analysis.
 
@@ -16,17 +16,17 @@ quantms-rescoring is a Python tool that aims to add features to peptide-spectrum
 ## CLI Tools
 
 ```sh
- quantms-rescoring msrescore2feature --help
+ rescoring msrescore2feature --help
 ```
 Annotates PSMs with prediction-based features from MS2PIP and DeepLC
 
 ```sh
- quantms-rescoring add_sage_feature --help
+ rescoring add_sage_feature --help
 ```
-Incorporates additional features from SAGE into idXML files. 
+Incorporates additional features from SAGE into idXML files.
 
 ```sh
- quantms-rescoring spectrum2feature --help
+ rescoring spectrum2feature --help
 ```
 Add additional spectrum feature like signal-to-noise to each PSM in the idXML.
 

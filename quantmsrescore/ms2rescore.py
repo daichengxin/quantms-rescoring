@@ -37,14 +37,24 @@ configure_logging()
 @click.option("--log_level", help="Logging level (default: `info`)", default="info")
 @click.option(
     "--processes",
-    help="Number of parallel processes available to MS²Rescore",
+    help="Number of parallel processes available to MS²Rescore (default: 4)",
     type=int,
-    default=16,
+    default=4,
 )
 @click.option(
     "--feature_generators",
     help="Comma-separated list of feature generators to use (default: `ms2pip,deeplc`). See rescoring doc for further information",
     default="ms2pip,deeplc",
+)
+@click.option(
+    "--force_model",
+    help="Force to run with provided MS2PIP model. Don't look for the best model and validation. Default False",
+    is_flag=True,
+)
+@click.option(
+    "--find_best_model",
+    help="Find the best model with the best performance. Default True",
+    is_flag=True,
 )
 @click.option(
     "--only_features",
@@ -107,6 +117,8 @@ def msrescore2feature(
     only_features,
     ms2pip_model_dir,
     ms2pip_model,
+    force_model,
+    find_best_model,
     ms2_tolerance,
     calibration_set_size,
     valid_correlations_size,
@@ -145,6 +157,10 @@ def msrescore2feature(
         Path to the directory containing the MS²PIP models.
     ms2pip_model : str
         The MS²PIP model to use for annotation.
+    force_model : bool
+        Whether to force the use of the provided MS²PIP model.
+    find_best_model : bool
+        Whether to find the model with the best performance.
     ms2_tolerance : float
         The tolerance for MS²PIP annotation.
     calibration_set_size : float
@@ -163,6 +179,8 @@ def msrescore2feature(
         feature_generators=feature_generators,
         only_features=only_features,
         ms2pip_model=ms2pip_model,
+        force_model=force_model,
+        find_best_model=find_best_model,
         ms2pip_model_path=ms2pip_model_dir,
         ms2_tolerance=ms2_tolerance,
         calibration_set_size=calibration_set_size,

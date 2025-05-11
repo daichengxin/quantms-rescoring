@@ -23,24 +23,12 @@ class FeatureAnnotator:
     from MS2PIP and DeepLC models to improve rescoring.
     """
 
-    def __init__(
-        self,
-        feature_generators: str,
-        only_features: Optional[str] = None,
-        ms2pip_model: str = "HCD2021",
-        ms2pip_model_path: str = "models",
-        ms2_tolerance: float = 0.05,
-        calibration_set_size: float = 0.2,
-        valid_correlations_size: float = 0.7,
-        skip_deeplc_retrain: bool = False,
-        processes: int = 2,
-        log_level: str = "INFO",
-        spectrum_id_pattern: str = "(.*)",  # default for openms idXML
-        psm_id_pattern: str = "(.*)",  # default for openms idXML
-        remove_missing_spectra: bool = True,
-        ms2_only: bool = True,
-        find_best_ms2pip_model: bool = True,
-    ):
+    def __init__(self, feature_generators: str, only_features: Optional[str] = None, ms2pip_model: str = "HCD2021",
+                 force_model: bool = False, ms2pip_model_path: str = "models", ms2_tolerance: float = 0.05,
+                 calibration_set_size: float = 0.2, valid_correlations_size: float = 0.7,
+                 skip_deeplc_retrain: bool = False, processes: int = 2, log_level: str = "INFO",
+                 spectrum_id_pattern: str = "(.*)", psm_id_pattern: str = "(.*)", remove_missing_spectra: bool = True,
+                 ms2_only: bool = True, find_best_model: bool = False) -> None:
         """
         Initialize the Annotator with configuration parameters.
 
@@ -74,6 +62,10 @@ class FeatureAnnotator:
             Process only MS2-level PSMs (default: True).
         find_best_ms2pip_model : bool, optional
             Find best MS2PIP model for the dataset (default: False).
+        force_model : bool, optional
+            Force the use of the provided MS2PIP model (default: False).
+        find_best_model : bool, optional
+            Force the use of the best MS2PIP model (default: False).
 
         Raises
         ------
@@ -116,7 +108,8 @@ class FeatureAnnotator:
         self._skip_deeplc_retrain = skip_deeplc_retrain
         self._remove_missing_spectra = remove_missing_spectra
         self._ms2_only = ms2_only
-        self._find_best_ms2pip_model = find_best_ms2pip_model
+        self._force_model = force_model
+        self._find_best_model = find_best_model
 
     def build_idxml_data(
         self, idxml_file: Union[str, Path], spectrum_path: Union[str, Path]
@@ -145,7 +138,7 @@ class FeatureAnnotator:
 
             # Load the idXML file and corresponding mzML file
             self._idxml_reader = IdXMLRescoringReader(
-                idexml_filename=idxml_path,
+                idxml_filename=idxml_path,
                 mzml_file=spectrum_path,
                 only_ms2=self._ms2_only,
                 remove_missing_spectrum=self._remove_missing_spectra,
@@ -233,19 +226,53 @@ class FeatureAnnotator:
             logger.error(f"Failed to initialize MS2PIP: {e}")
             raise
 
-        # Apply MS2PIP annotation
+        # Get PSM list
         psm_list = self._idxml_reader.psms
+
         try:
-            ms2pip_generator.add_features(psm_list)
-            self._idxml_reader.psms = psm_list
-            logger.info("MS2PIP annotations added to PSMs")
-        except Ms2pipIncorrectModelException:
-            if self._find_best_ms2pip_model:
-                self._find_and_apply_best_ms2pip_model(psm_list)
+            # Save original model for reference
+            original_model = ms2pip_generator.model
+
+            # Determine which model to use based on configuration and validation
+            model_to_use = original_model
+
+            # Case 1: Force specific model regardless of validation
+            if self._force_model:
+                model_to_use = original_model
+                logger.info(f"Using forced model: {model_to_use}")
+
+            # Case 2: Find best model if requested and not forcing original
+            elif self._find_best_model:
+                best_model, best_corr = ms2pip_generator._find_best_ms2pip_model(psm_list)
+                if best_model and ms2pip_generator.validate_features(psm_list=psm_list, model=best_model):
+                    model_to_use = best_model
+                    logger.info(f"Using best model: {model_to_use} with correlation: {best_corr:.4f}")
+                else:
+                    # Fallback to original model if best model doesn't validate
+                    if ms2pip_generator.validate_features(psm_list, model=original_model):
+                        logger.warning("Best model validation failed, falling back to original model")
+                    else:
+                        logger.error("Both best model and original model validation failed")
+                        return  # Exit early since no valid model is available
+
+            # Case 3: Use original model but validate it first
             else:
-                logger.error("MS2PIP model not suitable for this data")
+                if not ms2pip_generator.validate_features(psm_list):
+                    logger.error("Original model validation failed. No features added.")
+                    return  # Exit early since validation failed
+                logger.info(f"Using original model: {model_to_use}")
+
+            # Apply the selected model
+            ms2pip_generator.model = model_to_use
+            ms2pip_generator.add_features(psm_list)
+            logger.info(f"Successfully applied MS2PIP annotation using model: {model_to_use}")
+
         except Exception as e:
-            logger.error(f"Failed to add MS2PIP features: {e}")
+            logger.error(f"Failed to apply MS2PIP annotation: {e}")
+            return  # Indicate failure through early return
+
+        return  # Successful completion
+
 
     def _create_ms2pip_annotator(
         self, model: Optional[str] = None, tolerance: Optional[float] = None
@@ -274,8 +301,7 @@ class FeatureAnnotator:
             correlation_threshold=0.7,  # Consider making this configurable
             higher_score_better=self._higher_score_better,
             processes=self._processes,
-            annotated_ms_tolerance=self._idxml_reader.stats.reported_ms_tolerance,
-            predicted_ms_tolerance=self._idxml_reader.stats.predicted_ms_tolerance,
+            force_model=self._force_model
         )
 
     def _find_and_apply_best_ms2pip_model(self, psm_list: PSMList) -> None:
@@ -297,23 +323,23 @@ class FeatureAnnotator:
 
         # Find best model based on fragmentation type
         fragmentation = self._get_highest_fragmentation()
-        model, corr, tolerance = ms2pip_generator._find_best_ms2pip_model(
+        model, corr = ms2pip_generator._find_best_ms2pip_model(
             batch_psms=batch_psms,
-            knwon_fragmentation=fragmentation,
+            known_fragmentation=fragmentation,
         )
 
         if model:
             logger.info(f"Best model found: {model} with average correlation {corr}")
 
             # Create new annotator with best model
-            ms2pip_generator = self._create_ms2pip_annotator(model=model, tolerance=tolerance)
+            ms2pip_generator = self._create_ms2pip_annotator(model=model, tolerance=self._ms2_tolerance)
 
             # Apply annotation with best model
             ms2pip_generator.add_features(psm_list)
             self._idxml_reader.psms = psm_list
             logger.info("MS2PIP annotations added using best model")
         else:
-            logger.error("No suitable MS2PIP model found for this dataset")
+            logger.error("No suitable MS2PIP model found for this dataset. Skip MS2PIP annotations.")
 
     def _run_deeplc_annotation(self) -> None:
         """Run DeepLC annotation on the loaded PSMs."""

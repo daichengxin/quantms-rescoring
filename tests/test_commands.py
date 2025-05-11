@@ -22,11 +22,11 @@ def test_ms2rescore():
         cli,
         [
             "ms2rescore",
-            "--psm_file",
+            "--idxml",
             "{}/test_data/TMT_Erwinia_1uLSike_Top10HCD_isol2_45stepped_60min_01_comet.idXML".format(
                 TESTS_DIR
             ),
-            "--spectrum_path",
+            "--mzml",
             "{}/test_data/TMT_Erwinia_1uLSike_Top10HCD_isol2_45stepped_60min_01.mzML".format(
                 TESTS_DIR
             ),
@@ -48,11 +48,11 @@ def test_ms2rescore_failing():
         cli,
         [
             "ms2rescore",
-            "--psm_file",
+            "--idxml",
             "{}/test_data/dae1cb16fb57893b94bfcb731b2bf7/Instrument1_sample14_S1R10_042116_Fr12_msgf.idXML".format(
                 TESTS_DIR
             ),
-            "--spectrum_path",
+            "--mzml",
             "{}/test_data/dae1cb16fb57893b94bfcb731b2bf7/Instrument1_sample14_S1R10_042116_Fr12.mzML".format(
                 TESTS_DIR
             ),
@@ -83,7 +83,7 @@ def test_idxmlreader():
         TESTS_DIR / "test_data" / "TMT_Erwinia_1uLSike_Top10HCD_isol2_45stepped_60min_01.mzML"
     )
 
-    idxml_reader = IdXMLRescoringReader(idexml_filename=idxml_file, mzml_file=mzml_file)
+    idxml_reader = IdXMLRescoringReader(idxml_filename=idxml_file, mzml_file=mzml_file)
     logging.info("Loaded %s PSMs from %s", len(idxml_reader.psms), idxml_file)
     assert len(idxml_reader.psms) == 5346
 
@@ -114,18 +114,9 @@ def test_annotator_train_rt():
         TESTS_DIR / "test_data" / "TMT_Erwinia_1uLSike_Top10HCD_isol2_45stepped_60min_01.mzML"
     )
 
-    annotator = FeatureAnnotator(
-        feature_generators="ms2pip,deeplc",
-        ms2pip_model="TMT",
-        ms2pip_model_path="models",
-        ms2_tolerance=0.05,
-        calibration_set_size=0.15,
-        skip_deeplc_retrain=False,
-        processes=2,
-        log_level="INFO",
-        spectrum_id_pattern="(.*)",
-        psm_id_pattern="(.*)",
-    )
+    annotator = FeatureAnnotator(feature_generators="ms2pip,deeplc", ms2pip_model="TMT", ms2pip_model_path="models",
+                                 ms2_tolerance=0.05, calibration_set_size=0.15, skip_deeplc_retrain=False, processes=2,
+                                 log_level="INFO", spectrum_id_pattern="(.*)", psm_id_pattern="(.*)")
     annotator.build_idxml_data(idxml_file, mzml_file)
     annotator.annotate()
 
@@ -150,19 +141,11 @@ def test_idxmlreader_filtering():
         TESTS_DIR / "test_data" / "TMT_Erwinia_1uLSike_Top10HCD_isol2_45stepped_60min_01.mzML"
     )
 
-    annotator = FeatureAnnotator(
-        feature_generators="ms2pip,deeplc",
-        only_features="DeepLC:RtDiff,DeepLC:PredictedRetentionTimeBest,Ms2pip:DotProd",
-        ms2pip_model="TMT",
-        ms2pip_model_path="models",
-        ms2_tolerance=0.2,
-        calibration_set_size=0.15,
-        skip_deeplc_retrain=True,
-        processes=2,
-        log_level="INFO",
-        spectrum_id_pattern="(.*)",
-        psm_id_pattern="(.*)",
-    )
+    annotator = FeatureAnnotator(feature_generators="ms2pip,deeplc",
+                                 only_features="DeepLC:RtDiff,DeepLC:PredictedRetentionTimeBest,Ms2pip:DotProd",
+                                 ms2pip_model="TMT", ms2pip_model_path="models", ms2_tolerance=0.2,
+                                 calibration_set_size=0.15, skip_deeplc_retrain=True, processes=2, log_level="INFO",
+                                 spectrum_id_pattern="(.*)", psm_id_pattern="(.*)")
     annotator.build_idxml_data(idxml_file, mzml_file)
     annotator.annotate()
 
@@ -187,21 +170,12 @@ def test_idxmlreader_wrong_model():
         TESTS_DIR / "test_data" / "TMT_Erwinia_1uLSike_Top10HCD_isol2_45stepped_60min_01.mzML"
     )
 
-    annotator = FeatureAnnotator(
-        feature_generators="ms2pip,deeplc",
-        only_features="DeepLC:RtDiff,DeepLC:PredictedRetentionTimeBest,Ms2pip:DotProd",
-        ms2pip_model="CID-TMT",
-        ms2pip_model_path="models",
-        ms2_tolerance=0.2,
-        calibration_set_size=0.15,
-        skip_deeplc_retrain=True,
-        processes=2,
-        log_level="INFO",
-        spectrum_id_pattern="(.*)",
-        psm_id_pattern="(.*)",
-        find_best_ms2pip_model=True,
-    )
-    annotator.build_idxml_data(idxml_file, mzml_file)
+    annotator = FeatureAnnotator(feature_generators="ms2pip,deeplc",
+                                 only_features="DeepLC:RtDiff,DeepLC:PredictedRetentionTimeBest,Ms2pip:DotProd",
+                                 ms2pip_model="CID-TMT", ms2pip_model_path="models", ms2_tolerance=0.2,
+                                 calibration_set_size=0.15, skip_deeplc_retrain=True, processes=2, log_level="INFO",
+                                 spectrum_id_pattern="(.*)", psm_id_pattern="(.*)", find_best_model=True)
+    annotator.build_idxml_data(idxml_file=idxml_file, spectrum_path=mzml_file)
     annotator.annotate()
 
     output_file = (
@@ -229,20 +203,11 @@ def test_idxmlreader_failing_help():
         / "01321_E03_P013560_B00_N21_R1.mzML"
     )
 
-    annotator = FeatureAnnotator(
-        feature_generators="ms2pip,deeplc",
-        only_features="DeepLC:RtDiff,DeepLC:PredictedRetentionTimeBest,Ms2pip:DotProd",
-        ms2pip_model="HCD2021",
-        ms2pip_model_path="models",
-        ms2_tolerance=0.05,
-        calibration_set_size=0.15,
-        skip_deeplc_retrain=True,
-        processes=2,
-        log_level="INFO",
-        spectrum_id_pattern="(.*)",
-        psm_id_pattern="(.*)",
-        find_best_ms2pip_model=True,
-    )
+    annotator = FeatureAnnotator(feature_generators="ms2pip,deeplc",
+                                 only_features="DeepLC:RtDiff,DeepLC:PredictedRetentionTimeBest,Ms2pip:DotProd",
+                                 ms2pip_model="HCD2021", ms2pip_model_path="models", ms2_tolerance=0.05,
+                                 calibration_set_size=0.15, skip_deeplc_retrain=True, processes=2, log_level="INFO",
+                                 spectrum_id_pattern="(.*)", psm_id_pattern="(.*)")
     annotator.build_idxml_data(idxml_file, mzml_file)
     annotator.annotate()
 
@@ -337,6 +302,32 @@ def test_local_file():
             "{}/UPS1_50amol_R1_rescored.idXML".format(local_folder),
             "--ms2_tolerance",
             "0.05",
+        ],
+    )
+    assert result.exit_code == 0
+
+def test_psm_clean():
+    output_file = (
+        TESTS_DIR
+        / "test_data"
+        / "TMT_Erwinia_1uLSike_Top10HCD_isol2_45stepped_60min_01_comet_clean.idXML"
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(
+        cli,
+        [
+            "psm_feature_clean",
+            "--idxml",
+            "{}/test_data/TMT_Erwinia_1uLSike_Top10HCD_isol2_45stepped_60min_01_comet.idXML".format(
+                TESTS_DIR
+            ),
+            "--mzml",
+            "{}/test_data/TMT_Erwinia_1uLSike_Top10HCD_isol2_45stepped_60min_01.mzML".format(
+                TESTS_DIR
+            ),
+            "--output",
+            output_file,
         ],
     )
     assert result.exit_code == 0
