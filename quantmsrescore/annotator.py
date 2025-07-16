@@ -10,6 +10,8 @@ from quantmsrescore.idxmlreader import IdXMLRescoringReader
 from quantmsrescore.logging_config import get_logger
 from quantmsrescore.ms2pip import MS2PIPAnnotator
 from quantmsrescore.openms import OpenMSHelper
+from quantmsrescore.alphapeptdeep import AlphaPeptDeepAnnotator
+
 
 # Get logger for this module
 logger = get_logger(__name__)
@@ -82,13 +84,14 @@ class FeatureAnnotator:
             raise ValueError("feature_generators must be provided.")
 
         feature_annotators = feature_generators.split(",")
-        if not any(annotator in feature_annotators for annotator in ["deeplc", "ms2pip"]):
+        if not any(annotator in feature_annotators for annotator in ["deeplc", "ms2pip", "alphapeptdeep"]):
             raise ValueError("At least one of deeplc or ms2pip must be provided.")
 
         # Initialize state
         self._idxml_reader = None
         self._deepLC = "deeplc" in feature_annotators
         self._ms2pip = "ms2pip" in feature_annotators
+        self._alphapeptdeep = "alphapeptdeep" in feature_annotators
 
         # Parse and validate features
         self._only_features = []
@@ -112,7 +115,7 @@ class FeatureAnnotator:
         self._find_best_model = find_best_model
 
     def build_idxml_data(
-        self, idxml_file: Union[str, Path], spectrum_path: Union[str, Path]
+            self, idxml_file: Union[str, Path], spectrum_path: Union[str, Path]
     ) -> None:
         """
         Load data from idXML and mzML files.
@@ -147,6 +150,7 @@ class FeatureAnnotator:
 
             # Log statistics about loaded data
             psm_list = self._idxml_reader.psms
+
             openms_helper = OpenMSHelper()
             decoys, targets = openms_helper.count_decoys_targets(self._idxml_reader.oms_peptides)
 
@@ -178,6 +182,8 @@ class FeatureAnnotator:
         # Run MS2PIP annotation if enabled
         if self._ms2pip:
             self._run_ms2pip_annotation()
+        elif self._alphapeptdeep:
+            self._run_alphapeptdeep_annotation()
 
         # Run DeepLC annotation if enabled
         if self._deepLC:
@@ -273,9 +279,96 @@ class FeatureAnnotator:
 
         return  # Successful completion
 
+    def _run_alphapeptdeep_annotation(self) -> None:
+        """Run Alphapeptdeep annotation on the loaded PSMs."""
+        logger.info("Running Alphapeptdeep annotation")
+
+        # Initialize MS2PIP annotator
+        try:
+            alphapeptdeep_generator = self._create_alphapeptdeep_annotator()
+        except Exception as e:
+            logger.error(f"Failed to initialize alphapeptdeep: {e}")
+            raise
+
+        # Get PSM list
+        psm_list = self._idxml_reader.psms
+        psms_df = self._idxml_reader.psms_df
+
+        try:
+            # Save original model for reference
+            original_model = alphapeptdeep_generator.model
+
+            # Determine which model to use based on configuration and validation
+            model_to_use = original_model
+
+            # Case 1: Force specific model regardless of validation
+            if self._force_model:
+                model_to_use = original_model
+                logger.info(f"Using forced model: {model_to_use}")
+
+            # Case 2: Find best model if requested and not forcing original
+            # elif self._find_best_model:
+            #     best_model, best_corr = alphapeptdeep_generator._find_best_ms2pip_model(psm_list)
+            #     if best_model and alphapeptdeep_generator.validate_features(psm_list=psm_list, model=best_model):
+            #         model_to_use = best_model
+            #         logger.info(f"Using best model: {model_to_use} with correlation: {best_corr:.4f}")
+            #     else:
+            #         # Fallback to original model if best model doesn't validate
+            #         if alphapeptdeep_generator.validate_features(psm_list, model=original_model):
+            #             logger.warning("Best model validation failed, falling back to original model")
+            #         else:
+            #             logger.error("Both best model and original model validation failed")
+            #             return  # Exit early since no valid model is available
+
+            # Case 3: Use original model but validate it first
+            else:
+                if not alphapeptdeep_generator.validate_features(psm_list, psms_df):
+                    logger.error("Original model validation failed. No features added.")
+                    return  # Exit early since validation failed
+                logger.info(f"Using original model: {model_to_use}")
+
+            # Apply the selected model
+            alphapeptdeep_generator.model = model_to_use
+            alphapeptdeep_generator.add_features(psm_list, psms_df)
+            logger.info(f"Successfully applied AlphaPeptDeep annotation using model: {model_to_use}")
+
+        except Exception as e:
+            logger.error(f"Failed to apply AlphaPeptDeep annotation: {e}")
+            return  # Indicate failure through early return
+
+        return  # Successful completion
+
+    def _create_alphapeptdeep_annotator(self, model: Optional[str] = "generic", tolerance: Optional[float] = None):
+        """
+        Create an MS2PIP annotator with the specified or default model.
+
+        Parameters
+        ----------
+        model : str, optional
+            MS2PIP model name to use, defaults to self._ms2pip_model if None.
+
+        Returns
+        -------
+        MS2PIPAnnotator
+            Configured MS2PIP annotator.
+        """
+        return AlphaPeptDeepAnnotator(
+            ms2_tolerance=tolerance or self._ms2_tolerance,
+            model=model,
+            spectrum_path=self._idxml_reader.spectrum_path,
+            spectrum_id_pattern=self._spectrum_id_pattern,
+            model_dir=self._ms2pip_model_path,
+            calibration_set_size=self._calibration_set_size,
+            valid_correlations_size=self._valid_correlations_size,
+            correlation_threshold=0.7,  # Consider making this configurable
+            higher_score_better=self._higher_score_better,
+            processes=self._processes,
+            force_model=self._force_model
+        )
+
 
     def _create_ms2pip_annotator(
-        self, model: Optional[str] = None, tolerance: Optional[float] = None
+            self, model: Optional[str] = None, tolerance: Optional[float] = None
     ) -> MS2PIPAnnotator:
         """
         Create an MS2PIP annotator with the specified or default model.
@@ -364,7 +457,7 @@ class FeatureAnnotator:
             raise
 
     def _create_deeplc_annotator(
-        self, retrain: bool = False, calibration_set_size: float = None
+            self, retrain: bool = False, calibration_set_size: float = None
     ) -> DeepLCAnnotator:
         """
         Create a DeepLC annotator with specified configuration.
@@ -460,8 +553,8 @@ class FeatureAnnotator:
 
                         if canonical_feature is not None:
                             if (
-                                self._only_features
-                                and canonical_feature not in self._only_features
+                                    self._only_features
+                                    and canonical_feature not in self._only_features
                             ):
                                 continue
 
