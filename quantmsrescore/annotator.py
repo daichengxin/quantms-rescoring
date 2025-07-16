@@ -424,7 +424,7 @@ class FeatureAnnotator:
             logger.info("Running MS2PIP model")
             ms2pip_best_model, ms2pip_best_corr = ms2pip_generator._find_best_ms2pip_model(psm_list)
             logger.info("Running AlphaPeptDeep model")
-            alphapeptdeep_best_model, alphapeptdeep_best_corr = alphapeptdeep_generator._find_best_ms2pip_model(psm_list)
+            alphapeptdeep_best_model, alphapeptdeep_best_corr = alphapeptdeep_generator._find_best_ms2_model(psm_list)
             if alphapeptdeep_best_corr > ms2pip_best_corr:
                 if alphapeptdeep_best_model and alphapeptdeep_generator.validate_features(psm_list=psm_list, model=alphapeptdeep_best_model):
                     model_to_use = alphapeptdeep_best_model
