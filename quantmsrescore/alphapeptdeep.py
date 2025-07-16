@@ -1,3 +1,5 @@
+import os.path
+
 import pandas as pd
 from peptdeep.pretrained_models import ModelManager
 from peptdeep.mass_spec.match import match_centroid_mz
@@ -428,7 +430,7 @@ class AlphaPeptDeepAnnotator(AlphaPeptDeepFeatureGenerator):
         current_run = 1
         valid_correlation = None
         if model is None:
-            model = 'generic'
+            model = self.model
         for runs in psm_dict.values():
             for run, psms in runs.items():
                 psm_list_run = PSMList(psm_list=list(chain.from_iterable(psms.values())))
@@ -582,6 +584,48 @@ class AlphaPeptDeepAnnotator(AlphaPeptDeepFeatureGenerator):
 
         return True
 
+    def _find_best_ms2_model(
+            self, batch_psms: PSMList
+    ) -> Tuple[str, float]:
+        """
+        Find the best MS2 model for a batch of PSMs.
+
+        This method finds the best MS2 model for a batch of PSMs by
+        comparing the correlation of the PSMs with the different models.
+
+        Parameters
+        ----------
+        batch_psms : list
+            List of PSMs to find the best model for.
+
+        Returns
+        -------
+        Tuple
+            Tuple containing the best model and the correlation value.
+        """
+
+        best_model = None
+        best_correlation = 0
+        
+        # AlphaPeptDeep has generic model
+        logger.info(f"Running AlphaPeptDeep for model `{model}`...")
+        alphapeptdeep_results = self.custom_correlate(
+            psms=batch_psms,
+            spectrum_file=self.spectrum_path,
+            spectrum_id_pattern=self.spectrum_id_pattern,
+            model=model,
+            ms2_tolerance=self.ms2_tolerance,
+            compute_correlations=True,
+            model_dir=self.model_dir,
+            processes=self.processes,
+        )
+
+        correlation = self._calculate_correlation(alphapeptdeep_results)
+        if correlation >= 0.4:
+            best_model = model
+            best_correlation = correlation
+
+        return best_model, best_correlation
 
     @staticmethod
     def _calculate_correlation(alphapeptdeep_results: List[ProcessingResult]) -> float:
@@ -618,8 +662,6 @@ class AlphaPeptDeepAnnotator(AlphaPeptDeepFeatureGenerator):
             psm_filetype: Optional[str] = None,
             spectrum_id_pattern: Optional[str] = None,
             compute_correlations: bool = False,
-            add_retention_time: bool = False,
-            add_ion_mobility: bool = False,
             model: Optional[str] = "generic",
             model_dir: Optional[Union[str, Path]] = None,
             ms2_tolerance: float = 0.02,
@@ -631,18 +673,8 @@ class AlphaPeptDeepAnnotator(AlphaPeptDeepFeatureGenerator):
         psm_list = read_psms(psms, filetype=psm_filetype)
         spectrum_id_pattern = spectrum_id_pattern if spectrum_id_pattern else "(.*)"
 
-        # if add_retention_time:
-        #     logger.info("Adding retention time predictions")
-        #     rt_predictor = RetentionTime(processes=processes)
-        #     rt_predictor.add_rt_predictions(psm_list)
-        #
-        # if add_ion_mobility:
-        #     logger.info("Adding ion mobility predictions")
-        #     im_predictor = IonMobility(processes=processes)
-        #     im_predictor.add_im_predictions(psm_list)
-
-        results = self.make_prediction(psm_list, psms_df, spectrum_file, spectrum_id_pattern, model_dir,
-                                       model, ms2_tolerance, processes)
+        results = self.make_prediction(psm_list, psms_df, spectrum_file, spectrum_id_pattern,
+                                       model, model_dir, ms2_tolerance, processes)
 
         # Correlations also requested
         if compute_correlations:
@@ -657,11 +689,11 @@ class AlphaPeptDeepAnnotator(AlphaPeptDeepFeatureGenerator):
                         ms2_tolerance, processes):
         # print(ms2_tolerance)
         model_mgr = ModelManager(mask_modloss=True, device="cpu")
-        if model_dir is None:
-            model_mgr.load_installed_models(model)
-        else:
+        if model_dir is not None and os.path.exists(os.path.join(model_dir, "ms2.pth")):
             model_mgr.load_external_models(
-                ms2_model_file=model_dir)
+                ms2_model_file=os.path.join(model_dir, "ms2.pth"))
+        else:
+            model_mgr.load_installed_models(model)
 
         results = []
         predictions = model_mgr.predict_all(precursor_df=psms_df, predict_items=["ms2"],
@@ -727,7 +759,7 @@ class AlphaPeptDeepAnnotator(AlphaPeptDeepFeatureGenerator):
                                          "y": predict_intensity[y_cols].values.flatten()},
                     observed_intensity={"b": b_targets, "y": y_targets},
                     correlation=None,
-                    feature_vectors=None,
+                    feature_vectors=None
                 ))
                 # print(results)
 

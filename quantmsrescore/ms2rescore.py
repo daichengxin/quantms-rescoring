@@ -61,13 +61,13 @@ configure_logging()
     help="Comma-separated list of features to use for annotation (read docs for default)",
 )
 @click.option(
-    "--ms2pip_model",
+    "--ms2_model",
     help="MS²PIP model (default: `HCD2021`)",
     type=str,
     default="HCD2021",
 )
 @click.option(
-    "--ms2pip_model_dir",
+    "--ms2_model_dir",
     help="The path of MS²PIP model (default: `./`)",
     type=str,
     default="./",
@@ -115,8 +115,8 @@ def msrescore2feature(
     processes,
     feature_generators,
     only_features,
-    ms2pip_model_dir,
-    ms2pip_model,
+    ms2_model_dir,
+    ms2_model,
     force_model,
     find_best_model,
     ms2_tolerance,
@@ -178,10 +178,10 @@ def msrescore2feature(
     annotator = FeatureAnnotator(
         feature_generators=feature_generators,
         only_features=only_features,
-        ms2pip_model=ms2pip_model,
+        ms2_model=ms2_model,
         force_model=force_model,
         find_best_model=find_best_model,
-        ms2pip_model_path=ms2pip_model_dir,
+        ms2_model_path=ms2_model_dir,
         ms2_tolerance=ms2_tolerance,
         calibration_set_size=calibration_set_size,
         valid_correlations_size=valid_correlations_size,
