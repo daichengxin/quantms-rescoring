@@ -619,7 +619,7 @@ class OpenMSHelper:
             if spec.getMSLevel() == ms_level:
                 spectra.append(spec)
         return spectra
-    
+
     @staticmethod
     def get_instrument(exp: oms.MSExperiment):
         instrument = exp.getInstrument().getName()

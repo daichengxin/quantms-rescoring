@@ -612,7 +612,7 @@ class AlphaPeptDeepAnnotator(AlphaPeptDeepFeatureGenerator):
 
         best_model = None
         best_correlation = 0
-        
+
         # AlphaPeptDeep has generic model, So force it to default.
         logger.info(f"Running AlphaPeptDeep for model `{self.model}`...")
         alphapeptdeep_results = custom_correlate(
