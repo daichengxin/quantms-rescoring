@@ -3,7 +3,6 @@ import os.path
 import pandas as pd
 from peptdeep.pretrained_models import ModelManager
 from peptdeep.mass_spec.match import match_centroid_mz
-from ms2rescore.feature_generators.base import FeatureGeneratorException
 from ms2rescore.feature_generators.base import FeatureGeneratorBase, FeatureGeneratorException
 from typing import Optional, Tuple, List, Union, Callable, Generator, Dict
 import logging
@@ -41,6 +40,7 @@ class AlphaPeptDeepFeatureGenerator(FeatureGeneratorBase):
             spectrum_path: Optional[str] = None,
             spectrum_id_pattern: str = "(.*)",
             model_dir: Optional[str] = None,
+            mask_modloss: bool = True,
             processes: 1,
             **kwargs,
     ) -> None:
@@ -50,7 +50,7 @@ class AlphaPeptDeepFeatureGenerator(FeatureGeneratorBase):
         Parameters
         ----------
         model
-            AlphaPeptDeep prediction model to use. Defaults to :py:const:`HCD`.
+            AlphaPeptDeep prediction model to use. Defaults to :py:const:`generic`.
         ms2_tolerance
             MS2 mass tolerance in Da. Defaults to :py:const:`0.02`.
         spectrum_path
@@ -77,6 +77,7 @@ class AlphaPeptDeepFeatureGenerator(FeatureGeneratorBase):
         self.spectrum_id_pattern = spectrum_id_pattern
         self.model_dir = model_dir
         self.processes = processes
+        self.mask_modloss = mask_modloss
 
     @property
     def feature_names(self):
@@ -188,6 +189,7 @@ class AlphaPeptDeepFeatureGenerator(FeatureGeneratorBase):
                         compute_correlations=False,
                         model_dir=self.model_dir,
                         processes=self.processes,
+                        mask_modloss=self.mask_modloss
                     )
                 except NoMatchingSpectraFound as e:
                     raise FeatureGeneratorException(
@@ -393,6 +395,7 @@ class AlphaPeptDeepAnnotator(AlphaPeptDeepFeatureGenerator):
             correlation_threshold: Optional[float] = 0.6,
             higher_score_better: bool = True,
             force_model: bool = False,
+            mask_modloss: bool = True,
             **kwargs,
     ):
         super().__init__(
@@ -410,6 +413,7 @@ class AlphaPeptDeepAnnotator(AlphaPeptDeepFeatureGenerator):
         self._correlation_threshold: float = correlation_threshold
         self._higher_score_better: bool = higher_score_better
         self._force_model: bool = force_model
+        self._mask_modloss: bool = mask_modloss
 
     def validate_features(self, psm_list: PSMList, psms_df: pd.DataFrame, model: str = None) -> bool:
         """
@@ -423,7 +427,7 @@ class AlphaPeptDeepAnnotator(AlphaPeptDeepFeatureGenerator):
         model : str, optional
             The model to validate. If not provided, the default model is used.
         psms_df:
-
+            The PSM Dataframe to validate the model for.
         """
         logger.info("Adding AlphaPeptDeep-derived features to PSMs.")
         psm_dict = psm_list.get_psm_dict()
@@ -438,7 +442,7 @@ class AlphaPeptDeepAnnotator(AlphaPeptDeepFeatureGenerator):
                 logger.debug(f"Using spectrum file `{spectrum_filename}`")
 
                 try:
-                    AlphaPeptDeep_results = self.custom_correlate(
+                    AlphaPeptDeep_results = custom_correlate(
                         psms=psm_list_run,
                         spectrum_file=str(spectrum_filename),
                         psms_df=psms_df,
@@ -448,6 +452,7 @@ class AlphaPeptDeepAnnotator(AlphaPeptDeepFeatureGenerator):
                         compute_correlations=True,
                         model_dir=self.model_dir,
                         processes=self.processes,
+                        mask_modloss=self._mask_modloss,
                     )
                 except NoMatchingSpectraFound as e:
                     raise FeatureGeneratorException(
@@ -491,7 +496,7 @@ class AlphaPeptDeepAnnotator(AlphaPeptDeepFeatureGenerator):
                 spectrum_filename = infer_spectrum_path(self.spectrum_path, run)
                 logger.debug(f"Using spectrum file `{spectrum_filename}`")
                 try:
-                    alphapeptdeep_results = self.custom_correlate(
+                    alphapeptdeep_results = custom_correlate(
                         psms=psm_list_run,
                         spectrum_file=str(spectrum_filename),
                         psms_df=psms_df,
@@ -501,6 +506,7 @@ class AlphaPeptDeepAnnotator(AlphaPeptDeepFeatureGenerator):
                         compute_correlations=True,
                         model_dir=self.model_dir,
                         processes=self.processes,
+                        mask_modloss=self._mask_modloss
                     )
                 except NoMatchingSpectraFound as e:
                     raise FeatureGeneratorException(
@@ -585,7 +591,7 @@ class AlphaPeptDeepAnnotator(AlphaPeptDeepFeatureGenerator):
         return True
 
     def _find_best_ms2_model(
-            self, batch_psms: PSMList
+            self, batch_psms: PSMList, psms_df: pd.DataFrame
     ) -> Tuple[str, float]:
         """
         Find the best MS2 model for a batch of PSMs.
@@ -607,22 +613,24 @@ class AlphaPeptDeepAnnotator(AlphaPeptDeepFeatureGenerator):
         best_model = None
         best_correlation = 0
         
-        # AlphaPeptDeep has generic model
-        logger.info(f"Running AlphaPeptDeep for model `{model}`...")
-        alphapeptdeep_results = self.custom_correlate(
+        # AlphaPeptDeep has generic model, So force it to default.
+        logger.info(f"Running AlphaPeptDeep for model `{self.model}`...")
+        alphapeptdeep_results = custom_correlate(
             psms=batch_psms,
+            psms_df=psms_df,
             spectrum_file=self.spectrum_path,
             spectrum_id_pattern=self.spectrum_id_pattern,
-            model=model,
+            model=self.model,
             ms2_tolerance=self.ms2_tolerance,
             compute_correlations=True,
             model_dir=self.model_dir,
             processes=self.processes,
+            mask_modloss=self._mask_modloss
         )
 
         correlation = self._calculate_correlation(alphapeptdeep_results)
         if correlation >= 0.4:
-            best_model = model
+            best_model = self.model
             best_correlation = correlation
 
         return best_model, best_correlation
@@ -654,116 +662,115 @@ class AlphaPeptDeepAnnotator(AlphaPeptDeepFeatureGenerator):
         )
         return total_correlation / len(alphapeptdeep_results)
 
-    def custom_correlate(
-            self,
-            psms: Union[PSMList, str, Path],
-            psms_df: pd.DataFrame,
-            spectrum_file: Union[str, Path],
-            psm_filetype: Optional[str] = None,
-            spectrum_id_pattern: Optional[str] = None,
-            compute_correlations: bool = False,
-            model: Optional[str] = "generic",
-            model_dir: Optional[Union[str, Path]] = None,
-            ms2_tolerance: float = 0.02,
-            processes: Optional[int] = None,
-    ) -> List[ProcessingResult]:
-        """
-        Custom implementation of correlate that uses our custom spectrum reader.
-        """
-        psm_list = read_psms(psms, filetype=psm_filetype)
-        spectrum_id_pattern = spectrum_id_pattern if spectrum_id_pattern else "(.*)"
 
-        results = self.make_prediction(psm_list, psms_df, spectrum_file, spectrum_id_pattern,
-                                       model, model_dir, ms2_tolerance, processes)
+def custom_correlate(
+        psms: Union[PSMList, str, Path],
+        psms_df: pd.DataFrame,
+        spectrum_file: Union[str, Path],
+        psm_filetype: Optional[str] = None,
+        spectrum_id_pattern: Optional[str] = None,
+        compute_correlations: bool = False,
+        model: Optional[str] = "generic",
+        model_dir: Optional[Union[str, Path]] = None,
+        ms2_tolerance: float = 0.02,
+        mask_modloss: bool = True,
+        processes: Optional[int] = None,
+) -> List[ProcessingResult]:
+    """
+    Custom implementation of correlate that uses our custom spectrum reader.
+    """
+    psm_list = read_psms(psms, filetype=psm_filetype)
+    spectrum_id_pattern = spectrum_id_pattern if spectrum_id_pattern else "(.*)"
 
-        # Correlations also requested
-        if compute_correlations:
-            calculate_correlations(results)
-            logger.info(
-                f"Median correlation: {np.median([r.correlation for r in results if r.correlation is not None and not np.isnan(r.correlation)])}, model {model}"
+    results = make_prediction(psm_list, psms_df, spectrum_file, spectrum_id_pattern,
+                            model, model_dir, ms2_tolerance, processes, mask_modloss)
+
+    # Correlations also requested
+    if compute_correlations:
+        calculate_correlations(results)
+        logger.info(
+            f"Median correlation: {np.median([r.correlation for r in results if r.correlation is not None and not np.isnan(r.correlation)])}, model {model}"
+        )
+
+    return results
+
+
+def make_prediction(enumerated_psm_list, psms_df, spec_file, spectrum_id_pattern, model, model_dir,
+                    ms2_tolerance, processes, mask_modloss):
+
+    model_mgr = ModelManager(mask_modloss=mask_modloss, device="cpu")
+    if model_dir is not None and os.path.exists(os.path.join(model_dir, "ms2.pth")):
+        model_mgr.load_external_models(
+            ms2_model_file=os.path.join(model_dir, "ms2.pth"))
+    else:
+        model_mgr.load_installed_models(model)
+
+    results = []
+    predictions = model_mgr.predict_all(precursor_df=psms_df, predict_items=["ms2"],
+                                        frag_types=['b_z1', 'y_z1', 'b_z2', 'y_z2'],
+                                        process_num=processes)
+    precusor_df, predict_int_df, theoretical_mz_df = predictions["precursor_df"], predictions[
+        "fragment_intensity_df"], predictions["fragment_mz_df"]
+    precusor_df = precusor_df.set_index("provenance_data")
+
+    b_cols = [col for col in theoretical_mz_df.columns if col.startswith('b')]
+    y_cols = [col for col in theoretical_mz_df.columns if col.startswith('y')]
+    # Compile regex for spectrum ID matching
+    try:
+        spectrum_id_regex = re.compile(spectrum_id_pattern)
+    except TypeError:
+        spectrum_id_regex = re.compile(r"(.*)")
+
+    # Organize PSMs by spectrum ID
+    psms_by_specid = _organize_psms_by_spectrum_id(enumerated_psm_list)
+
+    # Process each spectrum
+    for spectrum in read_spectrum_file(spec_file):
+
+        # Match spectrum ID with provided regex
+        match = spectrum_id_regex.search(spectrum.identifier)
+        try:
+            spectrum_id = match[1]
+        except (TypeError, IndexError):
+            raise exceptions.TitlePatternError(
+                f"Spectrum title pattern `{spectrum_id_pattern}` could not be matched to "
+                f"spectrum ID `{spectrum.identifier}`. "
+                " Are you sure that the regex contains a capturing group?"
             )
 
-        return results
+        # Skip if no matching PSMs
+        if spectrum_id not in psms_by_specid:
+            continue
 
-    def make_prediction(self, enumerated_psm_list, psms_df, spec_file, spectrum_id_pattern, model, model_dir,
-                        ms2_tolerance, processes):
-        # print(ms2_tolerance)
-        model_mgr = ModelManager(mask_modloss=True, device="cpu")
-        if model_dir is not None and os.path.exists(os.path.join(model_dir, "ms2.pth")):
-            model_mgr.load_external_models(
-                ms2_model_file=os.path.join(model_dir, "ms2.pth"))
-        else:
-            model_mgr.load_installed_models(model)
+        # # Preprocess spectrum
+        # _preprocess_spectrum(spectrum, model)
 
-        results = []
-        predictions = model_mgr.predict_all(precursor_df=psms_df, predict_items=["ms2"],
-                                            frag_types=['b_z1', 'y_z1', 'b_z2', 'y_z2'],
-                                            process_num=processes)
-        precusor_df, predict_int_df, theoretical_mz_df = predictions["precursor_df"], predictions[
-            "fragment_intensity_df"], predictions["fragment_mz_df"]
-        precusor_df = precusor_df.set_index("provenance_data")
-        # print(precusor_df)
-        b_cols = [col for col in theoretical_mz_df.columns if col.startswith('b')]
-        y_cols = [col for col in theoretical_mz_df.columns if col.startswith('y')]
-        # Compile regex for spectrum ID matching
-        try:
-            spectrum_id_regex = re.compile(spectrum_id_pattern)
-        except TypeError:
-            spectrum_id_regex = re.compile(r"(.*)")
+        # Process each PSM for this spectrum
+        for psm_idx, psm in psms_by_specid[spectrum_id]:
 
-        # Organize PSMs by spectrum ID
-        psms_by_specid = _organize_psms_by_spectrum_id(enumerated_psm_list)
+            row = precusor_df.loc[next(iter(psm.provenance_data.keys()))]
+            mz = theoretical_mz_df.iloc[row["frag_start_idx"]:row["frag_stop_idx"], ]
+            b_array_1d = mz[b_cols].values.flatten()
+            y_array_1d = mz[y_cols].values.flatten()
 
-        # Process each spectrum
-        for spectrum in read_spectrum_file(spec_file):
+            b_targets, y_targets = _get_targets_for_psm(
+                b_array_1d, y_array_1d, spectrum, ms2_tolerance
+            )
+            predict_intensity = predict_int_df.iloc[row["frag_start_idx"]:row["frag_stop_idx"], ]
 
-            # Match spectrum ID with provided regex
-            match = spectrum_id_regex.search(spectrum.identifier)
-            try:
-                spectrum_id = match[1]
-            except (TypeError, IndexError):
-                raise exceptions.TitlePatternError(
-                    f"Spectrum title pattern `{spectrum_id_pattern}` could not be matched to "
-                    f"spectrum ID `{spectrum.identifier}`. "
-                    " Are you sure that the regex contains a capturing group?"
-                )
+            results.append(ProcessingResult(
+                psm_index=psm_idx,
+                psm=psm,
+                theoretical_mz={"b": b_array_1d, "y": y_array_1d},
+                predicted_intensity={"b": predict_intensity[b_cols].values.flatten(),
+                                     "y": predict_intensity[y_cols].values.flatten()},
+                observed_intensity={"b": b_targets, "y": y_targets},
+                correlation=None,
+                feature_vectors=None
+            ))
 
-            # Skip if no matching PSMs
-            if spectrum_id not in psms_by_specid:
-                continue
 
-            # # Preprocess spectrum
-            # _preprocess_spectrum(spectrum, model)
-
-            # Process each PSM for this spectrum
-            for psm_idx, psm in psms_by_specid[spectrum_id]:
-                # print(psm_index)
-                # Get targets for PSM
-                # print(psm)
-                row = precusor_df.loc[next(iter(psm.provenance_data.keys()))]
-                mz = theoretical_mz_df.iloc[row["frag_start_idx"]:row["frag_stop_idx"], ]
-                b_array_1d = mz[b_cols].values.flatten()
-                y_array_1d = mz[y_cols].values.flatten()
-                # print(b_array_1d)
-                # print(y_array_1d)
-                b_targets, y_targets = _get_targets_for_psm(
-                    b_array_1d, y_array_1d, spectrum, ms2_tolerance
-                )
-                predict_intensity = predict_int_df.iloc[row["frag_start_idx"]:row["frag_stop_idx"], ]
-
-                results.append(ProcessingResult(
-                    psm_index=psm_idx,
-                    psm=psm,
-                    theoretical_mz={"b": b_array_1d, "y": y_array_1d},
-                    predicted_intensity={"b": predict_intensity[b_cols].values.flatten(),
-                                         "y": predict_intensity[y_cols].values.flatten()},
-                    observed_intensity={"b": b_targets, "y": y_targets},
-                    correlation=None,
-                    feature_vectors=None
-                ))
-                # print(results)
-
-        return results
+    return results
 
 
 def calculate_correlations(results: List[ProcessingResult]) -> None:
