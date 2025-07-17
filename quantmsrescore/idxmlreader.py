@@ -106,7 +106,7 @@ class IdXMLRescoringReader(IdXMLReader):
     @psms_df.setter
     def psms_df(self, psms: pd.DataFrame) -> None:
         """Set the list of PSMs."""
-        if not isinstance(df, pd.DataFrame):
+        if not isinstance(psms, pd.DataFrame):
             raise TypeError("psms must be an instance of DataFrame")
         self._psms_df = psms
 

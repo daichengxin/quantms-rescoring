@@ -4,15 +4,15 @@ import pandas as pd
 from peptdeep.pretrained_models import ModelManager
 from peptdeep.mass_spec.match import match_centroid_mz
 from ms2rescore.feature_generators.base import FeatureGeneratorBase, FeatureGeneratorException
-from typing import Optional, Tuple, List, Union, Callable, Generator, Dict
-import logging
+from typing import Optional, Tuple, List, Union, Generator, Dict
+
 from psm_utils import PSMList, PSM
 from quantmsrescore.logging_config import get_logger
 from quantmsrescore.openms import OpenMSHelper
 from ms2rescore.utils import infer_spectrum_path
 import ms2pip.exceptions as exceptions
 import numpy as np
-from math import ceil
+
 from ms2pip._utils.psm_input import read_psms
 from ms2pip.exceptions import NoMatchingSpectraFound
 from ms2pip.result import ProcessingResult
