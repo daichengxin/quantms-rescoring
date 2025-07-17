@@ -630,4 +630,3 @@ class OpenMSHelper:
         spectrum = OpenMSHelper.get_spectrum_for_psm(psm_hit, exp, spec_lookup)
         collision_energy = float(re.findall(r"@[a-zA-Z]+(\d+\.\d+)\s", spectrum.getMetaValue("filter string"))[0])
         return collision_energy
-        
