@@ -260,8 +260,6 @@ class IdXMLRescoringReader(IdXMLReader):
                 peptidoform = psm_hit.getSequence().toString()
                 mods, mod_sites = extract_modifications(peptidoform, mods_name_dict)
                 nce = OpenMSHelper.get_nce_psm(peptide_id, self.spec_lookup, self.exp)
-                # print(nce)
-                # print(instrument)
                 if psm is not None:
                     psm_list.append(psm)
                     psm_df = psm_df._append({"sequence": sequence,
