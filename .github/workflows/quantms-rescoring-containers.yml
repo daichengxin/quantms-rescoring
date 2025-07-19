@@ -1,0 +1,132 @@
+name: QuantMS-Rescoring Containers Build and Sync
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - 'Dockerfile'
+      - '.github/workflows/**'
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      push_images:
+        description: 'Push images to registry'
+        required: false
+        default: true
+        type: 'boolean'
+      push_release:
+        description: 'Push as release version'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  build-quantms-rescoring:
+    name: Build and Push QuantMS-Rescoring Docker Images
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    env:
+      RETRY_TIMES: 3
+      RETRY_DELAY: 30
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to GitHub Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GHCR_TOKEN }}
+
+    - name: Extract version from pyproject.toml
+      id: version
+      run: |
+        VERSION=$(grep '^version = ' pyproject.toml | cut -d'"' -f2)
+        echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+        echo "Extracted version: $VERSION"
+
+    - name: Extract metadata for Docker
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ghcr.io/bigbio/quantms-rescoring
+        tags: |
+          type=raw,value=latest,enable={{is_default_branch}}
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+
+    - name: Build and Push QuantMS-Rescoring image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        push: ${{ (github.event.inputs.push_images == true || github.event.inputs.push_images == '') }}
+        tags: |
+          ghcr.io/bigbio/quantms-rescoring:latest
+          ghcr.io/bigbio/quantms-rescoring:${{ steps.version.outputs.VERSION }}
+          ghcr.io/bigbio/quantms-rescoring:${{ steps.meta.outputs.version }}
+          ghcr.io/bigbio/quantms-rescoring:${{ steps.meta.outputs.major }}.${{ steps.meta.outputs.minor }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        provenance: false
+        platforms: linux/amd64,linux/arm64
+
+    - name: Set up Singularity
+      if: ${{ (github.event.inputs.push_images == true || github.event.inputs.push_images == '') }}
+      uses: eWaterCycle/setup-singularity@v7
+      with:
+        singularity-version: 3.8.7
+
+    - name: Pull Docker image for Singularity conversion
+      if: ${{ (github.event.inputs.push_images == true || github.event.inputs.push_images == '') }}
+      run: |
+        # Pull the Docker image from GitHub Container Registry
+        docker pull ghcr.io/bigbio/quantms-rescoring:latest
+        # Save the Docker image to a tar file
+        docker save ghcr.io/bigbio/quantms-rescoring:latest -o quantms-rescoring.tar
+
+    - name: Convert Docker image to Singularity
+      if: ${{ (github.event.inputs.push_images == true || github.event.inputs.push_images == '') }}
+      run: |
+        # Convert Docker tar to Singularity SIF
+        singularity build quantms-rescoring.sif docker-archive://quantms-rescoring.tar
+        # Verify the SIF file exists
+        ls -la quantms-rescoring.sif
+
+    - name: Login and Deploy Container
+      if: (github.event_name != 'pull_request')
+      env:
+        IS_RELEASE: ${{ github.event_name == 'release' }}
+      run: |
+        echo ${{ secrets.GHCR_TOKEN }} | singularity remote login -u ${{ secrets.GHCR_USERNAME }} --password-stdin oras://ghcr.io
+        
+        # Push with exact version tag
+        singularity push quantms-rescoring.sif oras://ghcr.io/bigbio/quantms-rescoring-sif:${{ steps.version.outputs.VERSION }}
+        
+        # Push with major.minor version tag
+        singularity push quantms-rescoring.sif oras://ghcr.io/bigbio/quantms-rescoring-sif:${{ steps.meta.outputs.major }}.${{ steps.meta.outputs.minor }}
+        
+        # If this is a release event, also tag as latest
+        if [[ "${{ env.IS_RELEASE }}" == "true" || "${{ github.event_name }}" == "release" ]]; then
+          singularity push quantms-rescoring.sif oras://ghcr.io/bigbio/quantms-rescoring-sif:latest
+        fi
+
+    - name: Notify on success
+      if: success()
+      run: |
+        echo "::notice::Successfully built and pushed QuantMS-Rescoring Docker and Singularity images to ghcr.io/bigbio"
+
+    - name: Notify on failure
+      if: failure()
+      run: |
+        echo "::error::Failed to build or push QuantMS-Rescoring images. Check the logs for details." 

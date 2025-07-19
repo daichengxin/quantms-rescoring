@@ -225,6 +225,19 @@ Install quantms-rescoring using one of the following methods:
 ❯ conda install -c bioconda quantms-rescoring
 ```
 
+**Using Docker**
+
+```sh
+# Pull the latest image from GitHub Container Registry
+❯ docker pull ghcr.io/bigbio/quantms-rescoring:latest
+
+# Run the container
+❯ docker run --rm ghcr.io/bigbio/quantms-rescoring:latest --help
+
+# Run with data mounted
+❯ docker run --rm -v /path/to/data:/data ghcr.io/bigbio/quantms-rescoring:latest rescoring msrescore2feature --help
+```
+
 **Build from source:**
 
 1. Clone the quantms-rescoring repository:
@@ -258,6 +271,16 @@ Install quantms-rescoring using one of the following methods:
    ```sh
    ❯ poetry install
    ```
+
+**Build Docker image locally:**
+
+```sh
+# Build the Docker image
+❯ docker build -t quantms-rescoring:latest .
+
+# Test the image
+❯ ./scripts/test-docker.sh latest
+```
 
 ### TODO
 
