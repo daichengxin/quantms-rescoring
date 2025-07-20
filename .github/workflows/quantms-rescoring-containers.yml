@@ -71,7 +71,6 @@ jobs:
         tags: |
           ghcr.io/bigbio/quantms-rescoring:latest
           ghcr.io/bigbio/quantms-rescoring:${{ steps.version.outputs.VERSION }}
-          ghcr.io/bigbio/quantms-rescoring:${{ steps.version.outputs.MAJOR }}.${{ steps.version.outputs.MINOR }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
         provenance: false
@@ -108,9 +107,6 @@ jobs:
         
         # Push with exact version tag
         singularity push quantms-rescoring.sif oras://ghcr.io/bigbio/quantms-rescoring-sif:${{ steps.version.outputs.VERSION }}
-        
-        # Push with major.minor version tag
-        singularity push quantms-rescoring.sif oras://ghcr.io/bigbio/quantms-rescoring-sif:${{ steps.version.outputs.MAJOR }}.${{ steps.version.outputs.MINOR }}
         
         # If this is a release event, also tag as latest
         if [[ "${{ env.IS_RELEASE }}" == "true" || "${{ github.event_name }}" == "release" ]]; then
