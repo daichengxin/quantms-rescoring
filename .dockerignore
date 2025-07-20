@@ -4,11 +4,19 @@
 .gitattributes
 
 # Documentation
-LICENSE
-# Keep README.md for Poetry build
+docs/
+*.md
+!README.md
+
+# Development files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
 
 # Python
-__pycache__
+__pycache__/
 *.py[cod]
 *$py.class
 *.so
@@ -31,29 +39,11 @@ wheels/
 MANIFEST
 
 # Virtual environments
-.env
-.venv
-env/
 venv/
+env/
 ENV/
-env.bak/
-venv.bak/
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# OS
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
+.venv/
+.env/
 
 # Testing
 .pytest_cache/
@@ -68,16 +58,41 @@ coverage.xml
 
 # CI/CD
 .github/
-.codacy.yml
+.gitlab-ci.yml
+.travis.yml
+.circleci/
 
 # Docker
 Dockerfile*
 docker-compose*
 .dockerignore
 
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
 # Logs
 *.log
+logs/
 
 # Temporary files
+tmp/
+temp/
 *.tmp
-*.temp 
+*.temp
+
+# Data files (if any)
+*.mzML
+*.idXML
+*.fasta
+*.fa
+*.dat
+*.txt
+!requirements.txt
+!pyproject.toml 
