@@ -116,8 +116,6 @@ def test_annotator_train_rt():
 
     annotator = FeatureAnnotator(
         feature_generators="ms2pip,deeplc",
-        ms2pip_model="TMT",
-        ms2pip_model_path="models",
         ms2_tolerance=0.05,
         calibration_set_size=0.15,
         skip_deeplc_retrain=False,
@@ -153,8 +151,6 @@ def test_idxmlreader_filtering():
     annotator = FeatureAnnotator(
         feature_generators="ms2pip,deeplc",
                                  only_features="DeepLC:RtDiff,DeepLC:PredictedRetentionTimeBest,Ms2pip:DotProd",
-        ms2pip_model="TMT",
-        ms2pip_model_path="models",
         ms2_tolerance=0.2,
         calibration_set_size=0.15,
         skip_deeplc_retrain=True,
@@ -190,8 +186,6 @@ def test_idxmlreader_wrong_model():
     annotator = FeatureAnnotator(
         feature_generators="ms2pip,deeplc",
                                  only_features="DeepLC:RtDiff,DeepLC:PredictedRetentionTimeBest,Ms2pip:DotProd",
-        ms2pip_model="CID-TMT",
-        ms2pip_model_path="models",
         ms2_tolerance=0.2,
         calibration_set_size=0.15,
         skip_deeplc_retrain=True,
@@ -231,8 +225,6 @@ def test_idxmlreader_failing_help():
     annotator = FeatureAnnotator(
         feature_generators="ms2pip,deeplc",
                                  only_features="DeepLC:RtDiff,DeepLC:PredictedRetentionTimeBest,Ms2pip:DotProd",
-        ms2pip_model="HCD2021",
-        ms2pip_model_path="models",
         ms2_tolerance=0.05,
         calibration_set_size=0.15,
         skip_deeplc_retrain=True,
