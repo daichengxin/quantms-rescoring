@@ -41,7 +41,7 @@ class AlphaPeptDeepFeatureGenerator(FeatureGeneratorBase):
             spectrum_id_pattern: str = "(.*)",
             model_dir: Optional[str] = None,
             mask_modloss: bool = True,
-            processes: 1,
+            processes: int = 1,
             **kwargs,
     ) -> None:
         """
