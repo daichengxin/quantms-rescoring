@@ -55,11 +55,10 @@ WORKDIR /app
 COPY . .
 
 # Install Poetry and dependencies using the same strategy as CI/CD
-RUN python3.11 -m pip install --upgrade pip && \
-    python3.11 -m pip install flake8==7.3.0 pytest==8.4.1 && \
+RUN python3.11 -m pip install flake8==7.3.0 pytest==8.4.1 && \
     python3.11 -m pip install poetry==2.1.3 && \
     poetry build && \
-    python3.11 -m pip install dist/*.whl && \
+    python3.11 -m pip install --no-deps dist/*.whl && \
     python3.11 -m pip cache purge
 
 # Test pyOpenMS import
