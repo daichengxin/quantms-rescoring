@@ -74,7 +74,8 @@ jobs:
         cache-from: type=gha
         cache-to: type=gha,mode=max
         provenance: false
-        platforms: linux/amd64,linux/arm64
+        # Note: Only building for linux/amd64 as pyopenms doesn't have ARM64 wheels
+        platforms: linux/amd64
 
     - name: Set up Singularity
       if: ${{ (github.event.inputs.push_images == true || github.event.inputs.push_images == '') }}

@@ -23,6 +23,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     curl \
     git \
+    wget \
     locales \
     # pyOpenMS dependencies
     libglib2.0-0 \
@@ -50,19 +51,15 @@ ENV LC_ALL=en_US.UTF-8
 # Set work directory
 WORKDIR /app
 
-# Copy requirements first for better caching
-COPY requirements.txt .
-
-# Install Python dependencies and clean up in one step
-RUN python3.11 -m pip install --no-cache-dir --upgrade pip && \
-    python3.11 -m pip install --no-cache-dir -r requirements.txt && \
-    python3.11 -m pip cache purge
-
-# Copy application code
+# Copy application code first
 COPY . .
 
-# Install the package in development mode and clean up
-RUN python3.11 -m pip install --no-cache-dir -e . && \
+# Install Poetry and dependencies using the same strategy as CI/CD
+RUN python3.11 -m pip install --upgrade pip && \
+    python3.11 -m pip install flake8 pytest && \
+    python3.11 -m pip install poetry && \
+    poetry build && \
+    python3.11 -m pip install dist/*.whl && \
     python3.11 -m pip cache purge
 
 # Test pyOpenMS import
