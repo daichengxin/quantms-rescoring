@@ -50,13 +50,13 @@ jobs:
         wget https://ftp.pride.ebi.ac.uk/pub/databases/pride/resources/proteomes/quantms-ci-github/quantms-utils/TMT_Erwinia_1uLSike_Top10HCD_isol2_45stepped_60min_01_comet.idXML
         wget https://ftp.pride.ebi.ac.uk/pub/databases/pride/resources/proteomes/quantms-ci-github/quantms-utils/191126_AMLM_THY01-DN4_Thymus_Tue39L243_10_DDA_2_400-1000mz_msms40_standard.mzML
         wget https://ftp.pride.ebi.ac.uk/pub/databases/pride/resources/proteomes/quantms-ci-github/quantms-utils/191126_AMLM_THY01-DN4_Thymus_Tue39L243_10_DDA_2_400-1000mz_msms40_standard_comet.idXML
-    - name: Test percolator ms2rescore
+    - name: Test ms2pip ms2rescore
       env:
         CUDA_VISIBLE_DEVICES: "-1"
       run: |
         rescoring msrescore2feature --idxml TMT_Erwinia_1uLSike_Top10HCD_isol2_45stepped_60min_01_comet.idXML --mzml TMT_Erwinia_1uLSike_Top10HCD_isol2_45stepped_60min_01.mzML --processes 2 --feature_generators 'ms2pip,deeplc'
     
-    - name: Test percolator ms2rescore
+    - name: Test alphapeptdeep ms2rescore
       env:
         CUDA_VISIBLE_DEVICES: "-1"
       run: |
