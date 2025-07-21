@@ -34,6 +34,9 @@ jobs:
     env:
       RETRY_TIMES: 3
       RETRY_DELAY: 30
+      SINGULARITY_TMPDIR: ${{ github.workspace }}/.singularity-tmp
+      SINGULARITY_CACHEDIR: ${{ github.workspace }}/.singularity
+      SINGULARITY_LIBRARYDIR: ${{ github.workspace }}/.singularity
 
     steps:
     - name: Free up disk space before build
@@ -108,10 +111,13 @@ jobs:
         docker system prune -af || true
         df -h
 
+    - name: Prepare Singularity temp dir
+      run: mkdir -p ${{ github.workspace }}/.singularity-tmp
+
     - name: Convert Docker image to Singularity
       if: ${{ (github.event.inputs.push_images == true || github.event.inputs.push_images == '') }}
       run: |
-        SINGULARITY_TMPDIR=/mnt singularity build quantms-rescoring.sif docker-archive://quantms-rescoring.tar
+        singularity build quantms-rescoring.sif docker-archive://quantms-rescoring.tar
         ls -la quantms-rescoring.sif
 
     - name: Login and Deploy Container
