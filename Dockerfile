@@ -23,7 +23,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 COPY . .
 
-RUN pip install --no-cache-dir --upgrade pip && \
+RUN pip install --no-cache-dir pip==25.1.1 && \
     pip install --no-cache-dir poetry==2.1.3 && \
     poetry build && \
     pip install --no-cache-dir dist/*.whl && \
