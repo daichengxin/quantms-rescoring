@@ -101,6 +101,13 @@ jobs:
         docker pull ghcr.io/bigbio/quantms-rescoring:latest
         docker save ghcr.io/bigbio/quantms-rescoring:latest -o quantms-rescoring.tar
 
+    - name: Remove Docker image to free up space
+      if: ${{ (github.event.inputs.push_images == true || github.event.inputs.push_images == '') }}
+      run: |
+        docker rmi ghcr.io/bigbio/quantms-rescoring:latest || true
+        docker system prune -af || true
+        df -h
+
     - name: Convert Docker image to Singularity
       if: ${{ (github.event.inputs.push_images == true || github.event.inputs.push_images == '') }}
       run: |
