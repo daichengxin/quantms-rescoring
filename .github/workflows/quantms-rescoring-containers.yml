@@ -1,27 +1,27 @@
 name: QuantMS-Rescoring Containers Build and Sync
 
-on:
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
-    paths:
-      - 'Dockerfile'
-      - '.github/workflows/**'
-  release:
-    types: [published]
-  workflow_dispatch:
-    inputs:
-      push_images:
-        description: 'Push images to registry'
-        required: false
-        default: true
-        type: 'boolean'
-      push_release:
-        description: 'Push as release version'
-        required: false
-        default: false
-        type: boolean
+# on:
+#   push:
+#     branches: [ "main" ]
+#   pull_request:
+#     branches: [ "main" ]
+#     paths:
+#       - 'Dockerfile'
+#       - '.github/workflows/**'
+#   release:
+#     types: [published]
+#   workflow_dispatch:
+#     inputs:
+#       push_images:
+#         description: 'Push images to registry'
+#         required: false
+#         default: true
+#         type: 'boolean'
+#       push_release:
+#         description: 'Push as release version'
+#         required: false
+#         default: false
+#         type: boolean
 
 jobs:
   build-quantms-rescoring:
