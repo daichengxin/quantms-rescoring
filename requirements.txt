@@ -1,5 +1,5 @@
 click
-pyopenms>=3.0,<3.2
+pyopenms>=3.0
 ms2rescore==3.1.4
 pandas
 numpy>=1.25
@@ -9,3 +9,4 @@ scipy
 pygam
 protobuf
 ms2pip>=4.0
+peptdeep
