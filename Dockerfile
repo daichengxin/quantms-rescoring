@@ -1,7 +1,7 @@
 # ===================
 # Stage 1: Build
 # ===================
-FROM python:3.11-slim as builder
+FROM python:3.11-slim AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -17,8 +17,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxml2-dev \
     libxslt1-dev \
     libssl-dev \
-    libffi-dev && \
+    libffi-dev \
+    locales && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
+
+RUN sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen && \
+    locale-gen
 
 WORKDIR /app
 COPY . .
@@ -32,7 +36,7 @@ RUN pip install --no-cache-dir pip==25.1.1 && \
 # ===================
 # Stage 2: Runtime
 # ===================
-FROM python:3.11-slim as final
+FROM python:3.11-slim AS final
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV LANG=en_US.UTF-8
@@ -47,8 +51,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxml2 \
     libxslt1.1 \
     libssl3 \
-    libffi8 && \
+    libffi8 \
+    procps \
+    locales && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
+
+RUN sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen && \
+    locale-gen
 
 COPY --from=builder /usr/local /usr/local
 
