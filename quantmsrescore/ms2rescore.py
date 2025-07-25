@@ -159,10 +159,6 @@ def msrescore2feature(
         Comma-separated list of feature generators to use for annotation.
     only_features : str
         Comma-separated list of features to use for annotation.
-    ms2pip_model_dir : str
-        Path to the directory containing the MS²PIP models.
-    ms2pip_model : str
-        The MS²PIP model to use for annotation.
     force_model : bool
         Whether to force the use of the provided MS²PIP model.
     find_best_model : bool
