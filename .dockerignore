@@ -85,7 +85,7 @@ logs/
 tmp/
 temp/
 *.tmp
-*.temp
+*.temp 
 
 # Data files (if any)
 *.mzML
