@@ -18,3 +18,5 @@ dependencies:
   - protobuf
   - pytest
   - ms2pip>=4.0
+  - pip:
+    - peptdeep
