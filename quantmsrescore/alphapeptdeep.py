@@ -3,6 +3,9 @@ import os.path
 import pandas as pd
 from peptdeep.pretrained_models import ModelManager
 from peptdeep.mass_spec.match import match_centroid_mz
+from peptdeep.model.ms2 import pDeepModel
+from alphabase.peptide.fragment import create_fragment_mz_dataframe
+
 from ms2rescore.feature_generators.base import FeatureGeneratorBase, FeatureGeneratorException
 from typing import Optional, Tuple, List, Union, Generator, Dict
 
@@ -40,7 +43,7 @@ class AlphaPeptDeepFeatureGenerator(FeatureGeneratorBase):
             spectrum_path: Optional[str] = None,
             spectrum_id_pattern: str = "(.*)",
             model_dir: Optional[str] = None,
-            mask_modloss: bool = True,
+            consider_modloss: bool = False,
             processes: int = 1,
             **kwargs,
     ) -> None:
@@ -77,7 +80,7 @@ class AlphaPeptDeepFeatureGenerator(FeatureGeneratorBase):
         self.spectrum_id_pattern = spectrum_id_pattern
         self.model_dir = model_dir
         self.processes = processes
-        self.mask_modloss = mask_modloss
+        self.consider_modloss = consider_modloss
 
     @property
     def feature_names(self):
@@ -189,7 +192,7 @@ class AlphaPeptDeepFeatureGenerator(FeatureGeneratorBase):
                         compute_correlations=False,
                         model_dir=self.model_dir,
                         processes=self.processes,
-                        mask_modloss=self.mask_modloss
+                        consider_modloss=self.consider_modloss
                     )
                 except NoMatchingSpectraFound as e:
                     raise FeatureGeneratorException(
@@ -395,7 +398,7 @@ class AlphaPeptDeepAnnotator(AlphaPeptDeepFeatureGenerator):
             correlation_threshold: Optional[float] = 0.6,
             higher_score_better: bool = True,
             force_model: bool = False,
-            mask_modloss: bool = True,
+            consider_modloss: bool = False,
             **kwargs,
     ):
         super().__init__(
@@ -413,7 +416,7 @@ class AlphaPeptDeepAnnotator(AlphaPeptDeepFeatureGenerator):
         self._correlation_threshold: float = correlation_threshold
         self._higher_score_better: bool = higher_score_better
         self._force_model: bool = force_model
-        self._mask_modloss: bool = mask_modloss
+        self._consider_modloss: bool = consider_modloss
 
     def validate_features(self, psm_list: PSMList, psms_df: pd.DataFrame, model: str = None) -> bool:
         """
@@ -452,7 +455,7 @@ class AlphaPeptDeepAnnotator(AlphaPeptDeepFeatureGenerator):
                         compute_correlations=True,
                         model_dir=self.model_dir,
                         processes=self.processes,
-                        mask_modloss=self._mask_modloss,
+                        consider_modloss=self._consider_modloss,
                     )
                 except NoMatchingSpectraFound as e:
                     raise FeatureGeneratorException(
@@ -506,7 +509,7 @@ class AlphaPeptDeepAnnotator(AlphaPeptDeepFeatureGenerator):
                         compute_correlations=True,
                         model_dir=self.model_dir,
                         processes=self.processes,
-                        mask_modloss=self._mask_modloss
+                        consider_modloss=self._consider_modloss
                     )
                 except NoMatchingSpectraFound as e:
                     raise FeatureGeneratorException(
@@ -625,7 +628,7 @@ class AlphaPeptDeepAnnotator(AlphaPeptDeepFeatureGenerator):
             compute_correlations=True,
             model_dir=self.model_dir,
             processes=self.processes,
-            mask_modloss=self._mask_modloss
+            consider_modloss=self._consider_modloss
         )
 
         correlation = self._calculate_correlation(alphapeptdeep_results)
@@ -673,7 +676,7 @@ def custom_correlate(
         model: Optional[str] = "generic",
         model_dir: Optional[Union[str, Path]] = None,
         ms2_tolerance: float = 0.02,
-        mask_modloss: bool = True,
+        consider_modloss: bool = False,
         processes: Optional[int] = None,
 ) -> List[ProcessingResult]:
     """
@@ -683,7 +686,7 @@ def custom_correlate(
     spectrum_id_pattern = spectrum_id_pattern if spectrum_id_pattern else "(.*)"
 
     results = make_prediction(psm_list, psms_df, spectrum_file, spectrum_id_pattern,
-                            model, model_dir, ms2_tolerance, processes, mask_modloss)
+                              model, model_dir, ms2_tolerance, processes, consider_modloss)
 
     # Correlations also requested
     if compute_correlations:
@@ -696,22 +699,39 @@ def custom_correlate(
 
 
 def make_prediction(enumerated_psm_list, psms_df, spec_file, spectrum_id_pattern, model, model_dir,
-                    ms2_tolerance, processes, mask_modloss):
-
-    model_mgr = ModelManager(mask_modloss=mask_modloss, device="cpu")
+                    ms2_tolerance, processes, consider_modloss):
     if model_dir is not None and os.path.exists(os.path.join(model_dir, "ms2.pth")):
-        model_mgr.load_external_models(
-            ms2_model_file=os.path.join(model_dir, "ms2.pth"))
+        if consider_modloss:
+            model = pDeepModel(charged_frag_types=['b_z1', 'y_z1', 'b_z2', 'y_z2',
+                                                   'b_modloss_z1', 'b_modloss_z2',
+                                                   'y_modloss_z1', 'y_modloss_z2'], device="cpu")
+            theoretical_mz_df = create_fragment_mz_dataframe(psms_df, ['b_z1', 'y_z1', 'b_z2', 'y_z2',
+                                                                       'b_modloss_z1', 'b_modloss_z2',
+                                                                       'y_modloss_z1', 'y_modloss_z2'])
+        else:
+            model = pDeepModel(charged_frag_types=['b_z1', 'y_z1', 'b_z2', 'y_z2'], device="cpu")
+            theoretical_mz_df = create_fragment_mz_dataframe(psms_df, ['b_z1', 'y_z1', 'b_z2', 'y_z2'])
+        model.load(os.path.join(model_dir, "ms2.pth"))
+        predict_int_df = model.predict(psms_df)
+        precursor_df = psms_df
     else:
+        model_mgr = ModelManager(mask_modloss=not consider_modloss, device="cpu")
         model_mgr.load_installed_models(model)
+        if consider_modloss:
+            predictions = model_mgr.predict_all(precursor_df=psms_df, predict_items=["ms2"],
+                                                frag_types=['b_z1', 'y_z1', 'b_z2', 'y_z2',
+                                                            'b_modloss_z1', 'b_modloss_z2',
+                                                            'y_modloss_z1', 'y_modloss_z2'],
+                                                process_num=processes)
+        else:
+            predictions = model_mgr.predict_all(precursor_df=psms_df, predict_items=["ms2"],
+                                                frag_types=['b_z1', 'y_z1', 'b_z2', 'y_z2'],
+                                                process_num=processes)
+        precursor_df, predict_int_df, theoretical_mz_df = predictions["precursor_df"], predictions[
+            "fragment_intensity_df"], predictions["fragment_mz_df"]
 
     results = []
-    predictions = model_mgr.predict_all(precursor_df=psms_df, predict_items=["ms2"],
-                                        frag_types=['b_z1', 'y_z1', 'b_z2', 'y_z2'],
-                                        process_num=processes)
-    precusor_df, predict_int_df, theoretical_mz_df = predictions["precursor_df"], predictions[
-        "fragment_intensity_df"], predictions["fragment_mz_df"]
-    precusor_df = precusor_df.set_index("provenance_data")
+    precursor_df = precursor_df.set_index("provenance_data")
 
     b_cols = [col for col in theoretical_mz_df.columns if col.startswith('b')]
     y_cols = [col for col in theoretical_mz_df.columns if col.startswith('y')]
@@ -747,28 +767,30 @@ def make_prediction(enumerated_psm_list, psms_df, spec_file, spectrum_id_pattern
 
         # Process each PSM for this spectrum
         for psm_idx, psm in psms_by_specid[spectrum_id]:
-
-            row = precusor_df.loc[next(iter(psm.provenance_data.keys()))]
+            row = precursor_df.loc[next(iter(psm.provenance_data.keys()))]
             mz = theoretical_mz_df.iloc[row["frag_start_idx"]:row["frag_stop_idx"], ]
             b_array_1d = mz[b_cols].values.flatten()
             y_array_1d = mz[y_cols].values.flatten()
+            b_mask = b_array_1d != 0.0
+            y_mask = y_array_1d != 0.0
 
             b_targets, y_targets = _get_targets_for_psm(
-                b_array_1d, y_array_1d, spectrum, ms2_tolerance
+                b_array_1d[b_mask], y_array_1d[y_mask], spectrum, ms2_tolerance
             )
             predict_intensity = predict_int_df.iloc[row["frag_start_idx"]:row["frag_stop_idx"], ]
+            b_pred = predict_intensity[b_cols].values.flatten()[b_mask]
+            y_pred = predict_intensity[y_cols].values.flatten()[y_mask]
 
             results.append(ProcessingResult(
                 psm_index=psm_idx,
                 psm=psm,
-                theoretical_mz={"b": b_array_1d, "y": y_array_1d},
-                predicted_intensity={"b": predict_intensity[b_cols].values.flatten(),
-                                     "y": predict_intensity[y_cols].values.flatten()},
+                theoretical_mz={"b": b_array_1d[b_mask], "y": y_array_1d[y_mask]},
+                predicted_intensity={"b": b_pred,
+                                     "y": y_pred},
                 observed_intensity={"b": b_targets, "y": y_targets},
                 correlation=None,
                 feature_vectors=None
             ))
-
 
     return results
 
