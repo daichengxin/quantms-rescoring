@@ -713,7 +713,7 @@ def make_prediction(enumerated_psm_list, psms_df, spec_file, spectrum_id_pattern
             theoretical_mz_df = create_fragment_mz_dataframe(psms_df, ['b_z1', 'y_z1', 'b_z2', 'y_z2'])
         model.load(os.path.join(model_dir, "ms2.pth"))
         predict_int_df = model.predict(psms_df)
-        precusor_df = psms_df
+        precursor_df = psms_df
     else:
         model_mgr = ModelManager(mask_modloss=not consider_modloss, device="cpu")
         model_mgr.load_installed_models(model)
