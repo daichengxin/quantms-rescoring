@@ -30,7 +30,7 @@ class FeatureAnnotator:
                  calibration_set_size: float = 0.2, valid_correlations_size: float = 0.7,
                  skip_deeplc_retrain: bool = False, processes: int = 2, log_level: str = "INFO",
                  spectrum_id_pattern: str = "(.*)", psm_id_pattern: str = "(.*)", remove_missing_spectra: bool = True,
-                 ms2_only: bool = True, find_best_model: bool = False, mask_modloss: bool = True) -> None:
+                 ms2_only: bool = True, find_best_model: bool = False, consider_modloss: bool = False) -> None:
         """
         Initialize the Annotator with configuration parameters.
 
@@ -66,8 +66,8 @@ class FeatureAnnotator:
             Force the use of the provided MS2 model (default: False).
         find_best_model : bool, optional
             Force the use of the best MS2 model (default: False).
-        mask_modloss: bool, optional
-            If modloss ions are masked to zeros in the ms2 model. `modloss`
+        consider_modloss: bool, optional
+            If modloss ions are considered in the ms2 model. `modloss`
             ions are mostly useful for phospho MS2 prediciton model.
             Defaults to True.
 
@@ -116,6 +116,7 @@ class FeatureAnnotator:
         self._ms2_only = ms2_only
         self._force_model = force_model
         self._find_best_model = find_best_model
+        self._consider_modloss = consider_modloss
 
     def build_idxml_data(
             self, idxml_file: Union[str, Path], spectrum_path: Union[str, Path]
@@ -355,7 +356,8 @@ class FeatureAnnotator:
             correlation_threshold=0.7,  # Consider making this configurable
             higher_score_better=self._higher_score_better,
             processes=self._processes,
-            force_model=self._force_model
+            force_model=self._force_model,
+            consider_modloss=self._consider_modloss
         )
 
 
@@ -422,12 +424,25 @@ class FeatureAnnotator:
             # Save original model for reference
             original_model = ms2pip_generator.model
 
+            batch_psms_copy = (
+                psm_list.copy()
+            )  # Copy ms2pip results to avoid modifying the original list
+
+            # Select only PSMs that are target and not decoys
+            calibration_set = [
+                result
+                for result in batch_psms_copy.psm_list
+                if not result.is_decoy and result.rank == 1
+            ]
+            calibration_set = PSMList(psm_list=calibration_set)
+            psms_df_without_decoy = psms_df[psms_df["is_decoy"] == 0]
+
             # Determine which model to use based on configuration and validation
             model_to_use = original_model
             logger.info("Running MS2PIP model")
-            ms2pip_best_model, ms2pip_best_corr = ms2pip_generator._find_best_ms2pip_model(psm_list)
+            ms2pip_best_model, ms2pip_best_corr = ms2pip_generator._find_best_ms2pip_model(calibration_set)
             logger.info("Running AlphaPeptDeep model")
-            alphapeptdeep_best_model, alphapeptdeep_best_corr = alphapeptdeep_generator._find_best_ms2_model(psm_list, psms_df)
+            alphapeptdeep_best_model, alphapeptdeep_best_corr = alphapeptdeep_generator._find_best_ms2_model(calibration_set, psms_df_without_decoy)
             if alphapeptdeep_best_corr > ms2pip_best_corr:
                 if alphapeptdeep_best_model and alphapeptdeep_generator.validate_features(psm_list=psm_list, psms_df=psms_df,
                                                                                           model=alphapeptdeep_best_model):

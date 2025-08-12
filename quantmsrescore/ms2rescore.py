@@ -106,8 +106,8 @@ configure_logging()
     default="(.*)",
 )
 @click.option(
-    "--mask_modloss",
-    help="If modloss ions are masked to zeros in the ms2 model",
+    "--consider_modloss",
+    help="If modloss ions are considered in the ms2 model",
     is_flag=True,
 )
 @click.pass_context
@@ -130,7 +130,7 @@ def msrescore2feature(
     skip_deeplc_retrain,
     spectrum_id_pattern: str,
     psm_id_pattern: str,
-    mask_modloss
+    consider_modloss
 ):
     """
     Annotate PSMs in an idXML file with additional features using specified models.
@@ -175,8 +175,8 @@ def msrescore2feature(
         The regex pattern for spectrum IDs.
     psm_id_pattern : str
         The regex pattern for PSM IDs.
-    mask_modloss: bool, optional
-        If modloss ions are masked to zeros in the ms2 model. `modloss`
+    consider_modloss: bool, optional
+        If modloss ions are considered in the ms2 model. `modloss`
         ions are mostly useful for phospho MS2 prediciton model.
         Defaults to True.
     """
@@ -196,7 +196,7 @@ def msrescore2feature(
         log_level=log_level.upper(),
         spectrum_id_pattern=spectrum_id_pattern,
         psm_id_pattern=psm_id_pattern,
-        mask_modloss=mask_modloss
+        consider_modloss=consider_modloss
     )
     annotator.build_idxml_data(idxml, mzml)
     annotator.annotate()
