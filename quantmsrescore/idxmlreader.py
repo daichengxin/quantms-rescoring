@@ -268,7 +268,9 @@ class IdXMLRescoringReader(IdXMLReader):
                                              "mod_sites": mod_sites,
                                              "nce": nce,
                                              "provenance_data": next(iter(psm.provenance_data.keys())),
-                                             "instrument": instrument}, ignore_index=True)
+                                             "instrument": instrument,
+                                             "is_decoy": OpenMSHelper.is_decoy_peptide_hit(psm_hit),
+                                             "score": psm_hit.getScore()}, ignore_index=True)
 
         self._psms = PSMList(psm_list=psm_list)
         self._psms_df = psm_df
@@ -285,7 +287,17 @@ def extract_modifications(peptidoform, mods_name_dict):
     pre_len = 0
     for i, v in enumerate(list(pattern.finditer(peptidoform))):
         if peptidoform.startswith(".") and i == 0:
-            mods_res.append(v.group(0)[1:-1] + "@" + mods_name_dict[v.group(0)[1:-1]].replace(" ", "_"))
+            modsites = mods_name_dict[v.group(0)[1:-1]].split(" ")
+            if "".join(modsites[0]) == "N-term":
+                if len(modsites) == 2:
+                    mods_res.append(v.group(0)[1:-1] + "@" + modsites[-1] + "^Any_N-term")
+                else:
+                    mods_res.append(v.group(0)[1:-1] + "@" + "Any_N-term")
+            else:
+                if len(modsites) == 3:
+                    mods_res.append(v.group(0)[1:-1] + "@" + modsites[-1] + "^" + "_".join(modsites[:-1]))
+                else:
+                    mods_res.append(v.group(0)[1:-1] + "@" + "_".join(modsites))
             mod_sites.append("0")
             pre_len += 1 + len(mods[0])
         else:
