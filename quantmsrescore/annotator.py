@@ -27,7 +27,7 @@ class FeatureAnnotator:
 
     def __init__(self, feature_generators: str, only_features: Optional[str] = None, ms2_model: str = "HCD2021",
                  force_model: bool = False, ms2_model_path: str = "models", ms2_tolerance: float = 0.05,
-                 calibration_set_size: float = 0.2, valid_correlations_size: float = 0.7,
+                 ms2_tolerance_unit: str = "Da", calibration_set_size: float = 0.2, valid_correlations_size: float = 0.7,
                  skip_deeplc_retrain: bool = False, processes: int = 2, log_level: str = "INFO",
                  spectrum_id_pattern: str = "(.*)", psm_id_pattern: str = "(.*)", remove_missing_spectra: bool = True,
                  ms2_only: bool = True, find_best_model: bool = False, consider_modloss: bool = False) -> None:
@@ -92,8 +92,14 @@ class FeatureAnnotator:
         # Initialize state
         self._idxml_reader = None
         self._deepLC = "deeplc" in feature_annotators
-        self._ms2pip = "ms2pip" in feature_annotators
-        self._alphapeptdeep = "alphapeptdeep" in feature_annotators
+        if "ms2pip" in feature_annotators and ms2_tolerance_unit == "Da":
+            self._ms2pip = True
+        if "alphapeptdeep" in feature_annotators:
+            self._alphapeptdeep = True
+        elif "ms2pip" in feature_annotators and ms2_tolerance_unit == "ppm":
+            self._alphapeptdeep = True
+            logger.warning("MS2PIP only supports Da units. AlphaPeptDeep is enabled when setting ppm tolerance!")
+
         self.ms2_generator = None
 
         # Parse and validate features
@@ -105,6 +111,7 @@ class FeatureAnnotator:
         self._ms2_model = ms2_model
         self._ms2_model_path = ms2_model_path
         self._ms2_tolerance = ms2_tolerance
+        self._ms2_tolerance_unit = ms2_tolerance_unit
         self._calibration_set_size = calibration_set_size
         self._valid_correlations_size = valid_correlations_size
         self._processes = processes
@@ -331,7 +338,8 @@ class FeatureAnnotator:
 
         return  # Successful completion
 
-    def _create_alphapeptdeep_annotator(self, model: Optional[str] = None, tolerance: Optional[float] = None):
+    def _create_alphapeptdeep_annotator(self, model: Optional[str] = None, tolerance: Optional[float] = None,
+                                        tolerance_unit: Optional[str] = "Da"):
         """
         Create an AlphaPeptDeep annotator with the specified or default model.
 
@@ -347,6 +355,7 @@ class FeatureAnnotator:
         """
         return AlphaPeptDeepAnnotator(
             ms2_tolerance=tolerance or self._ms2_tolerance,
+            ms2_tolerance_unit=tolerance_unit or self._ms2_tolerance_unit,
             model=model or "generic",
             spectrum_path=self._idxml_reader.spectrum_path,
             spectrum_id_pattern=self._spectrum_id_pattern,

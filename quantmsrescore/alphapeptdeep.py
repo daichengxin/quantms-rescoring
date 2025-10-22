@@ -40,6 +40,7 @@ class AlphaPeptDeepFeatureGenerator(FeatureGeneratorBase):
             *args,
             model: str = "generic",
             ms2_tolerance: float = 0.02,
+            ms2_tolerance_unit: float = "Da",
             spectrum_path: Optional[str] = None,
             spectrum_id_pattern: str = "(.*)",
             model_dir: Optional[str] = None,
@@ -76,6 +77,7 @@ class AlphaPeptDeepFeatureGenerator(FeatureGeneratorBase):
         super().__init__(*args, **kwargs)
         self.model = model
         self.ms2_tolerance = ms2_tolerance
+        self.ms2_tolerance_unit = ms2_tolerance_unit
         self.spectrum_path = spectrum_path
         self.spectrum_id_pattern = spectrum_id_pattern
         self.model_dir = model_dir
@@ -189,6 +191,7 @@ class AlphaPeptDeepFeatureGenerator(FeatureGeneratorBase):
                         spectrum_id_pattern=self.spectrum_id_pattern,
                         model=self.model,
                         ms2_tolerance=self.ms2_tolerance,
+                        ms2_tolerance_unit=self.ms2_tolerance_unit,
                         compute_correlations=False,
                         model_dir=self.model_dir,
                         processes=self.processes,
@@ -676,6 +679,7 @@ def custom_correlate(
         model: Optional[str] = "generic",
         model_dir: Optional[Union[str, Path]] = None,
         ms2_tolerance: float = 0.02,
+        ms2_tolerance_unit: str = "Da",
         consider_modloss: bool = False,
         processes: Optional[int] = None,
 ) -> List[ProcessingResult]:
@@ -686,7 +690,7 @@ def custom_correlate(
     spectrum_id_pattern = spectrum_id_pattern if spectrum_id_pattern else "(.*)"
 
     results = make_prediction(psm_list, psms_df, spectrum_file, spectrum_id_pattern,
-                              model, model_dir, ms2_tolerance, processes, consider_modloss)
+                              model, model_dir, ms2_tolerance, ms2_tolerance_unit, processes, consider_modloss)
 
     # Correlations also requested
     if compute_correlations:
@@ -699,7 +703,7 @@ def custom_correlate(
 
 
 def make_prediction(enumerated_psm_list, psms_df, spec_file, spectrum_id_pattern, model, model_dir,
-                    ms2_tolerance, processes, consider_modloss):
+                    ms2_tolerance, ms2_tolerance_unit, processes, consider_modloss):
     if model_dir is not None and os.path.exists(os.path.join(model_dir, "ms2.pth")):
         if consider_modloss:
             model = pDeepModel(charged_frag_types=['b_z1', 'y_z1', 'b_z2', 'y_z2',
@@ -775,7 +779,7 @@ def make_prediction(enumerated_psm_list, psms_df, spec_file, spectrum_id_pattern
             y_mask = y_array_1d != 0.0
 
             b_targets, y_targets = _get_targets_for_psm(
-                b_array_1d[b_mask], y_array_1d[y_mask], spectrum, ms2_tolerance
+                b_array_1d[b_mask], y_array_1d[y_mask], spectrum, ms2_tolerance, ms2_tolerance_unit
             )
             predict_intensity = predict_int_df.iloc[row["frag_start_idx"]:row["frag_stop_idx"], ]
             b_pred = predict_intensity[b_cols].values.flatten()[b_mask]
@@ -906,7 +910,8 @@ def _get_targets_for_psm(
         b_frag_mzs: np.array,
         y_frag_mzs: np.array,
         spectrum: ObservedSpectrum,
-        ms2_tolerance: float
+        ms2_tolerance: float,
+        ms2_tolerance_unit: str
 ) -> Tuple[Optional[np.ndarray], Dict[str, np.ndarray]]:
     """
     Get targets for a PSM from a spectrum.
@@ -932,12 +937,13 @@ def _get_targets_for_psm(
         A tuple containing the encoded peptidoform and the targets.
     """
 
-    # if ms2_tolerance:
-    #     spec_mz_tols = spec_mzs * tol * 1e-6
-    # else:
+    if ms2_tolerance_unit == "ppm":
+        spec_mz_tols = spectrum.mz * ms2_tolerance * 1e-6
+    else:
+        spec_mz_tols = np.full_like(spectrum.mz, ms2_tolerance)
     # print(spectrum.mz)
     # print(ms2_tolerance)  # 0.05
-    spec_mz_tols = np.full_like(spectrum.mz, ms2_tolerance)
+    # spec_mz_tols = np.full_like(spectrum.mz, ms2_tolerance)
 
     b_matched_idxes = match_centroid_mz(spectrum.mz, b_frag_mzs, spec_mz_tols).reshape(-1)
     b_matched_intens = spectrum.intensity[b_matched_idxes]
