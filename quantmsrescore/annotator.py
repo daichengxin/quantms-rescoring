@@ -94,12 +94,15 @@ class FeatureAnnotator:
         self._deepLC = "deeplc" in feature_annotators
         if "ms2pip" in feature_annotators and ms2_tolerance_unit == "Da":
             self._ms2pip = True
+        else:
+            self._ms2pip = False
         if "alphapeptdeep" in feature_annotators:
             self._alphapeptdeep = True
         elif "ms2pip" in feature_annotators and ms2_tolerance_unit == "ppm":
             self._alphapeptdeep = True
             logger.warning("MS2PIP only supports Da units. AlphaPeptDeep is enabled when setting ppm tolerance!")
-
+        else:
+            self._alphapeptdeep = False
         self.ms2_generator = None
 
         # Parse and validate features
