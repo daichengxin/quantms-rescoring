@@ -713,7 +713,7 @@ def make_prediction(enumerated_psm_list, psms_df, spec_file, spectrum_id_pattern
             theoretical_mz_df = create_fragment_mz_dataframe(psms_df, ['b_z1', 'y_z1', 'b_z2', 'y_z2'])
         model.load(os.path.join(model_dir, "ms2.pth"))
         predict_int_df = model.predict(psms_df)
-        precusor_df = psms_df
+        precursor_df = psms_df
     else:
         model_mgr = ModelManager(mask_modloss=not consider_modloss, device="cpu")
         model_mgr.load_installed_models(model)
@@ -727,11 +727,11 @@ def make_prediction(enumerated_psm_list, psms_df, spec_file, spectrum_id_pattern
             predictions = model_mgr.predict_all(precursor_df=psms_df, predict_items=["ms2"],
                                                 frag_types=['b_z1', 'y_z1', 'b_z2', 'y_z2'],
                                                 process_num=processes)
-        precusor_df, predict_int_df, theoretical_mz_df = predictions["precursor_df"], predictions[
+        precursor_df, predict_int_df, theoretical_mz_df = predictions["precursor_df"], predictions[
             "fragment_intensity_df"], predictions["fragment_mz_df"]
 
     results = []
-    precusor_df = precusor_df.set_index("provenance_data")
+    precursor_df = precursor_df.set_index("provenance_data")
 
     b_cols = [col for col in theoretical_mz_df.columns if col.startswith('b')]
     y_cols = [col for col in theoretical_mz_df.columns if col.startswith('y')]
@@ -767,7 +767,7 @@ def make_prediction(enumerated_psm_list, psms_df, spec_file, spectrum_id_pattern
 
         # Process each PSM for this spectrum
         for psm_idx, psm in psms_by_specid[spectrum_id]:
-            row = precusor_df.loc[next(iter(psm.provenance_data.keys()))]
+            row = precursor_df.loc[next(iter(psm.provenance_data.keys()))]
             mz = theoretical_mz_df.iloc[row["frag_start_idx"]:row["frag_stop_idx"], ]
             b_array_1d = mz[b_cols].values.flatten()
             y_array_1d = mz[y_cols].values.flatten()
