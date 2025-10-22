@@ -74,9 +74,15 @@ configure_logging()
 )
 @click.option(
     "--ms2_tolerance",
-    help="Fragment mass tolerance [Da](default: `0.05`)",
+    help="Fragment mass tolerance (default: `0.05`)",
     type=float,
     default=0.05,
+)
+@click.option(
+    "--ms2_tolerance_unit",
+    help="Fragment mass tolerance unit (default: Da)",
+    type=str,
+    default="Da",
 )
 @click.option(
     "--calibration_set_size",
@@ -125,6 +131,7 @@ def msrescore2feature(
     force_model,
     find_best_model,
     ms2_tolerance,
+    ms2_tolerance_unit,
     calibration_set_size,
     valid_correlations_size,
     skip_deeplc_retrain,
@@ -189,6 +196,7 @@ def msrescore2feature(
         find_best_model=find_best_model,
         ms2_model_path=ms2_model_dir,
         ms2_tolerance=ms2_tolerance,
+        ms2_tolerance_unit=ms2_tolerance_unit,
         calibration_set_size=calibration_set_size,
         valid_correlations_size=valid_correlations_size,
         skip_deeplc_retrain=skip_deeplc_retrain,
