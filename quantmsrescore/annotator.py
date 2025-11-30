@@ -30,7 +30,8 @@ class FeatureAnnotator:
                  ms2_tolerance_unit: str = "Da", calibration_set_size: float = 0.2, valid_correlations_size: float = 0.7,
                  skip_deeplc_retrain: bool = False, processes: int = 2, log_level: str = "INFO",
                  spectrum_id_pattern: str = "(.*)", psm_id_pattern: str = "(.*)", remove_missing_spectra: bool = True,
-                 ms2_only: bool = True, find_best_model: bool = False, consider_modloss: bool = False) -> None:
+                 ms2_only: bool = True, find_best_model: bool = False, consider_modloss: bool = False,
+                 transfer_learning: bool = False) -> None:
         """
         Initialize the Annotator with configuration parameters.
 
@@ -127,6 +128,7 @@ class FeatureAnnotator:
         self._force_model = force_model
         self._find_best_model = find_best_model
         self._consider_modloss = consider_modloss
+        self._transfer_learning = transfer_learning
 
     def build_idxml_data(
             self, idxml_file: Union[str, Path], spectrum_path: Union[str, Path]
@@ -369,7 +371,8 @@ class FeatureAnnotator:
             higher_score_better=self._higher_score_better,
             processes=self._processes,
             force_model=self._force_model,
-            consider_modloss=self._consider_modloss
+            consider_modloss=self._consider_modloss,
+            transfer_learning=self._transfer_learning
         )
 
 

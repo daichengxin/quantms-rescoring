@@ -116,6 +116,9 @@ configure_logging()
     help="If modloss ions are considered in the ms2 model",
     is_flag=True,
 )
+@click.option("--transfer_learning",
+              help="Enabling transfer learning for AlphaPeptDeep MS2 prediction",
+              is_flag=True)
 @click.pass_context
 def msrescore2feature(
     ctx,
@@ -137,7 +140,8 @@ def msrescore2feature(
     skip_deeplc_retrain,
     spectrum_id_pattern: str,
     psm_id_pattern: str,
-    consider_modloss
+    consider_modloss,
+    transfer_learning
 ):
     """
     Annotate PSMs in an idXML file with additional features using specified models.
@@ -186,6 +190,9 @@ def msrescore2feature(
         If modloss ions are considered in the ms2 model. `modloss`
         ions are mostly useful for phospho MS2 prediciton model.
         Defaults to True.
+    transfer_learning: bool, optional
+        Enabling transfer learning for AlphaPeptDeep MS2 prediction.
+        Defaults to False.
     """
 
     annotator = FeatureAnnotator(
@@ -204,7 +211,8 @@ def msrescore2feature(
         log_level=log_level.upper(),
         spectrum_id_pattern=spectrum_id_pattern,
         psm_id_pattern=psm_id_pattern,
-        consider_modloss=consider_modloss
+        consider_modloss=consider_modloss,
+        transfer_learning=transfer_learning
     )
     annotator.build_idxml_data(idxml, mzml)
     annotator.annotate()
