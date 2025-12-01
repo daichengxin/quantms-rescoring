@@ -70,7 +70,7 @@ class FeatureAnnotator:
             Force the use of the best MS2 model (default: False).
         consider_modloss: bool, optional
             If modloss ions are considered in the ms2 model. `modloss`
-            ions are mostly useful for phospho MS2 prediciton model.
+            ions are mostly useful for phospho MS2 prediction model.
             Defaults to True.
         transfer_learning_test_ratio: float, optional
             The ratio of test data for MS2 transfer learning.
