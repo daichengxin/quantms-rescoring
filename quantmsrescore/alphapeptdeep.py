@@ -1137,10 +1137,6 @@ def _get_targets_df_for_psm(
         spec_mz_tols = spectrum.mz * ms2_tolerance * 1e-6
     else:
         spec_mz_tols = np.full_like(spectrum.mz, ms2_tolerance)
-    # print(spectrum.mz)
-    # print(ms2_tolerance)  # 0.05
-    # spec_mz_tols = np.full_like(spectrum.mz, ms2_tolerance)
-
     # match
     idx = match_centroid_mz(spectrum.mz, theo_mz, spec_mz_tols).reshape(-1)
     intens = np.where(idx >= 0, spectrum.intensity[idx], 0.0)
