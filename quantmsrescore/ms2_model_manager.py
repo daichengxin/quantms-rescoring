@@ -1,11 +1,13 @@
 import pandas as pd
-from peptdeep.pretrained_models import ModelManager, MODEL_ZIP_FILE_PATH, _download_models, psm_sampling_with_important_mods
+from peptdeep.pretrained_models import ModelManager, _download_models, MODEL_ZIP_FILE_PATH, \
+    psm_sampling_with_important_mods
 from peptdeep.model.ms2 import pDeepModel
 from peptdeep.model.rt import AlphaRTModel
 from peptdeep.model.ccs import AlphaCCSModel
-from peptdeep.model.charge import ChargeModelForAASeq, ChargeModelForModAASeq
+from peptdeep.model.charge import ChargeModelForModAASeq
 import os
 from peptdeep.utils import logging
+from zipfile import ZipFile
 
 
 class MS2ModelManager(ModelManager):
@@ -26,11 +28,11 @@ class MS2ModelManager(ModelManager):
             device=device
         )
 
-        if model_dir is not None and os.path.exists(model_dir):
-            self.load_external_models(ms2_model_file=model_dir)
+        if model_dir is not None and os.path.exists(os.path.join(model_dir, "ms2.pth")):
+            self.load_external_models(ms2_model_file=os.path.join(model_dir, "ms2.pth"))
             self.model_str = model_dir
         else:
-            _download_models()
+            _download_models(MODEL_ZIP_FILE_PATH)
             self.load_installed_models()
             self.model_str = "generic"
         self.reset_by_global_settings(reload_models=False)
@@ -45,6 +47,7 @@ class MS2ModelManager(ModelManager):
                         top_n_mods_to_train: int = 10,
                         psm_num_per_mod_to_train_ms2: int = 50,
                         psm_num_to_test_ms2: int = 0,
+                        epoch_to_train_ms2: int = 20,
                         train_verbose: bool = False):
 
         self.psm_num_to_train_ms2 = psm_num_to_train_ms2
@@ -53,7 +56,7 @@ class MS2ModelManager(ModelManager):
         self.psm_num_per_mod_to_train_ms2 = psm_num_per_mod_to_train_ms2
         self.psm_num_to_test_ms2 = psm_num_to_test_ms2
         self.train_verbose = train_verbose
-
+        self.epoch_to_train_ms2 = epoch_to_train_ms2
         self.train_ms2_model(psms_df, match_intensity_df)
 
     def train_ms2_model(
@@ -167,3 +170,6 @@ class MS2ModelManager(ModelManager):
             )
 
         self.model_str = "retrained_model"
+
+    def save_ms2_model(self):
+        self.ms2_model.save("retrained_ms2.pth")

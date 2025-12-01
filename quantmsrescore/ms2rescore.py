@@ -81,7 +81,7 @@ configure_logging()
 @click.option(
     "--ms2_tolerance_unit",
     help="Fragment mass tolerance unit (default: Da)",
-    type=str,
+    type=click.Choice(['Da', 'ppm'], case_sensitive=False),
     default="Da",
 )
 @click.option(
@@ -119,29 +119,42 @@ configure_logging()
 @click.option("--transfer_learning",
               help="Enabling transfer learning for AlphaPeptDeep MS2 prediction",
               is_flag=True)
+@click.option("--transfer_learning_test_ratio",
+              help="The ratio of test data for MS2 transfer learning",
+              default=0.30)
+@click.option("--save_retrain_model",
+              help="Save retrained AlphaPeptDeep MS2 model weights",
+              is_flag=True)
+@click.option("--epoch_to_train_ms2",
+              help="Epoch to train AlphaPeptDeep MS2 model",
+              type=int,
+              default=20)
 @click.pass_context
 def msrescore2feature(
-    ctx,
-    idxml: str,
-    mzml,
-    output: str,
-    log_level,
-    processes,
-    feature_generators,
-    only_features,
-    ms2_model_dir,
-    ms2_model,
-    force_model,
-    find_best_model,
-    ms2_tolerance,
-    ms2_tolerance_unit,
-    calibration_set_size,
-    valid_correlations_size,
-    skip_deeplc_retrain,
-    spectrum_id_pattern: str,
-    psm_id_pattern: str,
-    consider_modloss,
-    transfer_learning
+        ctx,
+        idxml: str,
+        mzml,
+        output: str,
+        log_level,
+        processes,
+        feature_generators,
+        only_features,
+        ms2_model_dir,
+        ms2_model,
+        ms2_tolerance,
+        ms2_tolerance_unit,
+        force_model,
+        find_best_model,
+        calibration_set_size,
+        valid_correlations_size,
+        skip_deeplc_retrain,
+        spectrum_id_pattern: str,
+        psm_id_pattern: str,
+        consider_modloss,
+        transfer_learning,
+        transfer_learning_test_ratio,
+        save_retrain_model,
+        epoch_to_train_ms2
 ):
     """
     Annotate PSMs in an idXML file with additional features using specified models.
@@ -193,6 +206,14 @@ def msrescore2feature(
     transfer_learning: bool, optional
         Enabling transfer learning for AlphaPeptDeep MS2 prediction.
         Defaults to False.
+    transfer_learning_test_ratio: float, optional
+        The ratio of test data for MS2 transfer learning.
+        Defaults to 0.3.
+    save_retrain_model: bool, optional
+        Save retrained MS2 model.
+        Defaults to False.
+    epoch_to_train_ms2: int, optional
+        Epoch to train AlphaPeptDeep MS2 model.
     """
 
     annotator = FeatureAnnotator(
@@ -212,7 +233,10 @@ def msrescore2feature(
         spectrum_id_pattern=spectrum_id_pattern,
         psm_id_pattern=psm_id_pattern,
         consider_modloss=consider_modloss,
-        transfer_learning=transfer_learning
+        transfer_learning=transfer_learning,
+        transfer_learning_test_ratio=transfer_learning_test_ratio,
+        save_retrain_model=save_retrain_model,
+        epoch_to_train_ms2=epoch_to_train_ms2
     )
     annotator.build_idxml_data(idxml, mzml)
     annotator.annotate()
