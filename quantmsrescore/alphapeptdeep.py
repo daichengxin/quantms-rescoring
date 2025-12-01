@@ -791,7 +791,7 @@ def ms2_fine_tune(enumerated_psm_list, psms_df, spec_file, spectrum_id_pattern, 
         # Sort alphapeptdeep results by PSM score and lower score is better
         enumerated_psm_list_copy.sort(key=lambda x: x.score, reverse=higher_score_better)
 
-        # Get a calibration set, the % of psms to be used for calibrarion is defined by calibration_set_size
+        # Get a calibration set, the % of psms to be used for calibration is defined by calibration_set_size
         calibration_set = enumerated_psm_list_copy[
                           : int(len(enumerated_psm_list_copy) * calibration_set_size)
                           ]
