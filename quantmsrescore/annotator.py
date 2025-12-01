@@ -12,7 +12,6 @@ from quantmsrescore.ms2pip import MS2PIPAnnotator
 from quantmsrescore.openms import OpenMSHelper
 from quantmsrescore.alphapeptdeep import AlphaPeptDeepAnnotator
 
-
 # Get logger for this module
 logger = get_logger(__name__)
 
@@ -27,10 +26,13 @@ class FeatureAnnotator:
 
     def __init__(self, feature_generators: str, only_features: Optional[str] = None, ms2_model: str = "HCD2021",
                  force_model: bool = False, ms2_model_path: str = "models", ms2_tolerance: float = 0.05,
-                 ms2_tolerance_unit: str = "Da", calibration_set_size: float = 0.2, valid_correlations_size: float = 0.7,
+                 ms2_tolerance_unit: str = "Da", calibration_set_size: float = 0.2,
+                 valid_correlations_size: float = 0.7,
                  skip_deeplc_retrain: bool = False, processes: int = 2, log_level: str = "INFO",
                  spectrum_id_pattern: str = "(.*)", psm_id_pattern: str = "(.*)", remove_missing_spectra: bool = True,
-                 ms2_only: bool = True, find_best_model: bool = False, consider_modloss: bool = False) -> None:
+                 ms2_only: bool = True, find_best_model: bool = False, consider_modloss: bool = False,
+                 transfer_learning: bool = False, transfer_learning_test_ratio: float = 0.3,
+                 save_retrain_model: bool = False, epoch_to_train_ms2: int = 20) -> None:
         """
         Initialize the Annotator with configuration parameters.
 
@@ -70,7 +72,14 @@ class FeatureAnnotator:
             If modloss ions are considered in the ms2 model. `modloss`
             ions are mostly useful for phospho MS2 prediciton model.
             Defaults to True.
-
+        transfer_learning_test_ratio: float, optional
+            The ratio of test data for MS2 transfer learning.
+            Defaults to 0.3.
+        save_retrain_model: bool, optional
+            Save retrained MS2 model.
+            Defaults to False.
+        epoch_to_train_ms2: bool, optional
+            Epoch to train AlphaPeptDeep MS2 model.
         Raises
         ------
         ValueError
@@ -127,6 +136,10 @@ class FeatureAnnotator:
         self._force_model = force_model
         self._find_best_model = find_best_model
         self._consider_modloss = consider_modloss
+        self._transfer_learning = transfer_learning
+        self._transfer_learning_test_ratio = transfer_learning_test_ratio
+        self._save_retrain_model = save_retrain_model
+        self._epoch_to_train_ms2 = epoch_to_train_ms2
 
     def build_idxml_data(
             self, idxml_file: Union[str, Path], spectrum_path: Union[str, Path]
@@ -333,7 +346,8 @@ class FeatureAnnotator:
             # Apply the selected model
             alphapeptdeep_generator.model = model_to_use
             alphapeptdeep_generator.add_features(psm_list, psms_df)
-            logger.info(f"Successfully applied AlphaPeptDeep annotation using model: {model_to_use}")
+            logger.info(
+                f"Successfully applied AlphaPeptDeep annotation using model: {alphapeptdeep_generator._peptdeep_model}")
 
         except Exception as e:
             logger.error(f"Failed to apply AlphaPeptDeep annotation: {e}")
@@ -342,7 +356,7 @@ class FeatureAnnotator:
         return  # Successful completion
 
     def _create_alphapeptdeep_annotator(self, model: Optional[str] = None, tolerance: Optional[float] = None,
-                                        tolerance_unit: Optional[str] = "Da"):
+                                        tolerance_unit: Optional[str] = None):
         """
         Create an AlphaPeptDeep annotator with the specified or default model.
 
@@ -356,6 +370,7 @@ class FeatureAnnotator:
         AlphaPeptDeep
             Configured AlphaPeptDeep annotator.
         """
+
         return AlphaPeptDeepAnnotator(
             ms2_tolerance=tolerance or self._ms2_tolerance,
             ms2_tolerance_unit=tolerance_unit or self._ms2_tolerance_unit,
@@ -369,9 +384,12 @@ class FeatureAnnotator:
             higher_score_better=self._higher_score_better,
             processes=self._processes,
             force_model=self._force_model,
-            consider_modloss=self._consider_modloss
+            consider_modloss=self._consider_modloss,
+            transfer_learning=self._transfer_learning,
+            transfer_learning_test_ratio=self._transfer_learning_test_ratio,
+            save_retrain_model=self._save_retrain_model,
+            epoch_to_train_ms2=self._epoch_to_train_ms2
         )
-
 
     def _create_ms2pip_annotator(
             self, model: Optional[str] = None, tolerance: Optional[float] = None
@@ -415,11 +433,14 @@ class FeatureAnnotator:
         logger.info("Finding best MS2 model for the dataset")
 
         # Initialize MS2PIP annotator
-        try:
-            ms2pip_generator = self._create_ms2pip_annotator()
-        except Exception as e:
-            logger.error(f"Failed to initialize MS2PIP: {e}")
-            raise
+        if self._ms2_tolerance_unit == "Da":
+            try:
+                ms2pip_generator = self._create_ms2pip_annotator()
+                original_model = ms2pip_generator.model
+                model_to_use = original_model
+            except Exception as e:
+                logger.error(f"Failed to initialize MS2PIP: {e}")
+                raise
 
         # Initialize AlphaPeptDeep annotator
         try:
@@ -433,9 +454,6 @@ class FeatureAnnotator:
         psms_df = self._idxml_reader.psms_df
 
         try:
-            # Save original model for reference
-            original_model = ms2pip_generator.model
-
             batch_psms_copy = (
                 psm_list.copy()
             )  # Copy ms2pip results to avoid modifying the original list
@@ -449,20 +467,31 @@ class FeatureAnnotator:
             calibration_set = PSMList(psm_list=calibration_set)
             psms_df_without_decoy = psms_df[psms_df["is_decoy"] == 0]
 
-            # Determine which model to use based on configuration and validation
-            model_to_use = original_model
-            logger.info("Running MS2PIP model")
-            ms2pip_best_model, ms2pip_best_corr = ms2pip_generator._find_best_ms2pip_model(calibration_set)
             logger.info("Running AlphaPeptDeep model")
-            alphapeptdeep_best_model, alphapeptdeep_best_corr = alphapeptdeep_generator._find_best_ms2_model(calibration_set, psms_df_without_decoy)
+            alphapeptdeep_best_model, alphapeptdeep_best_corr = alphapeptdeep_generator._find_best_ms2_model(
+                calibration_set, psms_df_without_decoy)
+
+            ms2pip_best_corr = -1  # Initial MS2PIP best correlation
+            ms2pip_best_model = None
+
+            # Determine which model to use based on configuration and validation
+            if self._ms2_tolerance_unit == "Da":
+                # Save original model for reference
+                logger.info("Running MS2PIP model")
+                ms2pip_best_model, ms2pip_best_corr = ms2pip_generator._find_best_ms2pip_model(calibration_set)
+            else:
+                original_model = alphapeptdeep_best_model
+
             if alphapeptdeep_best_corr > ms2pip_best_corr:
-                if alphapeptdeep_best_model and alphapeptdeep_generator.validate_features(psm_list=psm_list, psms_df=psms_df,
+                model_to_use = alphapeptdeep_best_model  # AlphaPeptdeep only has generic model
+                if alphapeptdeep_best_model and alphapeptdeep_generator.validate_features(psm_list=psm_list,
+                                                                                          psms_df=psms_df,
                                                                                           model=alphapeptdeep_best_model):
-                    model_to_use = alphapeptdeep_best_model
-                    logger.info(f"Using best model: {alphapeptdeep_best_model} with correlation: {alphapeptdeep_best_corr:.4f}")
+                    logger.info(
+                        f"Using best model: {alphapeptdeep_best_model} with correlation: {alphapeptdeep_best_corr:.4f}")
                 else:
                     # Fallback to original model if best model doesn't validate
-                    if alphapeptdeep_generator.validate_features(psm_list, psms_df, model=original_model):
+                    if alphapeptdeep_generator.validate_features(psm_list, psms_df, model=alphapeptdeep_best_model):
                         logger.warning("Best model validation failed, falling back to original model")
                     else:
                         logger.error("Both best model and original model validation failed")
