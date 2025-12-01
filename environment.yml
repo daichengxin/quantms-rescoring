@@ -19,4 +19,4 @@ dependencies:
   - pytest
   - ms2pip>=4.0
   - pip:
-    - peptdeep=1.4.0
+    - peptdeep==1.4.0
