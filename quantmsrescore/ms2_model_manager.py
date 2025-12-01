@@ -1,5 +1,5 @@
 import pandas as pd
-from peptdeep.pretrained_models import ModelManager, _download_models, MODEL_ZIP_FILE_PATH, \
+from peptdeep.pretrained_models import ModelManager, _download_models, model_mgr_settings, MODEL_ZIP_FILE_PATH, \
     psm_sampling_with_important_mods
 from peptdeep.model.ms2 import pDeepModel
 from peptdeep.model.rt import AlphaRTModel
@@ -7,7 +7,6 @@ from peptdeep.model.ccs import AlphaCCSModel
 from peptdeep.model.charge import ChargeModelForModAASeq
 import os
 from peptdeep.utils import logging
-from zipfile import ZipFile
 
 
 class MS2ModelManager(ModelManager):
