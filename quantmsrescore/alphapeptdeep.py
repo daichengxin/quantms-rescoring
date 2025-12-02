@@ -1,9 +1,6 @@
-import os.path
-
 import pandas as pd
 from peptdeep.pretrained_models import ModelManager
 from peptdeep.mass_spec.match import match_centroid_mz
-from peptdeep.model.ms2 import pDeepModel
 from alphabase.peptide.fragment import create_fragment_mz_dataframe
 from ms2rescore.feature_generators.base import FeatureGeneratorBase, FeatureGeneratorException
 from typing import Optional, Tuple, List, Union, Generator, Dict, Any
