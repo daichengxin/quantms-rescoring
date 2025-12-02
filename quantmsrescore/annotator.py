@@ -78,8 +78,9 @@ class FeatureAnnotator:
         save_retrain_model: bool, optional
             Save retrained MS2 model.
             Defaults to False.
-        epoch_to_train_ms2: bool, optional
-            Epoch to train AlphaPeptDeep MS2 model.
+        epoch_to_train_ms2: int, optional
+            Epochs to train AlphaPeptDeep MS2 model.
+            Defaults to 20.
         Raises
         ------
         ValueError
@@ -432,6 +433,13 @@ class FeatureAnnotator:
         """
         logger.info("Finding best MS2 model for the dataset")
 
+        # Initialize AlphaPeptDeep annotator
+        try:
+            alphapeptdeep_generator = self._create_alphapeptdeep_annotator(model="generic")
+        except Exception as e:
+            logger.error(f"Failed to initialize AlphaPeptDeep: {e}")
+            raise
+
         # Initialize MS2PIP annotator
         if self._ms2_tolerance_unit == "Da":
             try:
@@ -441,13 +449,9 @@ class FeatureAnnotator:
             except Exception as e:
                 logger.error(f"Failed to initialize MS2PIP: {e}")
                 raise
-
-        # Initialize AlphaPeptDeep annotator
-        try:
-            alphapeptdeep_generator = self._create_alphapeptdeep_annotator(model="generic")
-        except Exception as e:
-            logger.error(f"Failed to initialize AlphaPeptDeep: {e}")
-            raise
+        else:
+            original_model = alphapeptdeep_generator.model
+            model_to_use = original_model
 
         # Get PSM list
         psm_list = self._idxml_reader.psms
