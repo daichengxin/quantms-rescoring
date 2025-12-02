@@ -484,6 +484,7 @@ class FeatureAnnotator:
                 logger.info("Running MS2PIP model")
                 ms2pip_best_model, ms2pip_best_corr = ms2pip_generator._find_best_ms2pip_model(calibration_set)
             else:
+                logger.info("MS2PIP model don't support ppm tolerance unit. Only consider AlphaPeptDeep model")
                 original_model = alphapeptdeep_best_model
 
             if alphapeptdeep_best_corr > ms2pip_best_corr:
