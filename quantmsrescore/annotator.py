@@ -450,7 +450,8 @@ class FeatureAnnotator:
                 f"Using best model: {alphapeptdeep_best_model} with correlation: {alphapeptdeep_best_corr:.4f}")
         else:
             # Fallback to original model if best model doesn't validate
-            if alphapeptdeep_generator.validate_features(psm_list, psms_df, model=original_model):
+            if alphapeptdeep_generator.validate_features(psm_list=psm_list, psms_df=psms_df,
+                                                         model=original_model):
                 logger.warning("Best model validation failed, falling back to original model")
                 model_to_use = original_model
             else:
