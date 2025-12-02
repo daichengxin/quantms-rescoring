@@ -513,8 +513,10 @@ class FeatureAnnotator:
                     logger.info(f"Using best model: {model_to_use} with correlation: {ms2pip_best_corr:.4f}")
                 else:
                     # Fallback to original model if best model doesn't validate
-                    if ms2pip_generator.validate_features(psm_list, model=original_model):
+                    if ms2pip_generator.validate_features(psm_list,
+                                                          model=original_model if original_model != "generic" else "HCD2021"):
                         logger.warning("Best model validation failed, falling back to original model")
+                        model_to_use = original_model if original_model != "generic" else "HCD2021"
                     else:
                         logger.error("Both best model and original model validation failed")
                         return  # Exit early since no valid model is available
