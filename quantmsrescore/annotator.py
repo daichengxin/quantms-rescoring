@@ -72,6 +72,8 @@ class FeatureAnnotator:
             If modloss ions are considered in the ms2 model. `modloss`
             ions are mostly useful for phospho MS2 prediction model.
             Defaults to True.
+        transfer_learning : bool, required
+            Whether to use MS2 transfer learning. Set to True to enable transfer learning for MS2 model.
         transfer_learning_test_ratio: float, optional
             The ratio of test data for MS2 transfer learning.
             Defaults to 0.3.
