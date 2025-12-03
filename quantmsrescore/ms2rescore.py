@@ -126,7 +126,7 @@ configure_logging()
               help="Save retrained AlphaPeptDeep MS2 model weights",
               is_flag=True)
 @click.option("--epoch_to_train_ms2",
-              help="Epoch to train AlphaPeptDeep MS2 model",
+              help="Epochs to train AlphaPeptDeep MS2 model",
               type=int,
               default=20)
 @click.pass_context
