@@ -761,6 +761,38 @@ def custom_correlate(
 def ms2_fine_tune(enumerated_psm_list, psms_df, spec_file, spectrum_id_pattern, model_mgr,
                   ms2_tolerance, ms2_tolerance_unit, processes, consider_modloss, higher_score_better,
                   calibration_set_size, transfer_learning, transfer_learning_test_ratio, epoch_to_train_ms2):
+    """
+    Fine-tunes the MS2 prediction model using transfer learning on a calibration set of PSMs.
+
+    This function selects a subset of high-confidence PSMs, splits them into calibration and test sets,
+    and performs transfer learning on the MS2 prediction model. It then predicts MS2 spectra for all PSMs
+    using the (optionally) fine-tuned model.
+
+    Args:
+        enumerated_psm_list (List[PSM]): List of PSM objects to use for calibration and prediction.
+        psms_df (pd.DataFrame): DataFrame containing precursor information for all PSMs.
+        spec_file (str or Path): Path to the spectrum file containing observed spectra.
+        spectrum_id_pattern (str): Regex pattern to extract spectrum IDs from the spectrum file.
+        model_mgr (ModelManager): The MS2 prediction model manager instance.
+        ms2_tolerance (float): Tolerance for matching fragment ions (in Da or ppm).
+        ms2_tolerance_unit (str): Unit for ms2_tolerance ("Da" or "ppm").
+        processes (int or None): Number of processes to use for parallel prediction.
+        consider_modloss (bool): Whether to consider modification losses in fragment ion types.
+        higher_score_better (bool): If True, higher PSM scores are better; otherwise, lower scores are better.
+        calibration_set_size (float): Fraction of PSMs to use for calibration (transfer learning).
+        transfer_learning (bool): Whether to perform transfer learning on the MS2 model.
+        transfer_learning_test_ratio (float): Fraction of calibration set to use as test set during transfer learning.
+        epoch_to_train_ms2 (int): Number of epochs to train the MS2 model during transfer learning.
+
+    Returns:
+        Tuple[List[ProcessingResult], Any]: A tuple containing:
+            - List of ProcessingResult objects for each PSM, including predicted and observed spectra and scores.
+            - Model weights or state after (optional) transfer learning.
+
+    Raises:
+        Exception: If any error occurs during transfer learning or prediction.
+
+    """
     if consider_modloss:
         frag_types = ['b_z1', 'y_z1', 'b_z2', 'y_z2',
                       'b_modloss_z1', 'b_modloss_z2',
