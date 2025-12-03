@@ -106,13 +106,13 @@ class FeatureAnnotator:
         self._deepLC = "deeplc" in feature_annotators
         if "ms2pip" in feature_annotators and ms2_tolerance_unit == "Da":
             self._ms2pip = True
+        elif "ms2pip" in feature_annotators and ms2_tolerance_unit == "ppm":
+            raise ValueError(
+                "MS2PIP only supports Da units. Please remove 'ms2pip' from feature_generators or set ms2_tolerance_unit to 'Da'.")
         else:
             self._ms2pip = False
         if "alphapeptdeep" in feature_annotators:
             self._alphapeptdeep = True
-        elif "ms2pip" in feature_annotators and ms2_tolerance_unit == "ppm":
-            self._alphapeptdeep = True
-            logger.warning("MS2PIP only supports Da units. AlphaPeptDeep is enabled when setting ppm tolerance!")
         else:
             self._alphapeptdeep = False
         self.ms2_generator = None
@@ -424,10 +424,10 @@ class FeatureAnnotator:
             force_model=self._force_model
         )
 
-    def _apply_alphapeptdeep_model(self, alphapeptdeep_generator, alphapeptdeep_best_model,
-                                   alphapeptdeep_best_corr, psm_list, psms_df, original_model):
+    def _validate_and_apply_alphapeptdeep_model(self, alphapeptdeep_generator, alphapeptdeep_best_model,
+                                                alphapeptdeep_best_corr, psm_list, psms_df, original_model):
         """
-        Apply AlphaPeptDeep model to the PSM list.
+        Validate and apply AlphaPeptDeep model to the PSM list, with fallback to original model if needed.
 
         Parameters
         ----------
@@ -490,13 +490,11 @@ class FeatureAnnotator:
             try:
                 ms2pip_generator = self._create_ms2pip_annotator()
                 original_model = ms2pip_generator.model
-                model_to_use = original_model
             except Exception as e:
                 logger.error(f"Failed to initialize MS2PIP: {e}")
                 raise
         else:
             original_model = alphapeptdeep_generator.model
-            model_to_use = original_model
 
         # Get PSM list
         psm_list = self._idxml_reader.psms
@@ -529,22 +527,22 @@ class FeatureAnnotator:
                 logger.info("Running MS2PIP model")
                 ms2pip_best_model, ms2pip_best_corr = ms2pip_generator._find_best_ms2pip_model(calibration_set)
             else:
-                logger.info("MS2PIP model don't support ppm tolerance unit. Only consider AlphaPeptDeep model")
+                logger.info("MS2PIP model doesn't support ppm tolerance unit. Only consider AlphaPeptDeep model")
 
             # When using ppm tolerance, only AlphaPeptDeep is supported
             if self._ms2_tolerance_unit != "Da":
                 alphapeptdeep_original_model = alphapeptdeep_generator.model
-                if not self._apply_alphapeptdeep_model(alphapeptdeep_generator, alphapeptdeep_best_model,
-                                                       alphapeptdeep_best_corr, psm_list, psms_df,
-                                                       alphapeptdeep_original_model):
+                if not self._validate_and_apply_alphapeptdeep_model(alphapeptdeep_generator, alphapeptdeep_best_model,
+                                                                    alphapeptdeep_best_corr, psm_list, psms_df,
+                                                                    alphapeptdeep_original_model):
                     return  # Exit early since no valid model is available
 
             # When using Da tolerance, compare AlphaPeptDeep and MS2PIP
             elif alphapeptdeep_best_corr > ms2pip_best_corr:
                 alphapeptdeep_original_model = alphapeptdeep_generator.model
-                if not self._apply_alphapeptdeep_model(alphapeptdeep_generator, alphapeptdeep_best_model,
-                                                       alphapeptdeep_best_corr, psm_list, psms_df,
-                                                       alphapeptdeep_original_model):
+                if not self._validate_and_apply_alphapeptdeep_model(alphapeptdeep_generator, alphapeptdeep_best_model,
+                                                                    alphapeptdeep_best_corr, psm_list, psms_df,
+                                                                    alphapeptdeep_original_model):
                     return  # Exit early since no valid model is available
 
             else:

@@ -125,7 +125,7 @@ class MS2ModelManager(ModelManager):
                         "please reduce the `psm_num_to_train_ms2` "
                         "value according to overall PSM numbers. "
                     )
-                    test_psm_df = []
+                    test_psm_df = pd.DataFrame()
             else:
                 test_psm_df = psm_df.copy()
                 tr_inten_df = pd.DataFrame()

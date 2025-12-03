@@ -189,6 +189,8 @@ def msrescore2feature(
         Whether to find the model with the best performance.
     ms2_tolerance : float
         The tolerance for MS²PIP annotation.
+    ms2_tolerance_unit : str, optional
+        Unit for the fragment mass tolerance, e.g. "Da" or "ppm".
     calibration_set_size : float
         The percentage of PSMs to use for calibration and retraining.
     valid_correlations_size: float
