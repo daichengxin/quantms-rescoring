@@ -422,6 +422,49 @@ class FeatureAnnotator:
             force_model=self._force_model
         )
 
+    def _apply_alphapeptdeep_model(self, alphapeptdeep_generator, alphapeptdeep_best_model,
+                                   alphapeptdeep_best_corr, psm_list, psms_df, original_model):
+        """
+        Apply AlphaPeptDeep model to the PSM list.
+
+        Parameters
+        ----------
+        alphapeptdeep_generator : AlphaPeptDeepAnnotator
+            The AlphaPeptDeep annotator instance.
+        alphapeptdeep_best_model : str
+            The best model to use.
+        alphapeptdeep_best_corr : float
+            The correlation of the best model.
+        psm_list : PSMList
+            List of PSMs to annotate.
+        psms_df : pd.DataFrame
+            DataFrame of PSMs.
+        original_model : str
+            The original/fallback model to use if best model validation fails.
+        """
+        model_to_use = alphapeptdeep_best_model  # AlphaPeptdeep only has generic model
+        if alphapeptdeep_best_model and alphapeptdeep_generator.validate_features(psm_list=psm_list,
+                                                                                  psms_df=psms_df,
+                                                                                  model=alphapeptdeep_best_model):
+            logger.info(
+                f"Using best model: {alphapeptdeep_best_model} with correlation: {alphapeptdeep_best_corr:.4f}")
+        else:
+            # Fallback to original model if best model doesn't validate
+            if alphapeptdeep_generator.validate_features(psm_list=psm_list, psms_df=psms_df,
+                                                         model=original_model):
+                logger.warning("Best model validation failed, falling back to original model")
+                model_to_use = original_model
+            else:
+                logger.error("Both best model and original model validation failed")
+                return False  # Indicate failure
+
+        # Apply the selected model
+        alphapeptdeep_generator.model = model_to_use
+        alphapeptdeep_generator.add_features(psm_list, psms_df)
+        logger.info(f"Successfully applied AlphaPeptDeep annotation using model: {model_to_use}")
+        self.ms2_generator = "AlphaPeptDeep"
+        return True  # Indicate success
+
     def _find_and_apply_ms2_model(self):
         """
         Find and apply the best MS2 model for the dataset.
@@ -485,30 +528,25 @@ class FeatureAnnotator:
                 ms2pip_best_model, ms2pip_best_corr = ms2pip_generator._find_best_ms2pip_model(calibration_set)
             else:
                 logger.info("MS2PIP model don't support ppm tolerance unit. Only consider AlphaPeptDeep model")
-                original_model = alphapeptdeep_best_model
 
-            if alphapeptdeep_best_corr > ms2pip_best_corr:
-                model_to_use = alphapeptdeep_best_model  # AlphaPeptdeep only has generic model
-                if alphapeptdeep_best_model and alphapeptdeep_generator.validate_features(psm_list=psm_list,
-                                                                                          psms_df=psms_df,
-                                                                                          model=alphapeptdeep_best_model):
-                    logger.info(
-                        f"Using best model: {alphapeptdeep_best_model} with correlation: {alphapeptdeep_best_corr:.4f}")
-                else:
-                    # Fallback to original model if best model doesn't validate
-                    if alphapeptdeep_generator.validate_features(psm_list, psms_df, model=alphapeptdeep_best_model):
-                        logger.warning("Best model validation failed, falling back to original model")
-                    else:
-                        logger.error("Both best model and original model validation failed")
-                        return  # Exit early since no valid model is available
+            # When using ppm tolerance, only AlphaPeptDeep is supported
+            if self._ms2_tolerance_unit != "Da":
+                alphapeptdeep_original_model = alphapeptdeep_generator.model
+                if not self._apply_alphapeptdeep_model(alphapeptdeep_generator, alphapeptdeep_best_model,
+                                                       alphapeptdeep_best_corr, psm_list, psms_df,
+                                                       alphapeptdeep_original_model):
+                    return  # Exit early since no valid model is available
 
-                # Apply the selected model
-                alphapeptdeep_generator.model = model_to_use
-                alphapeptdeep_generator.add_features(psm_list, psms_df)
-                logger.info(f"Successfully applied AlphaPeptDeep annotation using model: {model_to_use}")
-                self.ms2_generator = "AlphaPeptDeep"
+            # When using Da tolerance, compare AlphaPeptDeep and MS2PIP
+            elif alphapeptdeep_best_corr > ms2pip_best_corr:
+                alphapeptdeep_original_model = alphapeptdeep_generator.model
+                if not self._apply_alphapeptdeep_model(alphapeptdeep_generator, alphapeptdeep_best_model,
+                                                       alphapeptdeep_best_corr, psm_list, psms_df,
+                                                       alphapeptdeep_original_model):
+                    return  # Exit early since no valid model is available
 
             else:
+                # Use MS2PIP when Da tolerance and ms2pip has better correlation
                 if ms2pip_best_model and ms2pip_generator.validate_features(psm_list=psm_list, model=ms2pip_best_model):
                     model_to_use = ms2pip_best_model
                     logger.info(f"Using best model: {model_to_use} with correlation: {ms2pip_best_corr:.4f}")
