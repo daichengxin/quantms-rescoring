@@ -231,11 +231,28 @@ def download_models(model_dir: Optional[str], log_level: str, models: str) -> No
     # Configure logging
     configure_logging(log_level.upper())
 
+    # Validate model names
+    VALID_MODELS = {"ms2pip", "deeplc", "alphapeptdeep"}
+
     # Convert model_dir to Path if provided
     target_dir = Path(model_dir) if model_dir else None
 
-    # Parse models list
+    # Parse and validate models list
     models_list = [m.strip().lower() for m in models.split(",")]
+    invalid_models = [m for m in models_list if m not in VALID_MODELS and m]
+
+    if invalid_models:
+        error_msg = (
+            f"Invalid model name(s): {', '.join(invalid_models)}. "
+            f"Valid options are: {', '.join(sorted(VALID_MODELS))}"
+        )
+        logger.error(error_msg)
+        raise click.BadParameter(error_msg)
+
+    if not models_list or all(not m for m in models_list):
+        error_msg = "No models specified. Please provide at least one model to download."
+        logger.error(error_msg)
+        raise click.BadParameter(error_msg)
 
     logger.info("Starting model download process...")
     if target_dir:
@@ -281,9 +298,14 @@ def download_models(model_dir: Optional[str], log_level: str, models: str) -> No
 
     if failed_models:
         logger.error(f"Failed to download: {', '.join(failed_models)}")
-        raise click.ClickException(
-            f"Failed to download some models: {', '.join(failed_models)}"
+        error_msg = (
+            f"Failed to download some models: {', '.join(failed_models)}.\n"
+            "Troubleshooting tips:\n"
+            "  - Check your internet connection\n"
+            "  - Ensure required packages are installed (ms2pip, deeplc, peptdeep)\n"
+            "  - Check the log messages above for specific error details"
         )
+        raise click.ClickException(error_msg)
     else:
         logger.info("All requested models downloaded successfully!")
         logger.info("\nYou can now use quantms-rescoring in offline environments.")
