@@ -74,9 +74,15 @@ configure_logging()
 )
 @click.option(
     "--ms2_tolerance",
-    help="Fragment mass tolerance [Da](default: `0.05`)",
+    help="Fragment mass tolerance (default: `0.05`)",
     type=float,
     default=0.05,
+)
+@click.option(
+    "--ms2_tolerance_unit",
+    help="Fragment mass tolerance unit (default: Da)",
+    type=click.Choice(['Da', 'ppm'], case_sensitive=False),
+    default="Da",
 )
 @click.option(
     "--calibration_set_size",
@@ -110,27 +116,45 @@ configure_logging()
     help="If modloss ions are considered in the ms2 model",
     is_flag=True,
 )
+@click.option("--transfer_learning",
+              help="Enabling transfer learning for AlphaPeptDeep MS2 prediction",
+              is_flag=True)
+@click.option("--transfer_learning_test_ratio",
+              help="The ratio of test data for MS2 transfer learning",
+              default=0.30)
+@click.option("--save_retrain_model",
+              help="Save retrained AlphaPeptDeep MS2 model weights",
+              is_flag=True)
+@click.option("--epoch_to_train_ms2",
+              help="Epochs to train AlphaPeptDeep MS2 model",
+              type=int,
+              default=20)
 @click.pass_context
 def msrescore2feature(
-    ctx,
-    idxml: str,
-    mzml,
-    output: str,
-    log_level,
-    processes,
-    feature_generators,
-    only_features,
-    ms2_model_dir,
-    ms2_model,
-    force_model,
-    find_best_model,
-    ms2_tolerance,
-    calibration_set_size,
-    valid_correlations_size,
-    skip_deeplc_retrain,
-    spectrum_id_pattern: str,
-    psm_id_pattern: str,
-    consider_modloss
+        ctx,
+        idxml: str,
+        mzml,
+        output: str,
+        log_level,
+        processes,
+        feature_generators,
+        force_model,
+        find_best_model,
+        only_features,
+        ms2_model,
+        ms2_model_dir,
+        ms2_tolerance,
+        ms2_tolerance_unit,
+        calibration_set_size,
+        valid_correlations_size,
+        skip_deeplc_retrain,
+        spectrum_id_pattern: str,
+        psm_id_pattern: str,
+        consider_modloss,
+        transfer_learning,
+        transfer_learning_test_ratio,
+        save_retrain_model,
+        epoch_to_train_ms2
 ):
     """
     Annotate PSMs in an idXML file with additional features using specified models.
@@ -165,6 +189,8 @@ def msrescore2feature(
         Whether to find the model with the best performance.
     ms2_tolerance : float
         The tolerance for MS²PIP annotation.
+    ms2_tolerance_unit : str, optional
+        Unit for the fragment mass tolerance, e.g. "Da" or "ppm".
     calibration_set_size : float
         The percentage of PSMs to use for calibration and retraining.
     valid_correlations_size: float
@@ -177,8 +203,19 @@ def msrescore2feature(
         The regex pattern for PSM IDs.
     consider_modloss: bool, optional
         If modloss ions are considered in the ms2 model. `modloss`
-        ions are mostly useful for phospho MS2 prediciton model.
+        ions are mostly useful for phospho MS2 prediction model.
         Defaults to True.
+    transfer_learning: bool, optional
+        Enabling transfer learning for AlphaPeptDeep MS2 prediction.
+        Defaults to False.
+    transfer_learning_test_ratio: float, optional
+        The ratio of test data for MS2 transfer learning.
+        Defaults to 0.3.
+    save_retrain_model: bool, optional
+        Save retrained MS2 model.
+        Defaults to False.
+    epoch_to_train_ms2: int, optional
+        Number of epochs to train AlphaPeptDeep MS2 model. Defaults to 20.
     """
 
     annotator = FeatureAnnotator(
@@ -189,6 +226,7 @@ def msrescore2feature(
         find_best_model=find_best_model,
         ms2_model_path=ms2_model_dir,
         ms2_tolerance=ms2_tolerance,
+        ms2_tolerance_unit=ms2_tolerance_unit,
         calibration_set_size=calibration_set_size,
         valid_correlations_size=valid_correlations_size,
         skip_deeplc_retrain=skip_deeplc_retrain,
@@ -196,7 +234,11 @@ def msrescore2feature(
         log_level=log_level.upper(),
         spectrum_id_pattern=spectrum_id_pattern,
         psm_id_pattern=psm_id_pattern,
-        consider_modloss=consider_modloss
+        consider_modloss=consider_modloss,
+        transfer_learning=transfer_learning,
+        transfer_learning_test_ratio=transfer_learning_test_ratio,
+        save_retrain_model=save_retrain_model,
+        epoch_to_train_ms2=epoch_to_train_ms2
     )
     annotator.build_idxml_data(idxml, mzml)
     annotator.annotate()

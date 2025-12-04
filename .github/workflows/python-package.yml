@@ -20,6 +20,11 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+    - name: Remove unnecessary files to release disk space
+      run: |
+        df -h
+        rm -rf /opt/hostedtoolcache
+        df -h
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v3
       with:
