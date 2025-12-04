@@ -51,14 +51,14 @@ def download_deeplc_models(model_dir: Optional[Path] = None) -> None:
 
     DeepLC models are automatically downloaded when the DeepLC predictor is
     first instantiated. This function triggers that download by creating
-    a temporary DeepLC instance.
+    a temporary DeepLC instance. Models are always downloaded to the default
+    DeepLC cache directory.
 
     Parameters
     ----------
     model_dir : Path, optional
-        Target directory for models. If provided, models will be downloaded
-        to this location. Otherwise, they will be downloaded to the default
-        DeepLC cache directory.
+        Not used for DeepLC (kept for API consistency).
+        DeepLC always uses its default cache directory.
 
     Raises
     ------
@@ -70,7 +70,7 @@ def download_deeplc_models(model_dir: Optional[Path] = None) -> None:
     try:
         from deeplc import DeepLC
         logger.info("Downloading DeepLC models...")
-        
+
         # Initialize DeepLC to trigger model download
         # This will download models to the default cache location
         try:
@@ -83,7 +83,7 @@ def download_deeplc_models(model_dir: Optional[Path] = None) -> None:
         except Exception as e:
             logger.error(f"Failed to initialize DeepLC: {e}")
             raise
-                
+
     except ImportError as e:
         logger.error("DeepLC package not found. Please install deeplc>=3.0")
         raise
@@ -114,27 +114,27 @@ def download_alphapeptdeep_models(model_dir: Optional[Path] = None) -> None:
             MODEL_ZIP_FILE_PATH,
             _download_models,
         )
-        
+
         logger.info("Downloading AlphaPeptDeep models...")
-        
+
         # Download models to default location
         _download_models(MODEL_ZIP_FILE_PATH)
-        
+
         logger.info("AlphaPeptDeep models downloaded successfully.")
         logger.info(f"Models cached at: {MODEL_ZIP_FILE_PATH}")
-        
+
         # If a custom model_dir is specified, copy models there
         if model_dir:
             model_dir = Path(model_dir)
             model_dir.mkdir(parents=True, exist_ok=True)
-            
+
             # The models are stored in the peptdeep package directory
             # We need to find where they are cached
             # Import is done here to find the actual installation path at runtime
             import peptdeep  # noqa: F401 - imported for path detection
             peptdeep_path = Path(peptdeep.__file__).parent
             models_path = peptdeep_path / "pretrained_models"
-            
+
             if models_path.exists():
                 logger.info(f"Copying models to {model_dir}...")
                 for model_file in models_path.glob("*.pth"):
@@ -146,7 +146,7 @@ def download_alphapeptdeep_models(model_dir: Optional[Path] = None) -> None:
                     f"Could not find models at {models_path}. "
                     "Models are still available in the default cache."
                 )
-                
+
     except ImportError as e:
         logger.error("peptdeep package not found. Please install peptdeep")
         raise
@@ -205,24 +205,24 @@ def download_models(model_dir: Optional[str], log_level: str, models: str) -> No
     """
     # Configure logging
     configure_logging(log_level.upper())
-    
+
     # Convert model_dir to Path if provided
     target_dir = Path(model_dir) if model_dir else None
-    
+
     # Parse models list
     models_list = [m.strip().lower() for m in models.split(",")]
-    
+
     logger.info("Starting model download process...")
     if target_dir:
         logger.info(f"Target directory: {target_dir}")
         target_dir.mkdir(parents=True, exist_ok=True)
     else:
         logger.info("Using default cache locations for each model type")
-    
+
     # Download requested models
     success_count = 0
     failed_models = []
-    
+
     if "ms2pip" in models_list:
         try:
             logger.info("\n=== Downloading MS2PIP models ===")
@@ -231,7 +231,7 @@ def download_models(model_dir: Optional[str], log_level: str, models: str) -> No
         except Exception as e:
             logger.error(f"Failed to download MS2PIP models: {e}")
             failed_models.append("ms2pip")
-    
+
     if "deeplc" in models_list:
         try:
             logger.info("\n=== Downloading DeepLC models ===")
@@ -240,7 +240,7 @@ def download_models(model_dir: Optional[str], log_level: str, models: str) -> No
         except Exception as e:
             logger.error(f"Failed to download DeepLC models: {e}")
             failed_models.append("deeplc")
-    
+
     if "alphapeptdeep" in models_list:
         try:
             logger.info("\n=== Downloading AlphaPeptDeep models ===")
@@ -249,11 +249,11 @@ def download_models(model_dir: Optional[str], log_level: str, models: str) -> No
         except Exception as e:
             logger.error(f"Failed to download AlphaPeptDeep models: {e}")
             failed_models.append("alphapeptdeep")
-    
+
     # Summary
     logger.info("\n=== Download Summary ===")
     logger.info(f"Successfully downloaded: {success_count}/{len(models_list)} model types")
-    
+
     if failed_models:
         logger.error(f"Failed to download: {', '.join(failed_models)}")
         raise click.ClickException(
