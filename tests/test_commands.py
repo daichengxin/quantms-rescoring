@@ -352,3 +352,29 @@ def test_psm_clean():
         ],
     )
     assert result.exit_code == 0
+
+
+def test_download_models_help():
+    """Test that download_models command is accessible and shows help."""
+    runner = CliRunner()
+    result = runner.invoke(cli, ["download_models", "--help"])
+    
+    assert result.exit_code == 0
+    assert "Download all required models" in result.output or "download_models" in result.output
+
+
+@pytest.mark.skip(reason="Requires internet connection and model downloads, skip for CI")
+def test_download_models_ms2pip_only():
+    """Test downloading only MS2PIP models."""
+    runner = CliRunner()
+    result = runner.invoke(
+        cli,
+        [
+            "download_models",
+            "--models",
+            "ms2pip",
+            "--log_level",
+            "info",
+        ],
+    )
+    assert result.exit_code == 0

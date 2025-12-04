@@ -30,6 +30,11 @@ Incorporates additional features from SAGE into idXML files.
 ```
 Add additional spectrum feature like signal-to-noise to each PSM in the idXML.
 
+```sh
+ rescoring download_models --help
+```
+Download all required models (MS2PIP, DeepLC, AlphaPeptDeep) for offline use. This is useful for running quantms-rescoring in environments without internet access, such as HPC clusters.
+
 ## Advanced Algorithms and Improvements
 
 quantms-rescoring significantly enhances the capabilities of MS2PIP, DeepLC, and MS2Rescore through several innovative approaches:
@@ -281,6 +286,31 @@ Install quantms-rescoring using one of the following methods:
 # Test the image
 ❯ ./scripts/test-docker.sh latest
 ```
+
+### Offline Model Download
+
+For environments without internet access (e.g., HPC clusters), you can download all required models ahead of time using the `download_models` command:
+
+```sh
+# Download all models to default cache locations
+❯ rescoring download_models
+
+# Download models to a specific directory
+❯ rescoring download_models --model_dir /path/to/models
+
+# Download only specific models
+❯ rescoring download_models --models deeplc,alphapeptdeep
+
+# Get help
+❯ rescoring download_models --help
+```
+
+This command downloads models for:
+- **MS2PIP**: Fragment ion intensity prediction models (bundled with ms2pip package)
+- **DeepLC**: Retention time prediction models
+- **AlphaPeptDeep**: MS2 spectrum, retention time, and CCS prediction models
+
+Once downloaded, you can transfer the models to your offline environment and use them with the `--ms2_model_dir` option in the `msrescore2feature` command.
 
 ### TODO
 
