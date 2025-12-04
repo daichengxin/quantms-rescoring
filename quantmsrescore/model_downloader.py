@@ -17,6 +17,42 @@ from quantmsrescore.logging_config import configure_logging, get_logger
 logger = get_logger(__name__)
 
 
+def _get_package_models_path(package_name: str, models_subdir: str = "pretrained_models") -> Optional[Path]:
+    """
+    Get the path to a package's models directory.
+
+    Uses importlib for robust package path detection with fallback to direct import.
+
+    Parameters
+    ----------
+    package_name : str
+        Name of the package to locate.
+    models_subdir : str
+        Subdirectory containing models (default: "pretrained_models").
+
+    Returns
+    -------
+    Path or None
+        Path to models directory if found, None otherwise.
+    """
+    try:
+        from importlib.util import find_spec
+        spec = find_spec(package_name)
+        if spec and spec.origin:
+            package_path = Path(spec.origin).parent
+        else:
+            # Fallback to direct import if spec doesn't have origin
+            package_module = __import__(package_name)
+            package_path = Path(package_module.__file__).parent
+
+        models_path = package_path / models_subdir
+        return models_path if models_path.exists() else None
+
+    except (ImportError, AttributeError, TypeError) as e:
+        logger.debug(f"Could not locate {package_name} package directory: {e}")
+        return None
+
+
 def download_ms2pip_models(model_dir: Optional[Path] = None) -> None:
     """
     Download MS2PIP models.
@@ -128,23 +164,12 @@ def download_alphapeptdeep_models(model_dir: Optional[Path] = None) -> None:
             model_dir = Path(model_dir)
             model_dir.mkdir(parents=True, exist_ok=True)
 
-            # The models are stored in the peptdeep package directory
-            # We need to find where they are cached
-            # Use importlib for more robust package path detection
-            try:
-                from importlib.util import find_spec
-                spec = find_spec("peptdeep")
-                if spec and spec.origin:
-                    peptdeep_path = Path(spec.origin).parent
-                    models_path = peptdeep_path / "pretrained_models"
-                else:
-                    # Fallback to direct import if spec doesn't have origin
-                    import peptdeep
-                    peptdeep_path = Path(peptdeep.__file__).parent
-                    models_path = peptdeep_path / "pretrained_models"
-            except (ImportError, AttributeError):
+            # Find the peptdeep models directory
+            models_path = _get_package_models_path("peptdeep", "pretrained_models")
+
+            if not models_path:
                 logger.warning(
-                    "Could not locate peptdeep package directory. "
+                    "Could not locate peptdeep package models directory. "
                     "Models are still available in the default cache."
                 )
                 return
@@ -238,8 +263,9 @@ def download_models(model_dir: Optional[str], log_level: str, models: str) -> No
     target_dir = Path(model_dir) if model_dir else None
 
     # Parse and validate models list
-    models_list = [m.strip().lower() for m in models.split(",")]
-    invalid_models = [m for m in models_list if m not in VALID_MODELS and m]
+    # Filter out empty strings from split result
+    models_list = [m.strip().lower() for m in models.split(",") if m.strip()]
+    invalid_models = [m for m in models_list if m not in VALID_MODELS]
 
     if invalid_models:
         error_msg = (
@@ -249,7 +275,7 @@ def download_models(model_dir: Optional[str], log_level: str, models: str) -> No
         logger.error(error_msg)
         raise click.BadParameter(error_msg)
 
-    if not models_list or all(not m for m in models_list):
+    if not models_list:
         error_msg = "No models specified. Please provide at least one model to download."
         logger.error(error_msg)
         raise click.BadParameter(error_msg)
