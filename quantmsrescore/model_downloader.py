@@ -5,9 +5,7 @@ This module provides functionality to download all required models for MS2PIP,
 DeepLC, and AlphaPeptDeep ahead of time for offline use.
 """
 
-import os
 import shutil
-import tempfile
 from pathlib import Path
 from typing import Optional
 
@@ -75,17 +73,16 @@ def download_deeplc_models(model_dir: Optional[Path] = None) -> None:
         
         # Initialize DeepLC to trigger model download
         # This will download models to the default cache location
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            try:
-                predictor = DeepLC(
-                    n_jobs=1,
-                    verbose=False,
-                )
-                logger.info("DeepLC models downloaded successfully.")
-                logger.info("Models are cached in the DeepLC default directory.")
-            except Exception as e:
-                logger.error(f"Failed to initialize DeepLC: {e}")
-                raise
+        try:
+            predictor = DeepLC(
+                n_jobs=1,
+                verbose=False,
+            )
+            logger.info("DeepLC models downloaded successfully.")
+            logger.info("Models are cached in the DeepLC default directory.")
+        except Exception as e:
+            logger.error(f"Failed to initialize DeepLC: {e}")
+            raise
                 
     except ImportError as e:
         logger.error("DeepLC package not found. Please install deeplc>=3.0")
@@ -133,7 +130,8 @@ def download_alphapeptdeep_models(model_dir: Optional[Path] = None) -> None:
             
             # The models are stored in the peptdeep package directory
             # We need to find where they are cached
-            import peptdeep
+            # Import is done here to find the actual installation path at runtime
+            import peptdeep  # noqa: F401 - imported for path detection
             peptdeep_path = Path(peptdeep.__file__).parent
             models_path = peptdeep_path / "pretrained_models"
             

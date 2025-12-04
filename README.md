@@ -310,7 +310,7 @@ This command downloads models for:
 - **DeepLC**: Retention time prediction models
 - **AlphaPeptDeep**: MS2 spectrum, retention time, and CCS prediction models
 
-Once downloaded, you can transfer the models to your offline environment and use them with the `--ms2_model_dir` option in the `msrescore2feature` command.
+Once downloaded, you can transfer the models to your offline environment and use them with the processing commands. For AlphaPeptDeep models, use the `--ms2_model_dir` option when running `msrescore2feature`.
 
 ### TODO
 

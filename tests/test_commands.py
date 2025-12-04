@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
 
-@pytest.mark.skip(reason="This is for local test in big datasets, kipping for now")
+@pytest.mark.skip(reason="This is for local test in big datasets, skipping for now")
 def test_ms2rescore():
     runner = CliRunner()
     result = runner.invoke(
@@ -39,7 +39,7 @@ def test_ms2rescore():
     assert result.exit_code == 0
 
 
-@pytest.mark.skip(reason="This is for local test in big datasets, kipping for now")
+@pytest.mark.skip(reason="This is for local test in big datasets, skipping for now")
 def test_ms2rescore_failing():
     runner = CliRunner()
     result = runner.invoke(
@@ -202,7 +202,7 @@ def test_idxmlreader_wrong_model():
     annotator.write_idxml_file(output_file)
 
 
-@pytest.mark.skip(reason="This is for local test in big datasets, kipping for now")
+@pytest.mark.skip(reason="This is for local test in big datasets, skipping for now")
 def test_idxmlreader_failing_help():
     idxml_file = (
         TESTS_DIR
@@ -301,7 +301,7 @@ def test_version():
     assert result.exit_code == 0
 
 
-@pytest.mark.skip(reason="This is for local test in big datasets, kipping for now")
+@pytest.mark.skip(reason="This is for local test in big datasets, skipping for now")
 def test_local_file():
     runner = CliRunner()
     local_folder = TESTS_DIR / "test_data" / "dae1cb16fb57893b94bfcb731b2bf7"
