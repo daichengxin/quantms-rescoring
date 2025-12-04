@@ -130,17 +130,42 @@ def download_alphapeptdeep_models(model_dir: Optional[Path] = None) -> None:
 
             # The models are stored in the peptdeep package directory
             # We need to find where they are cached
-            # Import is done here to find the actual installation path at runtime
-            import peptdeep  # noqa: F401 - imported for path detection
-            peptdeep_path = Path(peptdeep.__file__).parent
-            models_path = peptdeep_path / "pretrained_models"
+            # Use importlib for more robust package path detection
+            try:
+                from importlib.util import find_spec
+                spec = find_spec("peptdeep")
+                if spec and spec.origin:
+                    peptdeep_path = Path(spec.origin).parent
+                    models_path = peptdeep_path / "pretrained_models"
+                else:
+                    # Fallback to direct import if spec doesn't have origin
+                    import peptdeep
+                    peptdeep_path = Path(peptdeep.__file__).parent
+                    models_path = peptdeep_path / "pretrained_models"
+            except (ImportError, AttributeError):
+                logger.warning(
+                    "Could not locate peptdeep package directory. "
+                    "Models are still available in the default cache."
+                )
+                return
 
             if models_path.exists():
                 logger.info(f"Copying models to {model_dir}...")
-                for model_file in models_path.glob("*.pth"):
-                    target_file = model_dir / model_file.name
-                    shutil.copy2(model_file, target_file)
-                    logger.info(f"Copied {model_file.name} to {target_file}")
+                # Copy all model files (support multiple extensions)
+                model_patterns = ["*.pth", "*.ckpt", "*.h5", "*.pkl"]
+                copied_files = 0
+                for pattern in model_patterns:
+                    for model_file in models_path.glob(pattern):
+                        target_file = model_dir / model_file.name
+                        shutil.copy2(model_file, target_file)
+                        logger.info(f"Copied {model_file.name} to {target_file}")
+                        copied_files += 1
+
+                if copied_files == 0:
+                    logger.warning(
+                        f"No model files found in {models_path}. "
+                        "Models are still available in the default cache."
+                    )
             else:
                 logger.warning(
                     f"Could not find models at {models_path}. "
