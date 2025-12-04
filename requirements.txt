@@ -9,4 +9,4 @@ scipy
 pygam
 protobuf
 ms2pip>=4.0
-peptdeep
+peptdeep==1.4.0

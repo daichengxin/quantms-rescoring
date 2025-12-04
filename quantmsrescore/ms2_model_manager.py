@@ -66,7 +66,7 @@ class MS2ModelManager(ModelManager):
         """
         Using matched_intensity_df to train/fine-tune the ms2 model.
 
-        1. It will sample `n=self.psm_num_to_train_ms2` PSMs into training dataframe (`tr_df`) to for fine-tuning.
+        1. It will sample `n=self.psm_num_to_train_ms2` PSMs into training dataframe (`tr_df`) for fine-tuning.
         2. This method will also consider some important PTMs (`n=self.top_n_mods_to_train`) into `tr_df` for fine-tuning.
         3. If `self.use_grid_nce_search==True`, this method will call `self.ms2_model.grid_nce_search` to find the best NCE and instrument.
 
@@ -95,7 +95,6 @@ class MS2ModelManager(ModelManager):
                         tr_inten_df[frag_type] = matched_intensity_df[frag_type]
                     else:
                         tr_inten_df[frag_type] = 0.0
-                # normalize_fragment_intensities(tr_df, tr_inten_df)
 
                 if self.use_grid_nce_search:
                     self.nce, self.instrument = self.ms2_model.grid_nce_search(
@@ -113,7 +112,7 @@ class MS2ModelManager(ModelManager):
                 else:
                     self.set_default_nce_instrument(tr_df)
         else:
-            tr_df = []
+            tr_df = pd.DataFrame()
 
         if self.psm_num_to_test_ms2 > 0:
             if len(tr_df) > 0:
@@ -126,7 +125,7 @@ class MS2ModelManager(ModelManager):
                         "please reduce the `psm_num_to_train_ms2` "
                         "value according to overall PSM numbers. "
                     )
-                    test_psm_df = []
+                    test_psm_df = pd.DataFrame()
             else:
                 test_psm_df = psm_df.copy()
                 tr_inten_df = pd.DataFrame()
@@ -137,7 +136,7 @@ class MS2ModelManager(ModelManager):
                         tr_inten_df[frag_type] = 0.0
             self.set_default_nce_instrument(test_psm_df)
         else:
-            test_psm_df = []
+            test_psm_df = pd.DataFrame()
 
         if len(test_psm_df) > 0:
             logging.info(

@@ -126,7 +126,7 @@ configure_logging()
               help="Save retrained AlphaPeptDeep MS2 model weights",
               is_flag=True)
 @click.option("--epoch_to_train_ms2",
-              help="Epoch to train AlphaPeptDeep MS2 model",
+              help="Epochs to train AlphaPeptDeep MS2 model",
               type=int,
               default=20)
 @click.pass_context
@@ -138,13 +138,13 @@ def msrescore2feature(
         log_level,
         processes,
         feature_generators,
-        only_features,
-        ms2_model_dir,
-        ms2_model,
-        ms2_tolerance,
-        ms2_tolerance_unit,
         force_model,
         find_best_model,
+        only_features,
+        ms2_model,
+        ms2_model_dir,
+        ms2_tolerance,
+        ms2_tolerance_unit,
         calibration_set_size,
         valid_correlations_size,
         skip_deeplc_retrain,
@@ -189,6 +189,8 @@ def msrescore2feature(
         Whether to find the model with the best performance.
     ms2_tolerance : float
         The tolerance for MS²PIP annotation.
+    ms2_tolerance_unit : str, optional
+        Unit for the fragment mass tolerance, e.g. "Da" or "ppm".
     calibration_set_size : float
         The percentage of PSMs to use for calibration and retraining.
     valid_correlations_size: float
@@ -201,7 +203,7 @@ def msrescore2feature(
         The regex pattern for PSM IDs.
     consider_modloss: bool, optional
         If modloss ions are considered in the ms2 model. `modloss`
-        ions are mostly useful for phospho MS2 prediciton model.
+        ions are mostly useful for phospho MS2 prediction model.
         Defaults to True.
     transfer_learning: bool, optional
         Enabling transfer learning for AlphaPeptDeep MS2 prediction.
@@ -213,7 +215,7 @@ def msrescore2feature(
         Save retrained MS2 model.
         Defaults to False.
     epoch_to_train_ms2: int, optional
-        Epoch to train AlphaPeptDeep MS2 model.
+        Number of epochs to train AlphaPeptDeep MS2 model. Defaults to 20.
     """
 
     annotator = FeatureAnnotator(
