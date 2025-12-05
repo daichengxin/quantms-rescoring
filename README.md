@@ -33,7 +33,7 @@ Add additional spectrum feature like signal-to-noise to each PSM in the idXML.
 ```sh
  rescoring download_models --help
 ```
-Download all required models (MS2PIP, DeepLC, AlphaPeptDeep) for offline use. This is useful for running quantms-rescoring in environments without internet access, such as HPC clusters.
+Download all required models (MS2PIP, AlphaPeptDeep) for offline use. This is useful for running quantms-rescoring in environments without internet access, such as HPC clusters.
 
 ## Advanced Algorithms and Improvements
 
