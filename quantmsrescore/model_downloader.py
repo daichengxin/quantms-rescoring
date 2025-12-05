@@ -223,8 +223,7 @@ def download_ms2pip_models(model_dir: Optional[Path] = None) -> None:
         If ms2pip package is not installed.
     """
     try:
-        model_dir = model_dir if model_dir else Path.home() / ".ms2pip"
-        model_dir = Path(model_dir).expanduser()
+        model_dir = Path(model_dir or Path.home() / ".ms2pip").expanduser()
         model_dir.mkdir(parents=True, exist_ok=True)
         logger.info(f"Available MS2PIP models: {list(MODELS.keys())}")
         models = list(MODELS.keys())
