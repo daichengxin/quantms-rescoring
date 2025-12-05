@@ -228,11 +228,9 @@ def download_ms2pip_models(model_dir: Optional[Path] = None) -> None:
         logger.info(f"Available MS2PIP models: {list(MODELS.keys())}")
         models = list(MODELS.keys())
         for model in models:
-            try:
-                if "xgb_model_files" in MODELS[model].keys():
-                    continue
-            except KeyError:
+            if "xgb_model_files" not in MODELS[model]:
                 raise exceptions.UnknownModelError(model)
+            continue
             logger.debug("Downloading %s model files", model)
             validate_requested_xgb_model(
                 MODELS[model]["xgboost_model_files"],
