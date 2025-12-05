@@ -235,8 +235,6 @@ def download_ms2pip_models(model_dir: Optional[Path] = None) -> None:
             except KeyError:
                 raise exceptions.UnknownModelError(model)
             logger.debug("Downloading %s model files", model)
-            # if model == "TMT":
-            #     MODELS[model]["model_hash"]["model_20190107_TMT_train_Y.xgboost"] = sha1_hash.hexdigest()
             validate_requested_xgb_model(
                 MODELS[model]["xgboost_model_files"],
                 MODELS[model]["model_hash"],
