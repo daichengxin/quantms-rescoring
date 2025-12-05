@@ -1,8 +1,8 @@
 """
 Model downloader for quantms-rescoring.
 
-This module provides functionality to download all required models for MS2PIP,
-DeepLC, and AlphaPeptDeep ahead of time for offline use.
+This module provides functionality to download all required models for MS2PIP
+and AlphaPeptDeep ahead of time for offline use.
 """
 
 import shutil
