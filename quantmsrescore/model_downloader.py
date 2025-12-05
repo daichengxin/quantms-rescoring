@@ -8,13 +8,200 @@ DeepLC, and AlphaPeptDeep ahead of time for offline use.
 import shutil
 from pathlib import Path
 from typing import Optional
-
+import ms2pip
+from ms2pip._utils.xgb_models import validate_requested_xgb_model
 import click
 
 from quantmsrescore.logging_config import configure_logging, get_logger
 
 # Get logger for this module
 logger = get_logger(__name__)
+
+MODELS = {
+    "CID": {
+        "id": 0,
+        "ion_types": ["B", "Y"],
+        "peaks_version": "general",
+        "features_version": "normal",
+        "xgboost_model_files": {
+            "b": "model_20190107_CID_train_B.xgboost",
+            "y": "model_20190107_CID_train_Y.xgboost",
+        },
+        "model_hash": {
+            "model_20190107_CID_train_B.xgboost": "4398c6ebe23e2f37c0aca42b095053ecea6fb427",
+            "model_20190107_CID_train_Y.xgboost": "e0a9eb37e50da35a949d75807d66fb57e44aca0f",
+        },
+    },
+    "HCD2019": {
+        "id": 1,
+        "ion_types": ["B", "Y"],
+        "peaks_version": "general",
+        "features_version": "normal",
+        "xgboost_model_files": {
+            "b": "model_20190107_HCD_train_B.xgboost",
+            "y": "model_20190107_HCD_train_Y.xgboost",
+        },
+        "model_hash": {
+            "model_20190107_HCD_train_B.xgboost": "2503856c382806672e4b85f6b0ccc1f3093acc1b",
+            "model_20190107_HCD_train_Y.xgboost": "867bbc9940f75845b3f4f845d429b3780c997a02",
+        },
+    },
+    "TTOF5600": {
+        "id": 2,
+        "ion_types": ["B", "Y"],
+        "peaks_version": "general",
+        "features_version": "normal",
+        "xgboost_model_files": {
+            "b": "model_20190107_TTOF5600_train_B.xgboost",
+            "y": "model_20190107_TTOF5600_train_Y.xgboost",
+        },
+        "model_hash": {
+            "model_20190107_TTOF5600_train_B.xgboost": "ab2e28dfbc4ee60640253b0b4c127fc272c9d0ed",
+            "model_20190107_TTOF5600_train_Y.xgboost": "f8e9ddd8ca78ace06f67460a2fea0d8fa2623452",
+        },
+    },
+    "TMT": {
+        "id": 3,
+        "ion_types": ["B", "Y"],
+        "peaks_version": "general",
+        "features_version": "normal",
+        "xgboost_model_files": {
+            "b": "model_20190107_TMT_train_B.xgboost",
+            "y": "model_20190107_TMT_train_Y.xgboost",
+        },
+        "model_hash": {
+            "model_20190107_TMT_train_B.xgboost": "352073a591d45a2e3181818f5feef99c22755af7",
+            "model_20190107_TMT_train_Y.xgboost": "d9a73bff21ab504bb91eb386f20cd8a86d60c95d",
+        },
+    },
+    "iTRAQ": {
+        "id": 4,
+        "ion_types": ["B", "Y"],
+        "peaks_version": "general",
+        "features_version": "normal",
+        "xgboost_model_files": {
+            "b": "model_20190107_iTRAQ_train_B.xgboost",
+            "y": "model_20190107_iTRAQ_train_Y.xgboost",
+        },
+        "model_hash": {
+            "model_20190107_iTRAQ_train_B.xgboost": "b8d94ad329a245210c652a5b35d724d2c74d0d50",
+            "model_20190107_iTRAQ_train_Y.xgboost": "56ae87d56fd434b53fcc1d291745cabb7baf463a",
+        },
+    },
+    "iTRAQphospho": {
+        "id": 5,
+        "ion_types": ["B", "Y"],
+        "peaks_version": "general",
+        "features_version": "normal",
+        "xgboost_model_files": {
+            "b": "model_20190107_iTRAQphospho_train_B.xgboost",
+            "y": "model_20190107_iTRAQphospho_train_Y.xgboost",
+        },
+        "model_hash": {
+            "model_20190107_iTRAQphospho_train_B.xgboost": "e283b158cc50e219f42f93be624d0d0ac01d6b49",
+            "model_20190107_iTRAQphospho_train_Y.xgboost": "261b2e1810a299ed7ebf193ce1fb81a608c07d3b",
+        },
+    },
+    # ETD': {'id': 6, 'ion_types': ['B', 'Y', 'C', 'Z'], 'peaks_version': 'etd', 'features_version': 'normal'},
+    "HCDch2": {
+        "id": 7,
+        "ion_types": ["B", "Y", "B2", "Y2"],
+        "peaks_version": "ch2",
+        "features_version": "normal",
+    },
+    "CIDch2": {
+        "id": 8,
+        "ion_types": ["B", "Y", "B2", "Y2"],
+        "peaks_version": "ch2",
+        "features_version": "normal",
+        "xgboost_model_files": {
+            "b": "model_20190107_CID_train_B.xgboost",
+            "y": "model_20190107_CID_train_Y.xgboost",
+            "b2": "model_20190107_CID_train_B2.xgboost",
+            "y2": "model_20190107_CID_train_Y2.xgboost",
+        },
+        "model_hash": {
+            "model_20190107_CID_train_B.xgboost": "4398c6ebe23e2f37c0aca42b095053ecea6fb427",
+            "model_20190107_CID_train_Y.xgboost": "e0a9eb37e50da35a949d75807d66fb57e44aca0f",
+            "model_20190107_CID_train_B2.xgboost": "602f2fc648890aebbbe2646252ade658af3221a3",
+            "model_20190107_CID_train_Y2.xgboost": "4e4ad0f1d4606c17015aae0f74edba69f684d399",
+        },
+    },
+    "HCD2021": {
+        "id": 9,
+        "ion_types": ["B", "Y"],
+        "peaks_version": "general",
+        "features_version": "normal",
+        "xgboost_model_files": {
+            "b": "model_20210416_HCD2021_B.xgboost",
+            "y": "model_20210416_HCD2021_Y.xgboost",
+        },
+        "model_hash": {
+            "model_20210416_HCD2021_B.xgboost": "c086c599f618b199bbb36e2411701fb2866b24c8",
+            "model_20210416_HCD2021_Y.xgboost": "22a5a137e29e69fa6d4320ed7d701b61cbdc4fcf",
+        },
+    },
+    "Immuno-HCD": {
+        "id": 10,
+        "ion_types": ["B", "Y"],
+        "peaks_version": "general",
+        "features_version": "normal",
+        "xgboost_model_files": {
+            "b": "model_20210316_Immuno_HCD_B.xgboost",
+            "y": "model_20210316_Immuno_HCD_Y.xgboost",
+        },
+        "model_hash": {
+            "model_20210316_Immuno_HCD_B.xgboost": "977466d378de2e89c6ae15b4de8f07800d17a7b7",
+            "model_20210316_Immuno_HCD_Y.xgboost": "71948e1b9d6c69cb69b9baf84d361a9f80986fea",
+        },
+    },
+    "CID-TMT": {
+        "id": 11,
+        "ion_types": ["B", "Y"],
+        "peaks_version": "general",
+        "features_version": "normal",
+        "xgboost_model_files": {
+            "b": "model_20220104_CID_TMT_B.xgboost",
+            "y": "model_20220104_CID_TMT_Y.xgboost",
+        },
+        "model_hash": {
+            "model_20220104_CID_TMT_B.xgboost": "fa834162761a6ae444bb6523c9c1a174b9738389",
+            "model_20220104_CID_TMT_Y.xgboost": "299539179ca55d4ac82e9aed6a4e0bd134a9a41e",
+        },
+    },
+    "timsTOF2023": {
+        "id": 12,
+        "ion_types": ["B", "Y"],
+        "peaks_version": "general",
+        "features_version": "normal",
+        "xgboost_model_files": {
+            "b": "model_20230912_timsTOF_B.xgboost",
+            "y": "model_20230912_timsTOF_Y.xgboost",
+        },
+        "model_hash": {
+            "model_20230912_timsTOF_B.xgboost": "6beb557052455310d8c66311c86866dda8291f4b",
+            "model_20230912_timsTOF_Y.xgboost": "8edd87e0fba5f338d0a0881b5afbcf2f48ec5268",
+        },
+    },
+    "timsTOF2024": {
+        "id": 13,
+        "ion_types": ["B", "Y"],
+        "peaks_version": "general",
+        "features_version": "normal",
+        "xgboost_model_files": {
+            "b": "model_20240105_timsTOF_B.xgboost",
+            "y": "model_20240105_timsTOF_Y.xgboost",
+        },
+        "model_hash": {
+            "model_20240105_timsTOF_B.xgboost": "d70e145c15cf2bfa30968077a68409699b2fa541",
+            "model_20240105_timsTOF_Y.xgboost": "3f0414ee1ad7cff739e0d6242e25bfc22b6ebfe5",
+        },
+    },
+}
+
+
+MODELS["HCD"] = MODELS["HCD2021"]
+MODELS["timsTOF"] = MODELS["timsTOF2024"]
 
 
 def _get_package_models_path(package_name: str, models_subdir: str = "pretrained_models") -> Optional[Path]:
@@ -52,7 +239,7 @@ def _get_package_models_path(package_name: str, models_subdir: str = "pretrained
         logger.debug(f"Could not locate {package_name} package directory: {e}")
         return None
 
-
+import hashlib
 def download_ms2pip_models(model_dir: Optional[Path] = None) -> None:
     """
     Download MS2PIP models.
@@ -72,56 +259,28 @@ def download_ms2pip_models(model_dir: Optional[Path] = None) -> None:
         If ms2pip package is not installed.
     """
     try:
-        from ms2pip.constants import MODELS
-        logger.info("MS2PIP models are bundled with the ms2pip package.")
+        model_dir = model_dir if model_dir else Path.home() / ".ms2pip"
+        model_dir = Path(model_dir).expanduser()
+        model_dir.mkdir(parents=True, exist_ok=True)
         logger.info(f"Available MS2PIP models: {list(MODELS.keys())}")
+        models = list(MODELS.keys())
+        for model in models:
+            try:
+                if "xgb_model_files" in MODELS[model].keys():
+                    continue
+            except KeyError:
+                raise exceptions.UnknownModelError(model)
+            logger.debug("Downloading %s model files", model)
+            # if model == "TMT":
+            #     MODELS[model]["model_hash"]["model_20190107_TMT_train_Y.xgboost"] = sha1_hash.hexdigest()
+            validate_requested_xgb_model(
+                MODELS[model]["xgboost_model_files"],
+                MODELS[model]["model_hash"],
+                model_dir,
+            )
         logger.info("MS2PIP models validated successfully.")
     except ImportError as e:
         logger.error("MS2PIP package not found. Please install ms2pip>=4.0")
-        raise
-
-
-def download_deeplc_models(model_dir: Optional[Path] = None) -> None:
-    """
-    Download DeepLC models.
-
-    DeepLC models are automatically downloaded when the DeepLC predictor is
-    first instantiated. This function triggers that download by creating
-    a temporary DeepLC instance. Models are always downloaded to the default
-    DeepLC cache directory.
-
-    Parameters
-    ----------
-    model_dir : Path, optional
-        Not used for DeepLC (kept for API consistency).
-        DeepLC always uses its default cache directory.
-
-    Raises
-    ------
-    ImportError
-        If DeepLC package is not installed.
-    Exception
-        If model download fails.
-    """
-    try:
-        from deeplc import DeepLC
-        logger.info("Downloading DeepLC models...")
-
-        # Initialize DeepLC to trigger model download
-        # This will download models to the default cache location
-        try:
-            predictor = DeepLC(
-                n_jobs=1,
-                verbose=False,
-            )
-            logger.info("DeepLC models downloaded successfully.")
-            logger.info("Models are cached in the DeepLC default directory.")
-        except Exception as e:
-            logger.error(f"Failed to initialize DeepLC: {e}")
-            raise
-
-    except ImportError as e:
-        logger.error("DeepLC package not found. Please install deeplc>=3.0")
         raise
 
 
@@ -165,7 +324,7 @@ def download_alphapeptdeep_models(model_dir: Optional[Path] = None) -> None:
             model_dir.mkdir(parents=True, exist_ok=True)
 
             # Find the peptdeep models directory
-            models_path = _get_package_models_path("peptdeep", "pretrained_models")
+            models_path = Path(MODEL_ZIP_FILE_PATH)
 
             if not models_path:
                 logger.warning(
@@ -176,21 +335,10 @@ def download_alphapeptdeep_models(model_dir: Optional[Path] = None) -> None:
 
             if models_path.exists():
                 logger.info(f"Copying models to {model_dir}...")
-                # Copy all model files (support multiple extensions)
-                model_patterns = ["*.pth", "*.ckpt", "*.h5", "*.pkl"]
-                copied_files = 0
-                for pattern in model_patterns:
-                    for model_file in models_path.glob(pattern):
-                        target_file = model_dir / model_file.name
-                        shutil.copy2(model_file, target_file)
-                        logger.info(f"Copied {model_file.name} to {target_file}")
-                        copied_files += 1
+                target_file = model_dir / models_path.name
+                shutil.copy2(MODEL_ZIP_FILE_PATH, target_file)
+                logger.info(f"Copied {models_path.name} to {target_file}")
 
-                if copied_files == 0:
-                    logger.warning(
-                        f"No model files found in {models_path}. "
-                        "Models are still available in the default cache."
-                    )
             else:
                 logger.warning(
                     f"Could not find models at {models_path}. "
@@ -257,7 +405,7 @@ def download_models(model_dir: Optional[str], log_level: str, models: str) -> No
     configure_logging(log_level.upper())
 
     # Validate model names
-    VALID_MODELS = {"ms2pip", "deeplc", "alphapeptdeep"}
+    VALID_MODELS = {"ms2pip", "alphapeptdeep"}
 
     # Convert model_dir to Path if provided
     target_dir = Path(model_dir) if model_dir else None
@@ -299,15 +447,6 @@ def download_models(model_dir: Optional[str], log_level: str, models: str) -> No
         except Exception as e:
             logger.error(f"Failed to download MS2PIP models: {e}")
             failed_models.append("ms2pip")
-
-    if "deeplc" in models_list:
-        try:
-            logger.info("\n=== Downloading DeepLC models ===")
-            download_deeplc_models(target_dir)
-            success_count += 1
-        except Exception as e:
-            logger.error(f"Failed to download DeepLC models: {e}")
-            failed_models.append("deeplc")
 
     if "alphapeptdeep" in models_list:
         try:
