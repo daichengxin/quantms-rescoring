@@ -5,12 +5,15 @@ This module provides functionality to download all required models for MS2PIP,
 DeepLC, and AlphaPeptDeep ahead of time for offline use.
 """
 
+import hashlib
 import shutil
+from importlib.util import find_spec
 from pathlib import Path
 from typing import Optional
+
+import click
 import ms2pip
 from ms2pip._utils.xgb_models import validate_requested_xgb_model
-import click
 
 from quantmsrescore.logging_config import configure_logging, get_logger
 
@@ -223,7 +226,6 @@ def _get_package_models_path(package_name: str, models_subdir: str = "pretrained
         Path to models directory if found, None otherwise.
     """
     try:
-        from importlib.util import find_spec
         spec = find_spec(package_name)
         if spec and spec.origin:
             package_path = Path(spec.origin).parent
@@ -239,7 +241,7 @@ def _get_package_models_path(package_name: str, models_subdir: str = "pretrained
         logger.debug(f"Could not locate {package_name} package directory: {e}")
         return None
 
-import hashlib
+
 def download_ms2pip_models(model_dir: Optional[Path] = None) -> None:
     """
     Download MS2PIP models.
