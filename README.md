@@ -308,7 +308,6 @@ For environments without internet access (e.g., HPC clusters), you can download 
 This command downloads models for:
 
 - **MS2PIP**: Fragment ion intensity prediction models (bundled with ms2pip package)
-- **DeepLC**: Retention time prediction models
 - **AlphaPeptDeep**: MS2 spectrum, retention time, and CCS prediction models
 
 Once downloaded, you can transfer the models to your offline environment and use them with the processing commands. For AlphaPeptDeep models, use the `--ms2_model_dir` option when running `msrescore2feature`.
