@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
 
-@pytest.mark.skip(reason="This is for local test in big datasets, kipping for now")
+@pytest.mark.skip(reason="This is for local test in big datasets, skipping for now")
 def test_ms2rescore():
     runner = CliRunner()
     result = runner.invoke(
@@ -39,7 +39,7 @@ def test_ms2rescore():
     assert result.exit_code == 0
 
 
-@pytest.mark.skip(reason="This is for local test in big datasets, kipping for now")
+@pytest.mark.skip(reason="This is for local test in big datasets, skipping for now")
 def test_ms2rescore_failing():
     runner = CliRunner()
     result = runner.invoke(
@@ -202,7 +202,7 @@ def test_idxmlreader_wrong_model():
     annotator.write_idxml_file(output_file)
 
 
-@pytest.mark.skip(reason="This is for local test in big datasets, kipping for now")
+@pytest.mark.skip(reason="This is for local test in big datasets, skipping for now")
 def test_idxmlreader_failing_help():
     idxml_file = (
         TESTS_DIR
@@ -301,7 +301,7 @@ def test_version():
     assert result.exit_code == 0
 
 
-@pytest.mark.skip(reason="This is for local test in big datasets, kipping for now")
+@pytest.mark.skip(reason="This is for local test in big datasets, skipping for now")
 def test_local_file():
     runner = CliRunner()
     local_folder = TESTS_DIR / "test_data" / "dae1cb16fb57893b94bfcb731b2bf7"
@@ -349,6 +349,32 @@ def test_psm_clean():
             ),
             "--output",
             output_file,
+        ],
+    )
+    assert result.exit_code == 0
+
+
+def test_download_models_help():
+    """Test that download_models command is accessible and shows help."""
+    runner = CliRunner()
+    result = runner.invoke(cli, ["download_models", "--help"])
+    
+    assert result.exit_code == 0
+    assert "Download all required models" in result.output or "download_models" in result.output
+
+
+@pytest.mark.skip(reason="Requires internet connection and model downloads, skip for CI")
+def test_download_models_ms2pip_only():
+    """Test downloading only MS2PIP models."""
+    runner = CliRunner()
+    result = runner.invoke(
+        cli,
+        [
+            "download_models",
+            "--models",
+            "ms2pip",
+            "--log_level",
+            "info",
         ],
     )
     assert result.exit_code == 0
