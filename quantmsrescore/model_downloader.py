@@ -313,7 +313,7 @@ def download_alphapeptdeep_models(model_dir: Optional[Path] = None) -> None:
 
 @click.command(
     "download_models",
-    short_help="Download all models for offline use (MS2PIP, DeepLC, AlphaPeptDeep).",
+    short_help="Download all models for offline use (MS2PIP, AlphaPeptDeep).",
 )
 @click.option(
     "--model_dir",
