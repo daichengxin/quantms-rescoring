@@ -6,7 +6,6 @@ DeepLC, and AlphaPeptDeep ahead of time for offline use.
 """
 
 import shutil
-from importlib.util import find_spec
 from pathlib import Path
 from typing import Optional
 
