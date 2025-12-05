@@ -5,17 +5,15 @@ This module provides functionality to download all required models for MS2PIP,
 DeepLC, and AlphaPeptDeep ahead of time for offline use.
 """
 
-import hashlib
 import shutil
 from importlib.util import find_spec
 from pathlib import Path
 from typing import Optional
 
 import click
-import ms2pip
 from ms2pip._utils.xgb_models import validate_requested_xgb_model
-
 from quantmsrescore.logging_config import configure_logging, get_logger
+from quantmsrescore import exceptions
 
 # Get logger for this module
 logger = get_logger(__name__)
@@ -207,41 +205,6 @@ MODELS["HCD"] = MODELS["HCD2021"]
 MODELS["timsTOF"] = MODELS["timsTOF2024"]
 
 
-def _get_package_models_path(package_name: str, models_subdir: str = "pretrained_models") -> Optional[Path]:
-    """
-    Get the path to a package's models directory.
-
-    Uses importlib for robust package path detection with fallback to direct import.
-
-    Parameters
-    ----------
-    package_name : str
-        Name of the package to locate.
-    models_subdir : str
-        Subdirectory containing models (default: "pretrained_models").
-
-    Returns
-    -------
-    Path or None
-        Path to models directory if found, None otherwise.
-    """
-    try:
-        spec = find_spec(package_name)
-        if spec and spec.origin:
-            package_path = Path(spec.origin).parent
-        else:
-            # Fallback to direct import if spec doesn't have origin
-            package_module = __import__(package_name)
-            package_path = Path(package_module.__file__).parent
-
-        models_path = package_path / models_subdir
-        return models_path if models_path.exists() else None
-
-    except (ImportError, AttributeError, TypeError) as e:
-        logger.debug(f"Could not locate {package_name} package directory: {e}")
-        return None
-
-
 def download_ms2pip_models(model_dir: Optional[Path] = None) -> None:
     """
     Download MS2PIP models.
@@ -281,7 +244,7 @@ def download_ms2pip_models(model_dir: Optional[Path] = None) -> None:
                 model_dir,
             )
         logger.info("MS2PIP models validated successfully.")
-    except ImportError as e:
+    except ImportError:
         logger.error("MS2PIP package not found. Please install ms2pip>=4.0")
         raise
 
@@ -347,7 +310,7 @@ def download_alphapeptdeep_models(model_dir: Optional[Path] = None) -> None:
                     "Models are still available in the default cache."
                 )
 
-    except ImportError as e:
+    except ImportError:
         logger.error("peptdeep package not found. Please install peptdeep")
         raise
 
