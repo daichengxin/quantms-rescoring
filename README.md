@@ -33,7 +33,7 @@ Add additional spectrum feature like signal-to-noise to each PSM in the idXML.
 ```sh
  rescoring download_models --help
 ```
-Download all required models (MS2PIP, DeepLC, AlphaPeptDeep) for offline use. This is useful for running quantms-rescoring in environments without internet access, such as HPC clusters.
+Download all required models (MS2PIP, AlphaPeptDeep) for offline use. This is useful for running quantms-rescoring in environments without internet access, such as HPC clusters.
 
 ## Advanced Algorithms and Improvements
 
@@ -306,8 +306,8 @@ For environments without internet access (e.g., HPC clusters), you can download 
 ```
 
 This command downloads models for:
+
 - **MS2PIP**: Fragment ion intensity prediction models (bundled with ms2pip package)
-- **DeepLC**: Retention time prediction models
 - **AlphaPeptDeep**: MS2 spectrum, retention time, and CCS prediction models
 
 Once downloaded, you can transfer the models to your offline environment and use them with the processing commands. For AlphaPeptDeep models, use the `--ms2_model_dir` option when running `msrescore2feature`.
