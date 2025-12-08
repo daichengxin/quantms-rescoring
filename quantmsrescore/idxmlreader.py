@@ -242,6 +242,8 @@ class IdXMLRescoringReader(IdXMLReader):
             elif self.high_score_better != peptide_id.isHigherScoreBetter():
                 logger.warning("Inconsistent score direction found in idXML file")
 
+            spectrum_ref = peptide_id.getMetaValue("spectrum_reference")
+
             for psm_hit in peptide_id.getHits():
                 if (
                         only_ms2
@@ -269,7 +271,10 @@ class IdXMLRescoringReader(IdXMLReader):
                                              "nce": nce,
                                              "provenance_data": next(iter(psm.provenance_data.keys())),
                                              "instrument": instrument,
+                                             "spectrum_ref": spectrum_ref,
+                                             "filename": self.filename.stem.replace("_comet", "").replace("_msgf", "").replace("_sage", ""),
                                              "is_decoy": OpenMSHelper.is_decoy_peptide_hit(psm_hit),
+                                             "rank": psm_hit.getRank() + 1,
                                              "score": psm_hit.getScore()}, ignore_index=True)
 
         self._psms = PSMList(psm_list=psm_list)
