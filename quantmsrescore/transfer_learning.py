@@ -41,25 +41,18 @@ logger = get_logger(__name__)
 )
 @click.option(
     "-o",
-    "--output",
-    help="Path the output idxml for the annotated PSMs",
+    "--save_model_dir",
+    help="Path for the retrained model",
 )
-@click.option("--log_level", help="Logging level (default: `info`)", default="info")
 @click.option(
     "--processes",
-    help="Number of parallel processes available to MS²Rescore (default: 4)",
+    help="Number of parallel processes available to parse file (default: 4)",
     type=int,
     default=4,
 )
 @click.option(
-    "--ms2_model",
-    help="MS²PIP model (default: `HCD2021`)",
-    type=str,
-    default="HCD2021",
-)
-@click.option(
     "--ms2_model_dir",
-    help="The path of MS²PIP model (default: `./`)",
+    help="The path of AlphaPeptDeep model (default: `./`)",
     type=str,
     default="./",
 )
@@ -93,23 +86,18 @@ logger = get_logger(__name__)
 )
 @click.option("--transfer_learning_test_ratio",
               help="The ratio of test data for MS2 transfer learning",
-              default=0.30)
+              default=0.40)
 @click.option("--epoch_to_train_ms2",
               help="Epochs to train AlphaPeptDeep MS2 model",
               type=int,
               default=20)
-@click.option("--save_retrain_model",
-              help="Save retrained AlphaPeptDeep MS2 model weights",
-              is_flag=True)
 @click.pass_context
 def transfer_learning(
         ctx,
         idxml: str,
         mzml,
-        output: str,
-        log_level,
+        save_model_dir: str,
         processes,
-        ms2_model,
         ms2_model_dir,
         ms2_tolerance,
         ms2_tolerance_unit,
@@ -136,75 +124,53 @@ def transfer_learning(
         Path to the idXML file containing the PSMs.
     mzml : str
         Path to the mzML file containing the mass spectrometry deeplc_models.
-    output : str
-        Path to the output idXML file with annotated PSMs.
-    log_level : str
-        The logging level for the CLI command.
+    save_model_dir : str
+        Path for the retrained model.
     processes : int
         The number of parallel processes available for MS²Rescore.
-    feature_generators : str
-        Comma-separated list of feature generators to use for annotation.
-    only_features : str
-        Comma-separated list of features to use for annotation.
-    force_model : bool
-        Whether to force the use of the provided MS²PIP model.
-    find_best_model : bool
-        Whether to find the model with the best performance.
     ms2_tolerance : float
         The tolerance for MS²PIP annotation.
     ms2_tolerance_unit : str, optional
         Unit for the fragment mass tolerance, e.g. "Da" or "ppm".
+    ms2_model_dir: str, optional
+        Path for MS2 model
     calibration_set_size : float
         The percentage of PSMs to use for calibration and retraining.
-    valid_correlations_size: float
-        Fraction of the valid PSM.
-    skip_deeplc_retrain : bool
-        Whether to skip retraining the DeepLC model.
     spectrum_id_pattern : str
         The regex pattern for spectrum IDs.
-    psm_id_pattern : str
-        The regex pattern for PSM IDs.
     consider_modloss: bool, optional
         If modloss ions are considered in the ms2 model. `modloss`
         ions are mostly useful for phospho MS2 prediction model.
         Defaults to True.
-    transfer_learning: bool, optional
-        Enabling transfer learning for AlphaPeptDeep MS2 prediction.
-        Defaults to False.
     transfer_learning_test_ratio: float, optional
         The ratio of test data for MS2 transfer learning.
         Defaults to 0.3.
-    save_retrain_model: bool, optional
-        Save retrained MS2 model.
-        Defaults to False.
     epoch_to_train_ms2: int, optional
         Number of epochs to train AlphaPeptDeep MS2 model. Defaults to 20.
     """
 
     annotator = AlphaPeptdeepTrainer(
-        ms2_model=ms2_model,
         ms2_model_path=ms2_model_dir,
         ms2_tolerance=ms2_tolerance,
         ms2_tolerance_unit=ms2_tolerance_unit,
         calibration_set_size=calibration_set_size,
         processes=processes,
-        log_level=log_level.upper(),
         spectrum_id_pattern=spectrum_id_pattern,
-        save_retrain_model=save_retrain_model,
         consider_modloss=consider_modloss,
         transfer_learning_test_ratio=transfer_learning_test_ratio,
-        epoch_to_train_ms2=epoch_to_train_ms2
+        epoch_to_train_ms2=epoch_to_train_ms2,
+        save_model_dir=save_model_dir
     )
     annotator.build_idxml_data(idxml, mzml)
     annotator.fine_tune()
 
 
 class AlphaPeptdeepTrainer:
-    def __init__(self, ms2_model: str = "HCD2021",
+    def __init__(self,
                  ms2_model_path: str = "models", ms2_tolerance: float = 0.05,
                  ms2_tolerance_unit: str = "Da", calibration_set_size: float = 0.2,
-                 processes: int = 2, log_level: str = "INFO",
-                 save_retrain_model: bool = True,
+                 processes: int = 2,
+                 save_model_dir: str = None,
                  spectrum_id_pattern: str = "(.*)",
                  consider_modloss: bool = False,
                  transfer_learning_test_ratio: float = 0.3,
@@ -213,16 +179,16 @@ class AlphaPeptdeepTrainer:
         self._higher_score_better = None
         self.spec_file = None
         self.psms_df = []
-        self.processes = processes
-        self.spectrum_id_pattern = spectrum_id_pattern
+        self._processes = processes
+        self._spectrum_id_pattern = spectrum_id_pattern
         self._consider_modloss = consider_modloss
-        self.calibration_set_size = calibration_set_size
+        self._calibration_set_size = calibration_set_size
         self._transfer_learning_test_ratio = transfer_learning_test_ratio
         self._epoch_to_train_ms2 = epoch_to_train_ms2
         self._ms2_tolerance = ms2_tolerance
         self._ms2_tolerance_unit = ms2_tolerance_unit
         self._model_dir = ms2_model_path
-        self._save_retrain_model = save_retrain_model
+        self._save_model_dir = save_model_dir
 
     def _read_idxml_file(self, idxml_path, spectrum_path):
         # Load the idXML file and corresponding mzML file
@@ -232,6 +198,12 @@ class AlphaPeptdeepTrainer:
             only_ms2=True,
             remove_missing_spectrum=True,
         )
+        if (2, 'HCD') not in self._idxml_reader._stats.ms_level_dissociation_method:
+            logger.error(
+                "Found not HCD dissociation methods"
+                "AlphaPeptdeep pretrained models are not trained for not HCD dissociation methods"
+            )
+            raise ValueError("HCD dissociation method required")
         return self._idxml_reader.psms_df
 
     def build_idxml_data(self, idxml_file, spectrum_path):
@@ -253,12 +225,19 @@ class AlphaPeptdeepTrainer:
                         raise click.BadParameter(f"Missing mzML for idXML: {idxml_file.name}")
                     pairs.append((idxml_file, mzml_map[stem]))
 
-                with ProcessPoolExecutor(max_workers=self.processes) as executor:
+                with ProcessPoolExecutor(max_workers=self._processes) as executor:
                     future_to_file = {executor.submit(self._read_idxml_file, idxml_file, spectrum_path): idxml_file for
                                       idxml_file, spectrum_path in pairs}
                     for future in as_completed(future_to_file):
-                        content = future.result()
-                        self.psms_df.append(content)
+                        try:
+                            content = future.result()
+                            self.psms_df.append(content)
+                        except Exception as e:
+                            idxml_file = futures[future]
+                            logger.error(f"Error processing file: {idxml_file}")
+                            executor.shutdown(wait=False, cancel_futures=True)
+                            raise
+
                 self.psms_df = pd.concat(self.psms_df, ignore_index=True)
                 decoys = len(self.psms_df[self.psms_df["is_decoy"]])
                 targets = len(self.psms_df) - decoys
@@ -295,18 +274,15 @@ class AlphaPeptdeepTrainer:
 
         calibration_set = self.psms_df[(self.psms_df["is_decoy"] is not True) & (self.psms_df["rank"] == 1)]
         calibration_set.sort_values(by="score", inplace=True, ascending=not self._higher_score_better)
-        precursor_df = calibration_set[:int(len(self.psms_df) * self.calibration_set_size)]
+        precursor_df = calibration_set[:int(len(calibration_set) * self._calibration_set_size)]
         theoretical_mz_df = create_fragment_mz_dataframe(precursor_df, frag_types)
         precursor_df = precursor_df.set_index("provenance_data")
 
         # Compile regex for spectrum ID matching
         try:
-            spectrum_id_regex = re.compile(self.spectrum_id_pattern)
+            spectrum_id_regex = re.compile(self._spectrum_id_pattern)
         except TypeError:
             spectrum_id_regex = re.compile(r"(.*)")
-
-        # Organize PSMs by spectrum ID
-        # psms_by_specid = _organize_psms_by_spectrum_id(calibration_set)
 
         match_intensity_df = []
         current_index = 0
@@ -331,7 +307,6 @@ class AlphaPeptdeepTrainer:
                 psm = single_df[single_df["spectrum_ref"] == spectrum_id]
                 if psm.shape[0] <= 0:
                     continue
-
                 # Process each PSM for this spectrum
                 for row_index, row in psm.iterrows():
                     row = precursor_df.loc[row_index]
@@ -347,8 +322,8 @@ class AlphaPeptdeepTrainer:
 
         match_intensity_df = pd.concat(match_intensity_df, ignore_index=True)
 
-        psm_num_to_train_ms2 = int(len(calibration_set) * (1 - self._transfer_learning_test_ratio))
-        psm_num_to_test_ms2 = len(calibration_set) - psm_num_to_train_ms2
+        psm_num_to_train_ms2 = int(len(precursor_df) * (1 - self._transfer_learning_test_ratio))
+        psm_num_to_test_ms2 = len(precursor_df) - psm_num_to_train_ms2
 
         precursor_df.drop(columns=["frag_start_idx", "frag_stop_idx"], inplace=True)
         precursor_df.rename(columns={
@@ -371,5 +346,4 @@ class AlphaPeptdeepTrainer:
                                   train_verbose=True,
                                   epoch_to_train_ms2=self._epoch_to_train_ms2)
 
-        if self._save_retrain_model:
-            model_weights.save_ms2_model()
+        model_mgr.save_ms2_model(self._save_model_dir)

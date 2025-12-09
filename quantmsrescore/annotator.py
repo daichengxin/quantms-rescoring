@@ -216,6 +216,11 @@ class FeatureAnnotator:
             self._run_ms2pip_annotation()
             self.ms2_generator = "MS2PIP"
         elif self._alphapeptdeep:
+            if (2, 'HCD') not in self._idxml_reader._stats.ms_level_dissociation_method:
+                logger.error(
+                    "Found not HCD dissociation methods"
+                    "AlphaPeptdeep pretrained models are not trained for not HCD dissociation methods"
+                )
             self._run_alphapeptdeep_annotation()
             self.ms2_generator = "AlphaPeptDeep"
 
@@ -477,13 +482,17 @@ class FeatureAnnotator:
             List of PSMs to annotate.
         """
         logger.info("Finding best MS2 model for the dataset")
-
-        # Initialize AlphaPeptDeep annotator
-        try:
-            alphapeptdeep_generator = self._create_alphapeptdeep_annotator(model="generic")
-        except Exception as e:
-            logger.error(f"Failed to initialize AlphaPeptDeep: {e}")
-            raise
+        if (2, 'HCD') not in self._idxml_reader._stats.ms_level_dissociation_method:
+            is_HCD = False
+        else:
+            is_HCD = True
+        if is_HCD:
+            # Initialize AlphaPeptDeep annotator
+            try:
+                alphapeptdeep_generator = self._create_alphapeptdeep_annotator(model="generic")
+            except Exception as e:
+                logger.error(f"Failed to initialize AlphaPeptDeep: {e}")
+                raise
 
         # Initialize MS2PIP annotator
         if self._ms2_tolerance_unit == "Da":
@@ -493,8 +502,11 @@ class FeatureAnnotator:
             except Exception as e:
                 logger.error(f"Failed to initialize MS2PIP: {e}")
                 raise
-        else:
+        elif is_HCD:
             original_model = alphapeptdeep_generator.model
+        else:
+            logger.error(f"Failed to initialize all models")
+            raise
 
         # Get PSM list
         psm_list = self._idxml_reader.psms
@@ -514,9 +526,12 @@ class FeatureAnnotator:
             calibration_set = PSMList(psm_list=calibration_set)
             psms_df_without_decoy = psms_df[psms_df["is_decoy"] == 0]
 
-            logger.info("Running AlphaPeptDeep model")
-            alphapeptdeep_best_model, alphapeptdeep_best_corr = alphapeptdeep_generator._find_best_ms2_model(
-                calibration_set, psms_df_without_decoy)
+            if is_HCD:
+                logger.info("Running AlphaPeptDeep model")
+                alphapeptdeep_best_model, alphapeptdeep_best_corr = alphapeptdeep_generator._find_best_ms2_model(
+                    calibration_set, psms_df_without_decoy)
+            else:
+                alphapeptdeep_best_model, alphapeptdeep_best_corr = None, -1
 
             ms2pip_best_corr = -1  # Initial MS2PIP best correlation
             ms2pip_best_model = None
@@ -538,7 +553,7 @@ class FeatureAnnotator:
                     return  # Exit early since no valid model is available
 
             # When using Da tolerance, compare AlphaPeptDeep and MS2PIP
-            elif alphapeptdeep_best_corr > ms2pip_best_corr:
+            elif is_HCD and alphapeptdeep_best_corr > ms2pip_best_corr:
                 alphapeptdeep_original_model = alphapeptdeep_generator.model
                 if not self._validate_and_apply_alphapeptdeep_model(alphapeptdeep_generator, alphapeptdeep_best_model,
                                                                     alphapeptdeep_best_corr, psm_list, psms_df,
