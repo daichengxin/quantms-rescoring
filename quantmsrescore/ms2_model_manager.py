@@ -7,6 +7,7 @@ from peptdeep.model.ccs import AlphaCCSModel
 from peptdeep.model.charge import ChargeModelForModAASeq
 import os
 from peptdeep.utils import logging
+import glob
 
 
 class MS2ModelManager(ModelManager):
@@ -27,8 +28,8 @@ class MS2ModelManager(ModelManager):
             device=device
         )
 
-        if model_dir is not None and os.path.exists(os.path.join(model_dir, "ms2.pth")):
-            self.load_external_models(ms2_model_file=os.path.join(model_dir, "ms2.pth"))
+        if model_dir is not None and len(glob.glob(os.path.join(model_dir, "*ms2.pth"))) > 0:
+            self.load_external_models(ms2_model_file=glob.glob(os.path.join(model_dir, "*ms2.pth"))[0])
             self.model_str = model_dir
         else:
             _download_models(MODEL_ZIP_FILE_PATH)
@@ -169,5 +170,5 @@ class MS2ModelManager(ModelManager):
 
         self.model_str = "retrained_model"
 
-    def save_ms2_model(self):
-        self.ms2_model.save("retrained_ms2.pth")
+    def save_ms2_model(self, save_model_dir):
+        self.ms2_model.save(os.path.join(save_model_dir, "retained_ms2.pth"))

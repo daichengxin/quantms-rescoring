@@ -6,7 +6,7 @@ from quantmsrescore.sage_feature import add_sage_feature
 from quantmsrescore.snr import spectrum2feature
 from quantmsrescore.psm_clean import psm_feature_clean
 from quantmsrescore.model_downloader import download_models
-
+from quantmsrescore.transfer_learning import transfer_learning
 CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
 
 
@@ -23,6 +23,7 @@ cli.add_command(add_sage_feature)
 cli.add_command(spectrum2feature)
 cli.add_command(psm_feature_clean)
 cli.add_command(download_models)
+cli.add_command(transfer_learning)
 
 
 def main():
