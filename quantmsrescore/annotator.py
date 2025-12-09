@@ -505,8 +505,7 @@ class FeatureAnnotator:
         elif is_HCD:
             original_model = alphapeptdeep_generator.model
         else:
-            logger.error(f"Failed to initialize all models")
-            raise
+            logger.error("Failed to initialize all models")
 
         # Get PSM list
         psm_list = self._idxml_reader.psms

@@ -1,22 +1,15 @@
-import os.path
-
 import click
-import copy
 from pathlib import Path
-from typing import Optional, Set, Union
-from quantmsrescore.logging_config import configure_logging
-import glob
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from quantmsrescore.idxmlreader import IdXMLRescoringReader
 from quantmsrescore.logging_config import get_logger
 from quantmsrescore.openms import OpenMSHelper
 from quantmsrescore.alphapeptdeep import read_spectrum_file, _get_targets_df_for_psm
 from alphabase.peptide.fragment import create_fragment_mz_dataframe
-from peptdeep.mass_spec.match import match_centroid_mz
+from quantmsrescore.ms2_model_manager import MS2ModelManager
 import pandas as pd
 import re
-from quantmsrescore.ms2_model_manager import MS2ModelManager
-
+import ms2pip.exceptions as exceptions
 # Get logger for this module
 logger = get_logger(__name__)
 
@@ -42,6 +35,7 @@ logger = get_logger(__name__)
 @click.option(
     "-o",
     "--save_model_dir",
+    required=True,
     help="Path for the retrained model",
 )
 @click.option(
@@ -233,8 +227,8 @@ class AlphaPeptdeepTrainer:
                             content = future.result()
                             self.psms_df.append(content)
                         except Exception as e:
-                            idxml_file = futures[future]
-                            logger.error(f"Error processing file: {idxml_file}")
+                            idxml_file = future_to_file[future]
+                            logger.error(f"Error processing file: {idxml_file, e}")
                             executor.shutdown(wait=False, cancel_futures=True)
                             raise
 
@@ -297,7 +291,7 @@ class AlphaPeptdeepTrainer:
                     spectrum_id = match[1]
                 except (TypeError, IndexError):
                     raise exceptions.TitlePatternError(
-                        f"Spectrum title pattern `{spectrum_id_pattern}` could not be matched to "
+                        f"Spectrum title pattern `{self._spectrum_id_pattern}` could not be matched to "
                         f"spectrum ID `{spectrum.identifier}`. "
                         " Are you sure that the regex contains a capturing group?"
                     )
