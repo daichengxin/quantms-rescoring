@@ -1,13 +1,19 @@
 import pandas as pd
 from peptdeep.pretrained_models import ModelManager, _download_models, model_mgr_settings, MODEL_ZIP_FILE_PATH, \
     psm_sampling_with_important_mods
-from peptdeep.model.ms2 import pDeepModel
+from peptdeep.model.ms2 import pDeepModel, frag_types, max_frag_charge, ModelMS2Bert
 from peptdeep.model.rt import AlphaRTModel
 from peptdeep.model.ccs import AlphaCCSModel
 from peptdeep.model.charge import ChargeModelForModAASeq
 import os
 from peptdeep.utils import logging
 import glob
+from alphabase.peptide.fragment import get_charged_frag_types
+import torch
+import numpy as np
+import warnings
+from typing import List, Tuple, Optional
+from peptdeep.settings import global_settings as settings, model_const
 
 
 class MS2ModelManager(ModelManager):
@@ -18,7 +24,7 @@ class MS2ModelManager(ModelManager):
                  ):
         self._train_psm_logging = True
 
-        self.ms2_model: pDeepModel = pDeepModel(
+        self.ms2_model: pDeepModel = MS2pDeepModel(
             mask_modloss=mask_modloss, device=device
         )
         self.rt_model: AlphaRTModel = AlphaRTModel(device=device)
@@ -172,3 +178,125 @@ class MS2ModelManager(ModelManager):
 
     def save_ms2_model(self, save_model_dir):
         self.ms2_model.save(os.path.join(save_model_dir, "retained_ms2.pth"))
+
+
+class MS2pDeepModel(pDeepModel):
+    """
+    `ModelInterface` for MS2 prediction models
+
+    Parameters
+    ----------
+    charged_frag_types : List[str]
+        Charged fragment types to predict
+    dropout : float, optional
+        Dropout rate, by default 0.1
+    model_class : torch.nn.Module, optional
+        Ms2 Model class, by default ModelMS2Bert
+    device : str, optional
+        Device to run the model, by default "gpu"
+    override_from_weights : bool, optional default False
+        Override the requested charged frag types from the model weights on loading. This allows to predict all fragment types supported by the weights even if the user doesn't know what fragments types are supported by the weights. Thereby, the model will always be in a safe to predict state.
+    mask_modloss : bool, optional (deprecated)
+        Mask the modloss fragments, this is deprecated and will be removed in the future. To mask the modloss fragments,
+        the charged_frag_types should not include the modloss fragments.
+
+    """
+
+    def __init__(
+        self,
+        charged_frag_types=get_charged_frag_types(frag_types, max_frag_charge),
+        dropout=0.1,
+        model_class: torch.nn.Module = ModelMS2Bert,
+        device: str = "gpu",
+        mask_modloss: Optional[bool] = None,
+        override_from_weights: bool = False,
+        **kwargs,  # model params
+    ):
+        super().__init__(
+            charged_frag_types=charged_frag_types,
+            dropout=dropout,
+            model_class=model_class,
+            device=device,
+            mask_modloss=mask_modloss,
+            override_from_weights= False,
+            **kwargs,  # model params
+         )
+        if mask_modloss is not None:
+            warnings.warn(
+                "mask_modloss is deprecated and will be removed in the future. To mask the modloss fragments, the charged_frag_types should not include the modloss fragments."
+            )
+
+    def _set_batch_predict_data(
+        self,
+        batch_df: pd.DataFrame,
+        predicts: np.ndarray,
+        **kwargs,
+    ):
+        apex_intens = predicts.reshape((len(batch_df), -1)).max(axis=1)
+        apex_intens[apex_intens <= 0] = 1
+        predicts /= apex_intens.reshape((-1, 1, 1))
+        predicts[predicts < self.min_inten] = 0.0
+        # mask out predicted charged frag types that are not in the requested charged_frag_types
+        columns_mask = np.isin(
+            self.model.supported_charged_frag_types, self.charged_frag_types
+        )
+        predicts = predicts[:, :, columns_mask]
+
+        if self._predict_in_order:
+            self.predict_df.values[
+                batch_df.frag_start_idx.values[0] : batch_df.frag_stop_idx.values[-1], :
+            ] = predicts.reshape((-1, len(self.charged_frag_types)))
+        else:
+            update_sliced_fragment_dataframe(
+                self.predict_df,
+                self.predict_df.to_numpy(copy=True),
+                predicts.reshape((-1, len(self.charged_frag_types))),
+                batch_df[["frag_start_idx", "frag_stop_idx"]].values,
+            )
+
+
+def update_sliced_fragment_dataframe(
+        fragment_df: pd.DataFrame,
+        fragment_df_vals: np.ndarray,
+        values: np.ndarray,
+        frag_start_end_list: List[Tuple[int, int]],
+        charged_frag_types: List[str] = None,
+):
+    """
+    Set the values of the slices `frag_start_end_list=[(start,end),(start,end),...]`
+    of fragment_df.
+
+    Parameters
+    ----------
+    fragment_df : pd.DataFrame
+        fragment dataframe to set the values
+
+    fragment_df_vals : np.ndarray
+        The `fragment_df.to_numpy(copy=True)`, to prevent readonly assignment.
+
+    values : np.ndarray
+        values to set
+
+    frag_start_end_list : List[Tuple[int,int]]
+        e.g. `[(start,end),(start,end),...]`
+
+    charged_frag_types : List[str], optional
+        e.g. `['b_z1','b_z2','y_z1','y_z2']`.
+        If None, the columns of values should be the same as fragment_df's columns.
+        It is much faster if charged_frag_types is None as we use numpy slicing,
+        otherwise we use pd.loc (much slower).
+        Defaults to None.
+    """
+    frag_slice_list = [slice(start, end) for start, end in frag_start_end_list]
+    frag_slices = np.r_[tuple(frag_slice_list)]
+    if charged_frag_types is None or len(charged_frag_types) == 0:
+        fragment_df_vals[frag_slices, :] = values.astype(fragment_df_vals.dtype)
+        fragment_df.iloc[frag_slices, :] = values.astype(fragment_df_vals.dtype)
+    else:
+        charged_frag_idxes = [
+            fragment_df.columns.get_loc(c) for c in charged_frag_types
+        ]
+        fragment_df.iloc[frag_slices, charged_frag_idxes] = values.astype(
+            fragment_df_vals.dtype
+        )
+        fragment_df_vals[frag_slices] = fragment_df.values[frag_slices]

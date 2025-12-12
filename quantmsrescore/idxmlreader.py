@@ -236,6 +236,8 @@ class IdXMLRescoringReader(IdXMLReader):
             logger.warning("Spectrum lookup not initialized, cannot filter for MS2 spectra")
             only_ms2 = False
 
+        filename = self.oms_proteins[0].getMetaValue("spectra_data")[0].decode()
+
         for peptide_id in self.oms_peptides:
             if self.high_score_better is None:
                 self.high_score_better = peptide_id.isHigherScoreBetter()
@@ -272,7 +274,7 @@ class IdXMLRescoringReader(IdXMLReader):
                                              "provenance_data": next(iter(psm.provenance_data.keys())),
                                              "instrument": instrument,
                                              "spectrum_ref": spectrum_ref,
-                                             "filename": self.filename.stem.replace("_comet", "").replace("_msgf", "").replace("_sage", ""),
+                                             "filename": Path(filename).stem,
                                              "is_decoy": OpenMSHelper.is_decoy_peptide_hit(psm_hit),
                                              "rank": psm_hit.getRank() + 1,
                                              "score": psm_hit.getScore()}, ignore_index=True)
