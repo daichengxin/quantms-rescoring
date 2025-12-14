@@ -190,7 +190,7 @@ class MS2pDeepModel(pDeepModel):
     dropout : float, optional
         Dropout rate, by default 0.1
     model_class : torch.nn.Module, optional
-        Ms2 Model class, by default ModelMS2Bert
+        MS2 model class (should be a subclass of torch.nn.Module implementing the MS2 prediction interface), by default ModelMS2Bert
     device : str, optional
         Device to run the model, by default "gpu"
     override_from_weights : bool, optional default False
