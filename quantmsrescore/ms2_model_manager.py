@@ -13,7 +13,6 @@ import torch
 import numpy as np
 import warnings
 from typing import List, Tuple, Optional
-from peptdeep.settings import global_settings as settings, model_const
 
 
 class MS2ModelManager(ModelManager):
@@ -195,7 +194,9 @@ class MS2pDeepModel(pDeepModel):
     device : str, optional
         Device to run the model, by default "gpu"
     override_from_weights : bool, optional default False
-        Override the requested charged frag types from the model weights on loading. This allows to predict all fragment types supported by the weights even if the user doesn't know what fragments types are supported by the weights. Thereby, the model will always be in a safe to predict state.
+        Override the requested charged frag types from the model weights on loading.
+        This allows to predict all fragment types supported by the weights even if the user doesn't know what fragments types are supported by the weights.
+        Thereby, the model will always be in a safe to predict state.
     mask_modloss : bool, optional (deprecated)
         Mask the modloss fragments, this is deprecated and will be removed in the future. To mask the modloss fragments,
         the charged_frag_types should not include the modloss fragments.
@@ -218,12 +219,13 @@ class MS2pDeepModel(pDeepModel):
             model_class=model_class,
             device=device,
             mask_modloss=mask_modloss,
-            override_from_weights= False,
+            override_from_weights=override_from_weights,
             **kwargs,  # model params
          )
         if mask_modloss is not None:
             warnings.warn(
-                "mask_modloss is deprecated and will be removed in the future. To mask the modloss fragments, the charged_frag_types should not include the modloss fragments."
+                "mask_modloss is deprecated and will be removed in the future. To mask the modloss fragments, "
+                "the charged_frag_types should not include the modloss fragments."
             )
 
     def _set_batch_predict_data(
