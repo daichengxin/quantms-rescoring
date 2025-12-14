@@ -236,7 +236,19 @@ class IdXMLRescoringReader(IdXMLReader):
             logger.warning("Spectrum lookup not initialized, cannot filter for MS2 spectra")
             only_ms2 = False
 
-        filename = self.oms_proteins[0].getMetaValue("spectra_data")[0].decode()
+        filename = None
+        if self.oms_proteins and self.oms_proteins[0] is not None:
+            spectra_data = None
+            try:
+                spectra_data = self.oms_proteins[0].getMetaValue("spectra_data")
+            except Exception as e:
+                logger.warning(f"Could not retrieve 'spectra_data' meta value: {e}")
+            if spectra_data and len(spectra_data) > 0:
+                filename = spectra_data[0].decode()
+            else:
+                logger.warning("'spectra_data' meta value is missing or empty in the first protein entry.")
+        else:
+            logger.warning("self.oms_proteins is empty or first element is None; cannot retrieve 'spectra_data'.")
 
         for peptide_id in self.oms_peptides:
             if self.high_score_better is None:
