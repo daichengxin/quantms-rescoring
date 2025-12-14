@@ -201,7 +201,7 @@ class AlphaPeptdeepTrainer:
             logger.error(
                 "Missing mzML for idXML: {}".format(idxml_path)
             )
-            raise ValueError(" Missing mzML for idXML")
+            raise ValueError("Missing mzML for idXML")
 
         self._idxml_reader = IdXMLRescoringReader(
             idxml_filename=idxml_path,
