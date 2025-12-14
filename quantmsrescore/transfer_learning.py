@@ -190,7 +190,18 @@ class AlphaPeptdeepTrainer:
         prot_ids = []
         pep_ids = []
         oms.IdXMLFile().load(str(idxml_path), prot_ids, pep_ids)
-        spectra_data = prot_ids[0].getMetaValue("spectra_data")[0].decode("utf-8")
+        # Validate prot_ids and spectra_data
+        if not prot_ids:
+            logger.error(f"No protein identifications found in idXML: {idxml_path}")
+            raise ValueError("No protein identifications found in idXML file.")
+        if not prot_ids[0].hasMetaValue("spectra_data"):
+            logger.error(f'"spectra_data" meta value missing in first protein identification for idXML: {idxml_path}')
+            raise ValueError('"spectra_data" meta value missing in first protein identification.')
+        spectra_data_value = prot_ids[0].getMetaValue("spectra_data")
+        if not spectra_data_value or len(spectra_data_value) == 0:
+            logger.error(f'"spectra_data" meta value is empty in first protein identification for idXML: {idxml_path}')
+            raise ValueError('"spectra_data" meta value is empty in first protein identification.')
+        spectra_data = spectra_data_value[0].decode("utf-8")
         spectrum_path = None
         for mzml_file in spectrum_paths:
             if spectra_data in str(mzml_file):
