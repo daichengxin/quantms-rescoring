@@ -10,6 +10,7 @@ from quantmsrescore.ms2_model_manager import MS2ModelManager
 import pandas as pd
 import re
 import ms2pip.exceptions as exceptions
+import pyopenms as oms
 # Get logger for this module
 logger = get_logger(__name__)
 
@@ -184,8 +185,35 @@ class AlphaPeptdeepTrainer:
         self._model_dir = ms2_model_path
         self._save_model_dir = save_model_dir
 
-    def _read_idxml_file(self, idxml_path, spectrum_path):
+    def _read_idxml_file(self, idxml_path, spectrum_paths):
         # Load the idXML file and corresponding mzML file
+        prot_ids = []
+        pep_ids = []
+        oms.IdXMLFile().load(str(idxml_path), prot_ids, pep_ids)
+        # Validate prot_ids and spectra_data
+        if not prot_ids:
+            logger.error(f"No protein identifications found in idXML: {idxml_path}")
+            raise ValueError("No protein identifications found in idXML file.")
+        if not prot_ids[0].metaValueExists("spectra_data"):
+            logger.error(f'"spectra_data" meta value missing in first protein identification for idXML: {idxml_path}')
+            raise ValueError('"spectra_data" meta value missing in first protein identification.')
+        spectra_data_value = prot_ids[0].getMetaValue("spectra_data")
+        if not spectra_data_value or len(spectra_data_value) == 0:
+            logger.error(f'"spectra_data" meta value is empty in first protein identification for idXML: {idxml_path}')
+            raise ValueError('"spectra_data" meta value is empty in first protein identification.')
+        spectra_data = spectra_data_value[0].decode("utf-8")
+        spectrum_path = None
+        for mzml_file in spectrum_paths:
+            if Path(spectra_data).stem == mzml_file.stem:
+                spectrum_path = mzml_file
+                break
+
+        if spectrum_path is None:
+            logger.error(
+                "Missing mzML for idXML: {}".format(idxml_path)
+            )
+            raise ValueError("Missing mzML for idXML")
+
         self._idxml_reader = IdXMLRescoringReader(
             idxml_filename=idxml_path,
             mzml_file=spectrum_path,
@@ -210,18 +238,10 @@ class AlphaPeptdeepTrainer:
             if idxml_path.is_dir():
                 idxml_files = sorted([f for f in idxml_path.iterdir() if f.suffix.lower() == ".idxml"])
                 mzml_files = sorted([f for f in spectrum_path.iterdir() if f.suffix.lower() == ".mzml"])
-                mzml_map = {f.stem: f for f in mzml_files}
-                pairs = []
-                for idxml_file in idxml_files:
-                    # 去掉不同 idXML 后缀
-                    stem = idxml_file.stem.replace("_comet", "").replace("_sage", "").replace("_msgf", "")
-                    if stem not in mzml_map:
-                        raise click.BadParameter(f"Missing mzML for idXML: {idxml_file.name}")
-                    pairs.append((idxml_file, mzml_map[stem]))
 
                 with ProcessPoolExecutor(max_workers=self._processes) as executor:
-                    future_to_file = {executor.submit(self._read_idxml_file, idxml_file, spectrum_path): idxml_file for
-                                      idxml_file, spectrum_path in pairs}
+                    future_to_file = {executor.submit(self._read_idxml_file, idxml_file, mzml_files): idxml_file for
+                                      idxml_file in idxml_files}
                     for future in as_completed(future_to_file):
                         try:
                             content = future.result()
@@ -266,7 +286,7 @@ class AlphaPeptdeepTrainer:
         else:
             frag_types = ['b_z1', 'y_z1', 'b_z2', 'y_z2']
 
-        calibration_set = self.psms_df[(self.psms_df["is_decoy"] is not True) & (self.psms_df["rank"] == 1)]
+        calibration_set = self.psms_df[(~self.psms_df["is_decoy"]) & (self.psms_df["rank"] == 1)]
         calibration_set.sort_values(by="score", inplace=True, ascending=not self._higher_score_better)
         precursor_df = calibration_set[:int(len(calibration_set) * self._calibration_set_size)]
         theoretical_mz_df = create_fragment_mz_dataframe(precursor_df, frag_types)
