@@ -274,7 +274,7 @@ def update_sliced_fragment_dataframe(
         fragment dataframe to set the values
 
     fragment_df_vals : np.ndarray
-        The `fragment_df.to_numpy(copy=True)`, to prevent readonly assignment.
+        The `fragment_df.to_numpy(copy=True)` to prevent readonly assignment.
 
     values : np.ndarray
         values to set

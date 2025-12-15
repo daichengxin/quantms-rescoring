@@ -194,7 +194,7 @@ class AlphaPeptdeepTrainer:
         if not prot_ids:
             logger.error(f"No protein identifications found in idXML: {idxml_path}")
             raise ValueError("No protein identifications found in idXML file.")
-        if not prot_ids[0].hasMetaValue("spectra_data"):
+        if not prot_ids[0].metaValueExists("spectra_data"):
             logger.error(f'"spectra_data" meta value missing in first protein identification for idXML: {idxml_path}')
             raise ValueError('"spectra_data" meta value missing in first protein identification.')
         spectra_data_value = prot_ids[0].getMetaValue("spectra_data")
@@ -204,7 +204,7 @@ class AlphaPeptdeepTrainer:
         spectra_data = spectra_data_value[0].decode("utf-8")
         spectrum_path = None
         for mzml_file in spectrum_paths:
-            if spectra_data in str(mzml_file):
+            if Path(spectra_data).stem == mzml_file.stem:
                 spectrum_path = mzml_file
                 break
 
