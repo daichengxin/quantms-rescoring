@@ -120,11 +120,11 @@ Unlike traditional rescoring approaches, quantms-rescoring incorporates advanced
   - Determines weighted standard deviation of m/z values for spectral complexity estimation
 - **Feature Selection**: The parameters `only_features` allows to select the features to be added to the idXML file. For example: `--only_features "DeepLC:RtDiff,DeepLC:PredictedRetentionTimeBest,Ms2pip:DotProd"`. 
 
-##### Features
+#### Features
 
 <details>
 <summary>MS2PIP and AlphaPeptDeep Feature Mapping Table</summary>
-    
+
 | MS2PIP and AlphaPeptDeep Feature | quantms-rescoring Name                   |
 |----------------------------------|------------------------------------------|
 | spec_pearson                     | MS2PIP/AlphaPeptDeep:SpecPearson         |
