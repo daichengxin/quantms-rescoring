@@ -89,8 +89,8 @@ Unlike traditional rescoring approaches, quantms-rescoring incorporates advanced
 
 - **Compared to MS2PIP**: Adds automatic model selection, validation, features calculations and tolerance optimization, eliminating the need for manual parameter tuning.
 - **Compared to DeepLC**: Provides automatic model selection between pretrained and retrained models, with per-run calibration for improved accuracy.
-- **Compared to MS2Rescore**: Integrates more MS2 models (AlphaPeptDeep) and supports fine-tuning AlphaPeptDeep model to generate project-specific model. Offers a more comprehensive feature set including spectrum quality metrics, better integration with OpenMS, and improved handling of different fragmentation methods and MS levels. 
-- **Compared to AlphaPeptDeep**: Seamlessly integrates with quantms workflow, supporting quantms identification results format. Adds automatic model selection, validation. Offers a more comprehensive feature set, and improved handling of different fragmentation methods and MS levels.
+- **Compared to MS2Rescore**: Integrates a broader range of MS2 prediction models, including AlphaPeptDeep, and supports fine-tuning to generate project-specific models. It provides a richer feature set encompassing spectrum quality metrics, tighter integration with OpenMS, and more robust support for diverse fragmentation methods and MS levels. 
+- **Compared to AlphaPeptDeep**: Seamlessly integrates into the quantms workflow and natively supports the quantms identification results format. It introduces automatic model selection and validation, delivers an expanded feature set, and offers improved handling of different fragmentation methods and MS levels.
 
 
 ## Technical Implementation Details
