@@ -64,14 +64,12 @@ quantms-rescoring significantly enhances the capabilities of MS2PIP, AlphaPeptDe
 - **Enhanced Spectrum Processing**: AlphaPeptDeep don't support idXML input. So we use OpenMS for spectrum file reading and pass it to AlphaPeptDeep for prediction and fine-tuning
 - **Correlation Validation**: Implements a robust validation system that ensures the pretrained and retrained model achieves sufficient correlation with experimental spectra, preventing the use of inappropriate models.
 
-
 ### DeepLC Innovations
 
 - **Model Optimization**: Automatically benchmarks pretrained vs. retrained DeepLC models for each dataset, selecting the one with the lowest Mean Absolute Error (MAE) for retention time prediction.
 - **Per-Run Calibration**: Calibrates DeepLC models for each run to account for chromatographic variations between experiments, improving prediction accuracy.
 - **Best Peptide Retention Time**: Tracks the best retention time prediction for each peptide across multiple PSMs, providing more reliable retention time features.
 - **Transfer Learning**: Leverages transfer learning to adapt models to specific experimental conditions, improving prediction accuracy for challenging datasets.
-
 
 ### Spectrum Feature Analysis
 
@@ -125,94 +123,94 @@ Unlike traditional rescoring approaches, quantms-rescoring incorporates advanced
 ##### Features
 
 <details>
-    <summary>MS2PIP and AlphaPeptDeep Feature Mapping Table</summary>
+<summary>MS2PIP and AlphaPeptDeep Feature Mapping Table</summary>
     
-    | MS2PIP and AlphaPeptDeep Feature | quantms-rescoring Name                   |
-    |----------------------------------|------------------------------------------|
-    | spec_pearson                     | MS2PIP/AlphaPeptDeep:SpecPearson         |
-    | cos_norm                         | MS2PIP/AlphaPeptDeep:SpecCosineNorm      |
-    | spec_pearson_norm                | MS2PIP/AlphaPeptDeep:SpecPearsonNorm     |
-    | dotprod                          | MS2PIP/AlphaPeptDeep:DotProd             |
-    | ionb_pearson_norm                | MS2PIP/AlphaPeptDeep:IonBPearsonNorm     |
-    | iony_pearson_norm                | MS2PIP/AlphaPeptDeep:IonYPearsonNorm     |
-    | spec_mse_norm                    | MS2PIP/AlphaPeptDeep:SpecMseNorm         |
-    | ionb_mse_norm                    | MS2PIP/AlphaPeptDeep:IonBMseNorm         |
-    | iony_mse_norm                    | MS2PIP/AlphaPeptDeep:IonYMseNorm         |
-    | min_abs_diff_norm                | MS2PIP/AlphaPeptDeep:MinAbsDiffNorm      |
-    | max_abs_diff_norm                | MS2PIP/AlphaPeptDeep:MaxAbsDiffNorm      |
-    | abs_diff_Q1_norm                 | MS2PIP/AlphaPeptDeep:AbsDiffQ1Norm       |
-    | abs_diff_Q2_norm                 | MS2PIP/AlphaPeptDeep:AbsDiffQ2Norm       |
-    | abs_diff_Q3_norm                 | MS2PIP/AlphaPeptDeep:AbsDiffQ3Norm       |
-    | mean_abs_diff_norm               | MS2PIP/AlphaPeptDeep:MeanAbsDiffNorm     |
-    | std_abs_diff_norm                | MS2PIP/AlphaPeptDeep:StdAbsDiffNorm      |
-    | ionb_min_abs_diff_norm           | MS2PIP/AlphaPeptDeep:IonBMinAbsDiffNorm  |
-    | ionb_max_abs_diff_norm           | MS2PIP/AlphaPeptDeep:IonBMaxAbsDiffNorm  |
-    | ionb_abs_diff_Q1_norm            | MS2PIP/AlphaPeptDeep:IonBAbsDiffQ1Norm   |
-    | ionb_abs_diff_Q2_norm            | MS2PIP/AlphaPeptDeep:IonBAbsDiffQ2Norm   |
-    | ionb_abs_diff_Q3_norm            | MS2PIP/AlphaPeptDeep:IonBAbsDiffQ3Norm   |
-    | ionb_mean_abs_diff_norm          | MS2PIP/AlphaPeptDeep:IonBMeanAbsDiffNorm |
-    | ionb_std_abs_diff_norm           | MS2PIP/AlphaPeptDeep:IonBStdAbsDiffNorm  |
-    | iony_min_abs_diff_norm           | MS2PIP/AlphaPeptDeep:IonYMinAbsDiffNorm  |
-    | iony_max_abs_diff_norm           | MS2PIP/AlphaPeptDeep:IonYMaxAbsDiffNorm  |
-    | iony_abs_diff_Q1_norm            | MS2PIP/AlphaPeptDeep:IonYAbsDiffQ1Norm   |
-    | iony_abs_diff_Q2_norm            | MS2PIP/AlphaPeptDeep:IonYAbsDiffQ2Norm   |
-    | iony_abs_diff_Q3_norm            | MS2PIP/AlphaPeptDeep:IonYAbsDiffQ3Norm   |
-    | iony_mean_abs_diff_norm          | MS2PIP/AlphaPeptDeep:IonYMeanAbsDiffNorm |
-    | iony_std_abs_diff_norm           | MS2PIP/AlphaPeptDeep:IonYStdAbsDiffNorm  |
-    | dotprod_norm                     | MS2PIP/AlphaPeptDeep:DotProdNorm         |
-    | dotprod_ionb_norm                | MS2PIP/AlphaPeptDeep:DotProdIonBNorm     |
-    | dotprod_iony_norm                | MS2PIP/AlphaPeptDeep:DotProdIonYNorm     |
-    | cos_ionb_norm                    | MS2PIP/AlphaPeptDeep:CosIonBNorm         |
-    | cos_iony_norm                    | MS2PIP/AlphaPeptDeep:CosIonYNorm         |
-    | ionb_pearson                     | MS2PIP/AlphaPeptDeep:IonBPearson         |
-    | iony_pearson                     | MS2PIP/AlphaPeptDeep:IonYPearson         |
-    | spec_spearman                    | MS2PIP/AlphaPeptDeep:SpecSpearman        |
-    | ionb_spearman                    | MS2PIP/AlphaPeptDeep:IonBSpearman        |
-    | iony_spearman                    | MS2PIP/AlphaPeptDeep:IonYSpearman        |
-    | spec_mse                         | MS2PIP/AlphaPeptDeep:SpecMse             |
-    | ionb_mse                         | MS2PIP/AlphaPeptDeep:IonBMse             |
-    | iony_mse                         | MS2PIP/AlphaPeptDeep:IonYMse             |
-    | min_abs_diff_iontype             | MS2PIP/AlphaPeptDeep:MinAbsDiffIonType   |
-    | max_abs_diff_iontype             | MS2PIP/AlphaPeptDeep:MaxAbsDiffIonType   |
-    | min_abs_diff                     | MS2PIP/AlphaPeptDeep:MinAbsDiff          |
-    | max_abs_diff                     | MS2PIP/AlphaPeptDeep:MaxAbsDiff          |
-    | abs_diff_Q1                      | MS2PIP/AlphaPeptDeep:AbsDiffQ1           |
-    | abs_diff_Q2                      | MS2PIP/AlphaPeptDeep:AbsDiffQ2           |
-    | abs_diff_Q3                      | MS2PIP/AlphaPeptDeep:AbsDiffQ3           |
-    | mean_abs_diff                    | MS2PIP/AlphaPeptDeep:MeanAbsDiff         |
-    | std_abs_diff                     | MS2PIP/AlphaPeptDeep:StdAbsDiff          |
-    | ionb_min_abs_diff                | MS2PIP/AlphaPeptDeep:IonBMinAbsDiff      |
-    | ionb_max_abs_diff                | MS2PIP/AlphaPeptDeep:IonBMaxAbsDiff      |
-    | ionb_abs_diff_Q1                 | MS2PIP/AlphaPeptDeep:IonBAbsDiffQ1       |
-    | ionb_abs_diff_Q2                 | MS2PIP/AlphaPeptDeep:IonBAbsDiffQ2       |
-    | ionb_abs_diff_Q3                 | MS2PIP/AlphaPeptDeep:IonBAbsDiffQ3       |
-    | ionb_mean_abs_diff               | MS2PIP/AlphaPeptDeep:IonBMeanAbsDiff     |
-    | ionb_std_abs_diff                | MS2PIP/AlphaPeptDeep:IonBStdAbsDiff      |
-    | iony_min_abs_diff                | MS2PIP/AlphaPeptDeep:IonYMinAbsDiff      |
-    | iony_max_abs_diff                | MS2PIP/AlphaPeptDeep:IonYMaxAbsDiff      |
-    | iony_abs_diff_Q1                 | MS2PIP/AlphaPeptDeep:IonYAbsDiffQ1       |
-    | iony_abs_diff_Q2                 | MS2PIP/AlphaPeptDeep:IonYAbsDiffQ2       |
-    | iony_abs_diff_Q3                 | MS2PIP/AlphaPeptDeep:IonYAbsDiffQ3       |
-    | iony_mean_abs_diff               | MS2PIP/AlphaPeptDeep:IonYMeanAbsDiff     |
-    | iony_std_abs_diff                | MS2PIP/AlphaPeptDeep:IonYStdAbsDiff      |
-    | dotprod_ionb                     | MS2PIP/AlphaPeptDeep:DotProdIonB         |
-    | dotprod_iony                     | MS2PIP/AlphaPeptDeep:DotProdIonY         |
-    | cos_ionb                         | MS2PIP/AlphaPeptDeep:CosIonB             |
-    | cos_iony                         | MS2PIP/AlphaPeptDeep:CosIonY             |
+| MS2PIP and AlphaPeptDeep Feature | quantms-rescoring Name                   |
+|----------------------------------|------------------------------------------|
+| spec_pearson                     | MS2PIP/AlphaPeptDeep:SpecPearson         |
+| cos_norm                         | MS2PIP/AlphaPeptDeep:SpecCosineNorm      |
+| spec_pearson_norm                | MS2PIP/AlphaPeptDeep:SpecPearsonNorm     |
+| dotprod                          | MS2PIP/AlphaPeptDeep:DotProd             |
+| ionb_pearson_norm                | MS2PIP/AlphaPeptDeep:IonBPearsonNorm     |
+| iony_pearson_norm                | MS2PIP/AlphaPeptDeep:IonYPearsonNorm     |
+| spec_mse_norm                    | MS2PIP/AlphaPeptDeep:SpecMseNorm         |
+| ionb_mse_norm                    | MS2PIP/AlphaPeptDeep:IonBMseNorm         |
+| iony_mse_norm                    | MS2PIP/AlphaPeptDeep:IonYMseNorm         |
+| min_abs_diff_norm                | MS2PIP/AlphaPeptDeep:MinAbsDiffNorm      |
+| max_abs_diff_norm                | MS2PIP/AlphaPeptDeep:MaxAbsDiffNorm      |
+| abs_diff_Q1_norm                 | MS2PIP/AlphaPeptDeep:AbsDiffQ1Norm       |
+| abs_diff_Q2_norm                 | MS2PIP/AlphaPeptDeep:AbsDiffQ2Norm       |
+| abs_diff_Q3_norm                 | MS2PIP/AlphaPeptDeep:AbsDiffQ3Norm       |
+| mean_abs_diff_norm               | MS2PIP/AlphaPeptDeep:MeanAbsDiffNorm     |
+| std_abs_diff_norm                | MS2PIP/AlphaPeptDeep:StdAbsDiffNorm      |
+| ionb_min_abs_diff_norm           | MS2PIP/AlphaPeptDeep:IonBMinAbsDiffNorm  |
+| ionb_max_abs_diff_norm           | MS2PIP/AlphaPeptDeep:IonBMaxAbsDiffNorm  |
+| ionb_abs_diff_Q1_norm            | MS2PIP/AlphaPeptDeep:IonBAbsDiffQ1Norm   |
+| ionb_abs_diff_Q2_norm            | MS2PIP/AlphaPeptDeep:IonBAbsDiffQ2Norm   |
+| ionb_abs_diff_Q3_norm            | MS2PIP/AlphaPeptDeep:IonBAbsDiffQ3Norm   |
+| ionb_mean_abs_diff_norm          | MS2PIP/AlphaPeptDeep:IonBMeanAbsDiffNorm |
+| ionb_std_abs_diff_norm           | MS2PIP/AlphaPeptDeep:IonBStdAbsDiffNorm  |
+| iony_min_abs_diff_norm           | MS2PIP/AlphaPeptDeep:IonYMinAbsDiffNorm  |
+| iony_max_abs_diff_norm           | MS2PIP/AlphaPeptDeep:IonYMaxAbsDiffNorm  |
+| iony_abs_diff_Q1_norm            | MS2PIP/AlphaPeptDeep:IonYAbsDiffQ1Norm   |
+| iony_abs_diff_Q2_norm            | MS2PIP/AlphaPeptDeep:IonYAbsDiffQ2Norm   |
+| iony_abs_diff_Q3_norm            | MS2PIP/AlphaPeptDeep:IonYAbsDiffQ3Norm   |
+| iony_mean_abs_diff_norm          | MS2PIP/AlphaPeptDeep:IonYMeanAbsDiffNorm |
+| iony_std_abs_diff_norm           | MS2PIP/AlphaPeptDeep:IonYStdAbsDiffNorm  |
+| dotprod_norm                     | MS2PIP/AlphaPeptDeep:DotProdNorm         |
+| dotprod_ionb_norm                | MS2PIP/AlphaPeptDeep:DotProdIonBNorm     |
+| dotprod_iony_norm                | MS2PIP/AlphaPeptDeep:DotProdIonYNorm     |
+| cos_ionb_norm                    | MS2PIP/AlphaPeptDeep:CosIonBNorm         |
+| cos_iony_norm                    | MS2PIP/AlphaPeptDeep:CosIonYNorm         |
+| ionb_pearson                     | MS2PIP/AlphaPeptDeep:IonBPearson         |
+| iony_pearson                     | MS2PIP/AlphaPeptDeep:IonYPearson         |
+| spec_spearman                    | MS2PIP/AlphaPeptDeep:SpecSpearman        |
+| ionb_spearman                    | MS2PIP/AlphaPeptDeep:IonBSpearman        |
+| iony_spearman                    | MS2PIP/AlphaPeptDeep:IonYSpearman        |
+| spec_mse                         | MS2PIP/AlphaPeptDeep:SpecMse             |
+| ionb_mse                         | MS2PIP/AlphaPeptDeep:IonBMse             |
+| iony_mse                         | MS2PIP/AlphaPeptDeep:IonYMse             |
+| min_abs_diff_iontype             | MS2PIP/AlphaPeptDeep:MinAbsDiffIonType   |
+| max_abs_diff_iontype             | MS2PIP/AlphaPeptDeep:MaxAbsDiffIonType   |
+| min_abs_diff                     | MS2PIP/AlphaPeptDeep:MinAbsDiff          |
+| max_abs_diff                     | MS2PIP/AlphaPeptDeep:MaxAbsDiff          |
+| abs_diff_Q1                      | MS2PIP/AlphaPeptDeep:AbsDiffQ1           |
+| abs_diff_Q2                      | MS2PIP/AlphaPeptDeep:AbsDiffQ2           |
+| abs_diff_Q3                      | MS2PIP/AlphaPeptDeep:AbsDiffQ3           |
+| mean_abs_diff                    | MS2PIP/AlphaPeptDeep:MeanAbsDiff         |
+| std_abs_diff                     | MS2PIP/AlphaPeptDeep:StdAbsDiff          |
+| ionb_min_abs_diff                | MS2PIP/AlphaPeptDeep:IonBMinAbsDiff      |
+| ionb_max_abs_diff                | MS2PIP/AlphaPeptDeep:IonBMaxAbsDiff      |
+| ionb_abs_diff_Q1                 | MS2PIP/AlphaPeptDeep:IonBAbsDiffQ1       |
+| ionb_abs_diff_Q2                 | MS2PIP/AlphaPeptDeep:IonBAbsDiffQ2       |
+| ionb_abs_diff_Q3                 | MS2PIP/AlphaPeptDeep:IonBAbsDiffQ3       |
+| ionb_mean_abs_diff               | MS2PIP/AlphaPeptDeep:IonBMeanAbsDiff     |
+| ionb_std_abs_diff                | MS2PIP/AlphaPeptDeep:IonBStdAbsDiff      |
+| iony_min_abs_diff                | MS2PIP/AlphaPeptDeep:IonYMinAbsDiff      |
+| iony_max_abs_diff                | MS2PIP/AlphaPeptDeep:IonYMaxAbsDiff      |
+| iony_abs_diff_Q1                 | MS2PIP/AlphaPeptDeep:IonYAbsDiffQ1       |
+| iony_abs_diff_Q2                 | MS2PIP/AlphaPeptDeep:IonYAbsDiffQ2       |
+| iony_abs_diff_Q3                 | MS2PIP/AlphaPeptDeep:IonYAbsDiffQ3       |
+| iony_mean_abs_diff               | MS2PIP/AlphaPeptDeep:IonYMeanAbsDiff     |
+| iony_std_abs_diff                | MS2PIP/AlphaPeptDeep:IonYStdAbsDiff      |
+| dotprod_ionb                     | MS2PIP/AlphaPeptDeep:DotProdIonB         |
+| dotprod_iony                     | MS2PIP/AlphaPeptDeep:DotProdIonY         |
+| cos_ionb                         | MS2PIP/AlphaPeptDeep:CosIonB             |
+| cos_iony                         | MS2PIP/AlphaPeptDeep:CosIonY             |
 
 </details>
 
 <details>
-    <summary>DeepLC Feature Mapping Table</summary>
+<summary>DeepLC Feature Mapping Table</summary>
     
-    | MMS2Rescore DeepLC Feature    | quantms-rescoring Name            |
-    |-------------------------------|-----------------------------------|
-    | observed_retention_time       | DeepLC:ObservedRetentionTime      |
-    | predicted_retention_time      | DeepLC:PredictedRetentionTime     |
-    | rt_diff                       | DeepLC:RtDiff                     |
-    | observed_retention_time_best  | DeepLC:ObservedRetentionTimeBest  |
-    | predicted_retention_time_best | DeepLC:PredictedRetentionTimeBest |
-    | rt_diff_best                  | DeepLC:RtDiffBest                 |
+| MMS2Rescore DeepLC Feature    | quantms-rescoring Name            |
+|-------------------------------|-----------------------------------|
+| observed_retention_time       | DeepLC:ObservedRetentionTime      |
+| predicted_retention_time      | DeepLC:PredictedRetentionTime     |
+| rt_diff                       | DeepLC:RtDiff                     |
+| observed_retention_time_best  | DeepLC:ObservedRetentionTimeBest  |
+| predicted_retention_time_best | DeepLC:PredictedRetentionTimeBest |
+| rt_diff_best                  | DeepLC:RtDiffBest                 |
 
 </details>
 
