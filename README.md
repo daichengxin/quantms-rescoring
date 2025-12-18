@@ -62,7 +62,7 @@ quantms-rescoring significantly enhances the capabilities of MS2PIP, AlphaPeptDe
 - **Fine-tuning**: Leverages fine-tuning to adapt models to specific experimental/project conditions based on identifications file (idXML) from quantms, improving prediction accuracy for challenging datasets, such as PTM.
 - **Model Optimization**: Automatically benchmarks pretrained vs. retrained AlphaPeptDeep models for each dataset, selecting the one with the better Median PCC for MS2 intensity prediction.
 - **Enhanced Spectrum Processing**: AlphaPeptDeep does not support idXML input, so we use OpenMS for spectrum file reading and pass it to AlphaPeptDeep for prediction and fine-tuning.
-- **Correlation Validation**: Implements a robust validation system that ensures the pretrained and retrained model achieves sufficient correlation with experimental spectra, preventing the use of inappropriate models.
+- **Correlation Validation**: Implements a robust validation system that ensures the pretrained and retrained models achieve sufficient correlation with experimental spectra, preventing the use of inappropriate models.
 
 ### DeepLC Innovations
 
