@@ -102,7 +102,7 @@ Unlike traditional rescoring approaches, quantms-rescoring incorporates advanced
   - If the `ms_tolerance` is to restrictive for the data (e.g. 0.05 Da for a 0.5 Da dataset), the tool will try to find the annotated tolerances in the idXML file and use the best model for this tolerance.
 - **AlphaPeptDeep Model**:
   - Automatically evaluate the quality of the AlphaPeptDeep model weight passed by the user. If the correlation between predicted and experimental spectra is lower than a given threshold. We will skip MS2 features generation to avoid potential erroneous results.
-  - When enabling `transfer_learning`, the tool will try to fine-tuning AlphaPeptDeep model in the given idXML and mzML files and compare with pretrain model. Finally, using the best model based on similarity metrics.
+  - When enabling `transfer_learning`, the tool will try to fine-tune the AlphaPeptDeep model on the given idXML and mzML files and compare it with the pretrained model, finally using the best model based on similarity metrics.
 - **DeepLC Model Selection**: 
   - Automatically select the best DeepLC model for each run based on the retention time calibration and prediction accuracy. Different to ms2rescore, the tool will try to use the best model from MS2PIP and benchmark it with the same model by using transfer learning (`annotator.py`). The best model is selected to be used to predict the retention time of PSMs.
 
