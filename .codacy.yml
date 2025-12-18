@@ -3,6 +3,13 @@ engines:
     enabled: true
   pylint:
     enabled: true
+  remark-lint:
+    enabled: true
+    rules:
+      html:
+        allowed_elements:
+          - details
+          - summary
 
 eslint:
   config_file: .eslintrc.json
