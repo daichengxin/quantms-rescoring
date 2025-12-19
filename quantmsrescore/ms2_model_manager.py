@@ -1,7 +1,7 @@
 import pandas as pd
 from peptdeep.pretrained_models import ModelManager, _download_models, model_mgr_settings, MODEL_ZIP_FILE_PATH, \
     psm_sampling_with_important_mods
-from peptdeep.model.ms2 import pDeepModel, frag_types, max_frag_charge, ModelMS2Bert
+from peptdeep.model.ms2 import pDeepModel, frag_types, max_frag_charge, ModelMS2Bert, calc_ms2_similarity
 from peptdeep.model.rt import AlphaRTModel
 from peptdeep.model.ccs import AlphaCCSModel
 from peptdeep.model.charge import ChargeModelForModAASeq
@@ -13,6 +13,7 @@ import torch
 import numpy as np
 import warnings
 from typing import List, Tuple, Optional
+import copy
 
 
 class MS2ModelManager(ModelManager):
@@ -40,6 +41,7 @@ class MS2ModelManager(ModelManager):
             _download_models(MODEL_ZIP_FILE_PATH)
             self.load_installed_models()
             self.model_str = "generic"
+        self.pretrained_ms2_model = copy.deepcopy(self.ms2_model)
         self.reset_by_global_settings(reload_models=False)
 
     def __str__(self):
@@ -53,7 +55,8 @@ class MS2ModelManager(ModelManager):
                         psm_num_per_mod_to_train_ms2: int = 50,
                         psm_num_to_test_ms2: int = 0,
                         epoch_to_train_ms2: int = 20,
-                        train_verbose: bool = False):
+                        train_verbose: bool = False,
+                        force_transfer_learning: bool = False):
 
         self.psm_num_to_train_ms2 = psm_num_to_train_ms2
         self.use_grid_nce_search = use_grid_nce_search
@@ -61,6 +64,7 @@ class MS2ModelManager(ModelManager):
         self.psm_num_per_mod_to_train_ms2 = psm_num_per_mod_to_train_ms2
         self.psm_num_to_test_ms2 = psm_num_to_test_ms2
         self.train_verbose = train_verbose
+        self.force_transfer_learning = force_transfer_learning
         self.epoch_to_train_ms2 = epoch_to_train_ms2
         self.train_ms2_model(psms_df, match_intensity_df)
 
@@ -145,10 +149,10 @@ class MS2ModelManager(ModelManager):
             test_psm_df = pd.DataFrame()
 
         if len(test_psm_df) > 0:
-            logging.info(
-                "Testing pretrained MS2 model on testing df:\n"
-                + str(self.ms2_model.test(test_psm_df, tr_inten_df))
-            )
+            logging.info("Testing pretrained MS2 model on testing df:")
+            pretrained, metrics_desc = self.ms2_model.test(test_psm_df, tr_inten_df)
+            logging.info("\n" + str(metrics_desc))
+
         if len(tr_df) > 0:
             if self._train_psm_logging:
                 logging.info(
@@ -165,15 +169,27 @@ class MS2ModelManager(ModelManager):
             )
             logging.info(
                 "Testing refined MS2 model on training df:\n"
-                + str(self.ms2_model.test(tr_df, tr_inten_df))
+                + str(self.ms2_model.test(tr_df, tr_inten_df)[-1])
             )
         if len(test_psm_df) > 0:
-            logging.info(
-                "Testing refined MS2 model on testing df:\n"
-                + str(self.ms2_model.test(test_psm_df, tr_inten_df))
-            )
+            logging.info("Testing refined MS2 model on testing df:")
+            fine_tuning, metrics_desc = self.ms2_model.test(test_psm_df, tr_inten_df)
+            logging.info("\n" + str(metrics_desc))
 
-        self.model_str = "retrained_model"
+        if len(test_psm_df) > 0:
+            if pretrained["SA"].median() > fine_tuning["SA"].median():
+                logging.info("fine_tuning model is not better than pretrained for test dataset")
+                if self.force_transfer_learning:
+                    logging.info("Forced save fine-tune model")
+                    self.model_str = "retrained_model"
+                else:
+                    logging.info("Save original model")
+                    self.ms2_model = self.pretrained_ms2_model
+            else:
+                self.model_str = "retrained_model"
+
+        else:
+            self.model_str = "retrained_model"
 
     def save_ms2_model(self, save_model_dir):
         self.ms2_model.save(os.path.join(save_model_dir, "retained_ms2.pth"))
@@ -255,6 +271,29 @@ class MS2pDeepModel(pDeepModel):
                 predicts.reshape((-1, len(self.charged_frag_types))),
                 batch_df[["frag_start_idx", "frag_stop_idx"]].values,
             )
+
+    def test(
+        self,
+        precursor_df: pd.DataFrame,
+        fragment_intensity_df: pd.DataFrame,
+        default_instrument: str = "Lumos",
+        default_nce: float = 30.0,
+    ) -> pd.DataFrame:
+        if "instrument" not in precursor_df.columns:
+            precursor_df["instrument"] = default_instrument
+        if "nce" not in precursor_df.columns:
+            precursor_df["nce"] = default_nce
+        columns = np.intersect1d(
+            self.charged_frag_types,
+            fragment_intensity_df.columns.values,
+        )
+        return calc_ms2_similarity(
+            precursor_df,
+            self.predict(precursor_df, reference_frag_df=fragment_intensity_df)[
+                columns
+            ],
+            fragment_intensity_df=fragment_intensity_df[columns],
+        )
 
 
 def update_sliced_fragment_dataframe(
