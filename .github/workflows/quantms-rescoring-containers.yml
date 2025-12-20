@@ -57,7 +57,7 @@
        with:
          registry: ghcr.io
          username: ${{ github.actor }}
-         password: ${{ secrets.GHCR }}
+         password: ${{ secrets.GITHUB_TOKEN }}
 
      - name: Extract version from pyproject.toml
        id: version
