@@ -86,6 +86,11 @@ logger = get_logger(__name__)
               help="Epochs to train AlphaPeptDeep MS2 model",
               type=int,
               default=20)
+@click.option(
+    "--force_transfer_learning",
+    help="Forced save fine-tune model when it is not better than pretrained for test dataset",
+    is_flag=True,
+)
 @click.pass_context
 def transfer_learning(
         ctx,
@@ -100,7 +105,8 @@ def transfer_learning(
         spectrum_id_pattern: str,
         consider_modloss,
         transfer_learning_test_ratio,
-        epoch_to_train_ms2
+        epoch_to_train_ms2,
+        force_transfer_learning
 ):
     """
     Annotate PSMs in an idXML file with additional features using specified models.
@@ -142,6 +148,9 @@ def transfer_learning(
         Defaults to 0.3.
     epoch_to_train_ms2: int, optional
         Number of epochs to train AlphaPeptDeep MS2 model. Defaults to 20.
+    force_transfer_learning: bool, optional
+        Forced save fine-tune model when it is not better than pretrained for test dataset.
+        Defaults to False.
     """
 
     annotator = AlphaPeptdeepTrainer(
@@ -154,6 +163,7 @@ def transfer_learning(
         consider_modloss=consider_modloss,
         transfer_learning_test_ratio=transfer_learning_test_ratio,
         epoch_to_train_ms2=epoch_to_train_ms2,
+        force_transfer_learning=force_transfer_learning,
         save_model_dir=save_model_dir
     )
     annotator.build_idxml_data(idxml, mzml)
@@ -169,7 +179,8 @@ class AlphaPeptdeepTrainer:
                  spectrum_id_pattern: str = "(.*)",
                  consider_modloss: bool = False,
                  transfer_learning_test_ratio: float = 0.3,
-                 epoch_to_train_ms2: int = 20):
+                 epoch_to_train_ms2: int = 20,
+                 force_transfer_learning: bool = False):
         self._idxml_reader = None
         self._higher_score_better = None
         self.spec_file = None
@@ -180,6 +191,7 @@ class AlphaPeptdeepTrainer:
         self._calibration_set_size = calibration_set_size
         self._transfer_learning_test_ratio = transfer_learning_test_ratio
         self._epoch_to_train_ms2 = epoch_to_train_ms2
+        self._force_transfer_learning = force_transfer_learning
         self._ms2_tolerance = ms2_tolerance
         self._ms2_tolerance_unit = ms2_tolerance_unit
         self._model_dir = ms2_model_path
@@ -358,6 +370,7 @@ class AlphaPeptdeepTrainer:
                                   psm_num_to_train_ms2=psm_num_to_train_ms2,
                                   psm_num_to_test_ms2=psm_num_to_test_ms2,
                                   train_verbose=True,
+                                  force_transfer_learning=self._force_transfer_learning,
                                   epoch_to_train_ms2=self._epoch_to_train_ms2)
 
         model_mgr.save_ms2_model(self._save_model_dir)
