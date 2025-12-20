@@ -11,8 +11,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgomp1 \
     libhdf5-dev \
     libnetcdf-dev \
-    build-essential \
-    libhdf5-103-1\
     libxml2 \
     libxslt1.1 \
     libssl3 \
@@ -45,8 +43,6 @@ ENV LC_ALL=en_US.UTF-8
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
-    libhdf5-103-1\
-    libnetcdf19\
     libglib2.0-0 \
     libgomp1 \
     libhdf5-dev \
