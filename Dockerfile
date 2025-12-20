@@ -15,12 +15,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxslt1.1 \
     libssl3 \
     libffi-dev \
-    procps \
-    locales \
  && rm -rf /var/lib/apt/lists/*
 
-RUN sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen && \
-    locale-gen
+#RUN sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen && \
+#    locale-gen
 
 WORKDIR /app
 COPY . .
@@ -51,12 +49,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxslt1.1 \
     libssl3 \
     libffi-dev \
-    procps \
-    locales \
  && rm -rf /var/lib/apt/lists/*
 
-RUN sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen && \
-    locale-gen
+#RUN sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen && \
+#    locale-gen
 
 COPY --from=builder /usr/local /usr/local
 

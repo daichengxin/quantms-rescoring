@@ -82,6 +82,8 @@
            ghcr.io/daichengxin/quantms-rescoring:${{ steps.version.outputs.VERSION }}
          cache-from: type=gha
          cache-to: type=gha,mode=max
+         build-args: |
+           BUILDKIT_INLINE_CACHE=1
          provenance: false
          # Note: Only building for linux/amd64 as pyopenms doesn't have ARM64 wheels
          platforms: linux/amd64
@@ -98,26 +100,13 @@
        with:
          singularity-version: 3.8.7
 
-     - name: Pull Docker image for Singularity conversion
-       if: ${{ (github.event.inputs.push_images == true || github.event.inputs.push_images == '') }}
-       run: |
-         docker pull ghcr.io/daichengxin/quantms-rescoring:latest
-         docker save ghcr.io/daichengxin/quantms-rescoring:latest -o quantms-rescoring.tar
-
-     - name: Remove Docker image to free up space
-       if: ${{ (github.event.inputs.push_images == true || github.event.inputs.push_images == '') }}
-       run: |
-         docker rmi ghcr.io/daichengxin/quantms-rescoring:latest || true
-         docker system prune -af || true
-         df -h
-
      - name: Prepare Singularity temp dir
        run: mkdir -p ${{ github.workspace }}/.singularity-tmp
 
      - name: Convert Docker image to Singularity
        if: ${{ (github.event.inputs.push_images == true || github.event.inputs.push_images == '') }}
        run: |
-         singularity build quantms-rescoring.sif docker-archive://quantms-rescoring.tar
+         singularity build quantms-rescoring.sif docker://ghcr.io/daichengxin/quantms-rescoring:latest
          ls -la quantms-rescoring.sif
 
      - name: Login and Deploy Container
