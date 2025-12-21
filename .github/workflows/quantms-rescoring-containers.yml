@@ -34,9 +34,9 @@
      env:
        RETRY_TIMES: 3
        RETRY_DELAY: 30
-       SINGULARITY_TMPDIR: ${{ github.workspace }}/.singularity-tmp
-       SINGULARITY_CACHEDIR: ${{ github.workspace }}/.singularity
-       SINGULARITY_LIBRARYDIR: ${{ github.workspace }}/.singularity
+       SINGULARITY_TMPDIR: /tmp/singularity-tmp
+       SINGULARITY_CACHEDIR: /tmp/singularity-cache
+       SINGULARITY_LIBRARYDIR: /tmp/singularity-lib
 
      steps:
      - name: Free up disk space before build
@@ -90,6 +90,7 @@
 
      - name: Free up disk space after build
        run: |
+         docker image rm ghcr.io/bigbio/quantms-rescoring:latest || true
          docker system prune -af || true
          sudo apt-get clean
          sudo rm -rf /var/lib/apt/lists/*
@@ -101,12 +102,12 @@
          singularity-version: 3.8.7
 
      - name: Prepare Singularity temp dir
-       run: mkdir -p ${{ github.workspace }}/.singularity-tmp
+       run: mkdir -p /tmp/singularity-tmp /tmp/singularity-cache /tmp/singularity-lib
 
      - name: Convert Docker image to Singularity
        if: ${{ (github.event.inputs.push_images == true || github.event.inputs.push_images == '') }}
        run: |
-         singularity build quantms-rescoring.sif docker://ghcr.io/bigbio/quantms-rescoring:latest
+         singularity build --disable-cache quantms-rescoring.sif docker://ghcr.io/bigbio/quantms-rescoring:latest
          ls -la quantms-rescoring.sif
 
      - name: Login and Deploy Container
