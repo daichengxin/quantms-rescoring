@@ -1,5 +1,6 @@
+python>=3.9
 click
-pyopenms==3.2.0
+pyopenms==3.1.0
 ms2rescore==3.1.4
 pandas
 numpy>=1.25
