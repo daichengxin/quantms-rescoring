@@ -1,0 +1,376 @@
+import click
+from pathlib import Path
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from quantmsrescore.idxmlreader import IdXMLRescoringReader
+from quantmsrescore.logging_config import get_logger
+from quantmsrescore.openms import OpenMSHelper
+from quantmsrescore.alphapeptdeep import read_spectrum_file, _get_targets_df_for_psm
+from alphabase.peptide.fragment import create_fragment_mz_dataframe
+from quantmsrescore.ms2_model_manager import MS2ModelManager
+import pandas as pd
+import re
+import ms2pip.exceptions as exceptions
+import pyopenms as oms
+# Get logger for this module
+logger = get_logger(__name__)
+
+
+@click.command(
+    "transfer_learning",
+    short_help="Annotate PSMs in an idXML file using ms2rescore features.",
+)
+@click.option(
+    "-i",
+    "--idxml",
+    help="Path to the idxml containing the PSMs from OpenMS",
+    required=True,
+    type=click.Path(exists=True),
+)
+@click.option(
+    "-s",
+    "--mzml",
+    help="Path to the mzML file containing the spectra use for identification",
+    required=True,
+    type=click.Path(exists=True),
+)
+@click.option(
+    "-o",
+    "--save_model_dir",
+    required=True,
+    help="Path for the retrained model",
+)
+@click.option(
+    "--processes",
+    help="Number of parallel processes available to parse file (default: 4)",
+    type=int,
+    default=4,
+)
+@click.option(
+    "--ms2_model_dir",
+    help="The path of AlphaPeptDeep model (default: `./`)",
+    type=str,
+    default="./",
+)
+@click.option(
+    "--ms2_tolerance",
+    help="Fragment mass tolerance (default: `0.05`)",
+    type=float,
+    default=0.05,
+)
+@click.option(
+    "--ms2_tolerance_unit",
+    help="Fragment mass tolerance unit (default: Da)",
+    type=click.Choice(['Da', 'ppm'], case_sensitive=False),
+    default="Da",
+)
+@click.option(
+    "--calibration_set_size",
+    help="Percentage of number of psms to use for calibration and retraining (default: `0.20)",
+    default=0.20,
+)
+@click.option(
+    "--spectrum_id_pattern",
+    help="Pattern for spectrum identification",
+    type=str,
+    default="(.*)",
+)
+@click.option(
+    "--consider_modloss",
+    help="If modloss ions are considered in the ms2 model",
+    is_flag=True,
+)
+@click.option("--transfer_learning_test_ratio",
+              help="The ratio of test data for MS2 transfer learning",
+              default=0.40)
+@click.option("--epoch_to_train_ms2",
+              help="Epochs to train AlphaPeptDeep MS2 model",
+              type=int,
+              default=20)
+@click.option(
+    "--force_transfer_learning",
+    help="Forced save fine-tune model when it is not better than pretrained for test dataset",
+    is_flag=True,
+)
+@click.pass_context
+def transfer_learning(
+        ctx,
+        idxml: str,
+        mzml,
+        save_model_dir: str,
+        processes,
+        ms2_model_dir,
+        ms2_tolerance,
+        ms2_tolerance_unit,
+        calibration_set_size,
+        spectrum_id_pattern: str,
+        consider_modloss,
+        transfer_learning_test_ratio,
+        epoch_to_train_ms2,
+        force_transfer_learning
+):
+    """
+    Annotate PSMs in an idXML file with additional features using specified models.
+
+    This command-line interface (CLI) command processes a PSM file by adding
+    annotations from the MS²PIP and DeepLC models, among others, while preserving
+    existing information. It supports various options for specifying input and
+    output paths, logging levels, and feature generation configurations.
+
+    Parameters
+    ----------
+
+    ctx : click.Context
+        The Click context object.
+    idxml : str
+        Path to the idXML file containing the PSMs.
+    mzml : str
+        Path to the mzML file containing the mass spectrometry deeplc_models.
+    save_model_dir : str
+        Path for the retrained model.
+    processes : int
+        The number of parallel processes available for MS²Rescore.
+    ms2_tolerance : float
+        The tolerance for MS²PIP annotation.
+    ms2_tolerance_unit : str, optional
+        Unit for the fragment mass tolerance, e.g. "Da" or "ppm".
+    ms2_model_dir: str, optional
+        Path for MS2 model
+    calibration_set_size : float
+        The percentage of PSMs to use for calibration and retraining.
+    spectrum_id_pattern : str
+        The regex pattern for spectrum IDs.
+    consider_modloss: bool, optional
+        If modloss ions are considered in the ms2 model. `modloss`
+        ions are mostly useful for phospho MS2 prediction model.
+        Defaults to True.
+    transfer_learning_test_ratio: float, optional
+        The ratio of test data for MS2 transfer learning.
+        Defaults to 0.3.
+    epoch_to_train_ms2: int, optional
+        Number of epochs to train AlphaPeptDeep MS2 model. Defaults to 20.
+    force_transfer_learning: bool, optional
+        Forced save fine-tune model when it is not better than pretrained for test dataset.
+        Defaults to False.
+    """
+
+    annotator = AlphaPeptdeepTrainer(
+        ms2_model_path=ms2_model_dir,
+        ms2_tolerance=ms2_tolerance,
+        ms2_tolerance_unit=ms2_tolerance_unit,
+        calibration_set_size=calibration_set_size,
+        processes=processes,
+        spectrum_id_pattern=spectrum_id_pattern,
+        consider_modloss=consider_modloss,
+        transfer_learning_test_ratio=transfer_learning_test_ratio,
+        epoch_to_train_ms2=epoch_to_train_ms2,
+        force_transfer_learning=force_transfer_learning,
+        save_model_dir=save_model_dir
+    )
+    annotator.build_idxml_data(idxml, mzml)
+    annotator.fine_tune()
+
+
+class AlphaPeptdeepTrainer:
+    def __init__(self,
+                 ms2_model_path: str = "models", ms2_tolerance: float = 0.05,
+                 ms2_tolerance_unit: str = "Da", calibration_set_size: float = 0.2,
+                 processes: int = 2,
+                 save_model_dir: str = None,
+                 spectrum_id_pattern: str = "(.*)",
+                 consider_modloss: bool = False,
+                 transfer_learning_test_ratio: float = 0.3,
+                 epoch_to_train_ms2: int = 20,
+                 force_transfer_learning: bool = False):
+        self._idxml_reader = None
+        self._higher_score_better = None
+        self.spec_file = None
+        self.psms_df = []
+        self._processes = processes
+        self._spectrum_id_pattern = spectrum_id_pattern
+        self._consider_modloss = consider_modloss
+        self._calibration_set_size = calibration_set_size
+        self._transfer_learning_test_ratio = transfer_learning_test_ratio
+        self._epoch_to_train_ms2 = epoch_to_train_ms2
+        self._force_transfer_learning = force_transfer_learning
+        self._ms2_tolerance = ms2_tolerance
+        self._ms2_tolerance_unit = ms2_tolerance_unit
+        self._model_dir = ms2_model_path
+        self._save_model_dir = save_model_dir
+
+    def _read_idxml_file(self, idxml_path, spectrum_paths):
+        # Load the idXML file and corresponding mzML file
+        prot_ids = []
+        pep_ids = []
+        oms.IdXMLFile().load(str(idxml_path), prot_ids, pep_ids)
+        # Validate prot_ids and spectra_data
+        if not prot_ids:
+            logger.error(f"No protein identifications found in idXML: {idxml_path}")
+            raise ValueError("No protein identifications found in idXML file.")
+        if not prot_ids[0].metaValueExists("spectra_data"):
+            logger.error(f'"spectra_data" meta value missing in first protein identification for idXML: {idxml_path}')
+            raise ValueError('"spectra_data" meta value missing in first protein identification.')
+        spectra_data_value = prot_ids[0].getMetaValue("spectra_data")
+        if not spectra_data_value or len(spectra_data_value) == 0:
+            logger.error(f'"spectra_data" meta value is empty in first protein identification for idXML: {idxml_path}')
+            raise ValueError('"spectra_data" meta value is empty in first protein identification.')
+        spectra_data = spectra_data_value[0].decode("utf-8")
+        spectrum_path = None
+        for mzml_file in spectrum_paths:
+            if Path(spectra_data).stem == mzml_file.stem:
+                spectrum_path = mzml_file
+                break
+
+        if spectrum_path is None:
+            logger.error(
+                "Missing mzML for idXML: {}".format(idxml_path)
+            )
+            raise ValueError("Missing mzML for idXML")
+
+        self._idxml_reader = IdXMLRescoringReader(
+            idxml_filename=idxml_path,
+            mzml_file=spectrum_path,
+            only_ms2=True,
+            remove_missing_spectrum=True,
+        )
+        if (2, 'HCD') not in self._idxml_reader._stats.ms_level_dissociation_method:
+            logger.error(
+                "Found not HCD dissociation methods"
+                "AlphaPeptdeep pretrained models are not trained for not HCD dissociation methods"
+            )
+            raise ValueError("HCD dissociation method required")
+        return self._idxml_reader.psms_df
+
+    def build_idxml_data(self, idxml_file, spectrum_path):
+        logger.info(f"Loading data from: {idxml_file}")
+
+        try:
+            # Convert paths to Path objects for consistency
+            idxml_path = Path(idxml_file)
+            spectrum_path = Path(spectrum_path)
+            if idxml_path.is_dir():
+                idxml_files = sorted([f for f in idxml_path.iterdir() if f.suffix.lower() == ".idxml"])
+                mzml_files = sorted([f for f in spectrum_path.iterdir() if f.suffix.lower() == ".mzml"])
+
+                with ProcessPoolExecutor(max_workers=self._processes) as executor:
+                    future_to_file = {executor.submit(self._read_idxml_file, idxml_file, mzml_files): idxml_file for
+                                      idxml_file in idxml_files}
+                    for future in as_completed(future_to_file):
+                        try:
+                            content = future.result()
+                            self.psms_df.append(content)
+                        except Exception as e:
+                            idxml_file = future_to_file[future]
+                            logger.error(f"Error processing file: {idxml_file, e}")
+                            executor.shutdown(wait=False, cancel_futures=True)
+                            raise
+
+                self.psms_df = pd.concat(self.psms_df, ignore_index=True)
+                decoys = len(self.psms_df[self.psms_df["is_decoy"]])
+                targets = len(self.psms_df) - decoys
+                self.spec_file = mzml_files
+            else:
+                # Load the idXML file and corresponding mzML file
+                self._idxml_reader = IdXMLRescoringReader(
+                    idxml_filename=idxml_path,
+                    mzml_file=spectrum_path,
+                    only_ms2=True,
+                    remove_missing_spectrum=True,
+                )
+                self._higher_score_better = self._idxml_reader.high_score_better
+                self.psms_df = self._idxml_reader.psms_df
+                self.spec_file = [spectrum_path]
+                openms_helper = OpenMSHelper()
+                decoys, targets = openms_helper.count_decoys_targets(self._idxml_reader.oms_peptides)
+
+            logger.info(
+                f"Loaded {len(self.psms_df)} PSMs from {idxml_path.name}: {decoys} decoys and {targets} targets"
+            )
+
+        except Exception as e:
+            logger.error(f"Failed to load input files: {str(e)}")
+            raise
+
+    def fine_tune(self):
+        if self._consider_modloss:
+            frag_types = ['b_z1', 'y_z1', 'b_z2', 'y_z2',
+                          'b_modloss_z1', 'b_modloss_z2',
+                          'y_modloss_z1', 'y_modloss_z2']
+        else:
+            frag_types = ['b_z1', 'y_z1', 'b_z2', 'y_z2']
+
+        calibration_set = self.psms_df[(~self.psms_df["is_decoy"]) & (self.psms_df["rank"] == 1)]
+        calibration_set.sort_values(by="score", inplace=True, ascending=not self._higher_score_better)
+        precursor_df = calibration_set[:int(len(calibration_set) * self._calibration_set_size)]
+        theoretical_mz_df = create_fragment_mz_dataframe(precursor_df, frag_types)
+        precursor_df = precursor_df.set_index("provenance_data")
+
+        # Compile regex for spectrum ID matching
+        try:
+            spectrum_id_regex = re.compile(self._spectrum_id_pattern)
+        except TypeError:
+            spectrum_id_regex = re.compile(r"(.*)")
+
+        match_intensity_df = []
+        current_index = 0
+        # Process each spectrum
+        for sf in self.spec_file:
+            single_df = precursor_df[precursor_df["filename"] == sf.stem]
+            for spectrum in read_spectrum_file(sf.as_posix()):
+
+                # Match spectrum ID with provided regex
+                match = spectrum_id_regex.search(spectrum.identifier)
+                try:
+                    spectrum_id = match[1]
+                except (TypeError, IndexError):
+                    raise exceptions.TitlePatternError(
+                        f"Spectrum title pattern `{self._spectrum_id_pattern}` could not be matched to "
+                        f"spectrum ID `{spectrum.identifier}`. "
+                        " Are you sure that the regex contains a capturing group?"
+                    )
+
+                # print(spectrum_id)
+                # Skip if no matching PSMs
+                psm = single_df[single_df["spectrum_ref"] == spectrum_id]
+                if psm.shape[0] <= 0:
+                    continue
+                # Process each PSM for this spectrum
+                for row_index, row in psm.iterrows():
+                    row = precursor_df.loc[row_index]
+                    mz = theoretical_mz_df.iloc[row["frag_start_idx"]:row["frag_stop_idx"], ]
+                    match_intensity = _get_targets_df_for_psm(
+                        mz, spectrum, self._ms2_tolerance, self._ms2_tolerance_unit
+                    )
+                    fragment_len = match_intensity.shape[0]
+                    precursor_df.loc[row_index, "match_start_idx"] = current_index
+                    precursor_df.loc[row_index, "match_stop_idx"] = current_index + fragment_len
+                    match_intensity_df.append(match_intensity)
+                    current_index += fragment_len
+
+        match_intensity_df = pd.concat(match_intensity_df, ignore_index=True)
+
+        psm_num_to_train_ms2 = int(len(precursor_df) * (1 - self._transfer_learning_test_ratio))
+        psm_num_to_test_ms2 = len(precursor_df) - psm_num_to_train_ms2
+
+        precursor_df.drop(columns=["frag_start_idx", "frag_stop_idx"], inplace=True)
+        precursor_df.rename(columns={
+            "match_start_idx": "frag_start_idx",
+            "match_stop_idx": "frag_stop_idx"
+        }, inplace=True)
+        precursor_df["frag_start_idx"] = precursor_df["frag_start_idx"].astype("int64")
+        precursor_df["frag_stop_idx"] = precursor_df["frag_stop_idx"].astype("int64")
+
+        model_mgr = MS2ModelManager(
+            mask_modloss=not self._consider_modloss,
+            device="cpu",
+            model_dir=self._model_dir
+        )
+
+        model_mgr.ms2_fine_tuning(precursor_df,
+                                  match_intensity_df,
+                                  psm_num_to_train_ms2=psm_num_to_train_ms2,
+                                  psm_num_to_test_ms2=psm_num_to_test_ms2,
+                                  train_verbose=True,
+                                  force_transfer_learning=self._force_transfer_learning,
+                                  epoch_to_train_ms2=self._epoch_to_train_ms2)
+
+        model_mgr.save_ms2_model(self._save_model_dir)

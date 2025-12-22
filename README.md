@@ -5,13 +5,14 @@
 [![PyPI version](https://badge.fury.io/py/quantms-rescoring.svg)](https://badge.fury.io/py/quantms-rescoring)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-quantms-rescoring is a Python tool that aims to add features to peptide-spectrum matches (PSMs) in idXML files using multiple tools including SAGE features, quantms spectrum features, MS2PIP and DeepLC. It is part of the quantms ecosystem package and leverages the MS²Rescore framework to improve identification confidence in proteomics data analysis.
+quantms-rescoring is a Python tool that aims to add features to peptide-spectrum matches (PSMs) in idXML files using multiple tools including SAGE features, quantms spectrum features, MS2PIP, AlphaPeptDeep and DeepLC. It is part of the quantms ecosystem package and leverages the MS²Rescore framework to improve identification confidence in proteomics data analysis.
 
 ## Core Components
 
-- **Annotator Engine**: Integrates [MS2PIP](https://github.com/compomics/ms2pip) and [DeepLC](https://github.com/compomics/DeepLC) models to improve peptide-spectrum match (PSM) confidence. 
+- **Annotator Engine**: Integrates [MS2PIP](https://github.com/compomics/ms2pip), [AlphaPeptDeep](https://github.com/MannLabs/alphapeptdeep) and [DeepLC](https://github.com/compomics/DeepLC) models to improve peptide-spectrum match (PSM) confidence. 
 - **Feature Generation**: Extracts signal-to-noise ratios, spectrum metrics, SAGE extra features and add them to each PSM for posterior downstream with Percolator.
 - **OpenMS Integration**: Processes idXML and mzML files with custom validation methods.
+- **Transfer learning**: Implemented train and fine-tune the ms2 model to generate project-specific model and pass the new model to quantms workflow for rescoring.
 
 ## CLI Tools
 
@@ -31,13 +32,23 @@ Incorporates additional features from SAGE into idXML files.
 Add additional spectrum feature like signal-to-noise to each PSM in the idXML.
 
 ```sh
+ rescoring psm_feature_clean --help
+```
+Check and clean invalid PSM with invalid features in the idXML.
+
+```sh
  rescoring download_models --help
 ```
 Download all required models (MS2PIP, AlphaPeptDeep) for offline use. This is useful for running quantms-rescoring in environments without internet access, such as HPC clusters.
 
+```sh
+ rescoring transfer_learning --help
+```
+Perform train and fine-tuning model for AlphaPeptDeep to generate project-specific model. This is useful for running quantms-rescoring in PTM datasets, which are unseen for AlphaPeptDeep pretrained model.
+
 ## Advanced Algorithms and Improvements
 
-quantms-rescoring significantly enhances the capabilities of MS2PIP, DeepLC, and MS2Rescore through several innovative approaches:
+quantms-rescoring significantly enhances the capabilities of MS2PIP, AlphaPeptDeep, DeepLC, and MS2Rescore through several innovative approaches:
 
 ### MS2PIP Integration Enhancements
 
@@ -45,6 +56,13 @@ quantms-rescoring significantly enhances the capabilities of MS2PIP, DeepLC, and
 - **Adaptive MS2 Tolerance**: Dynamically adjusts MS2 tolerance based on the dataset characteristics, analyzing both reported and predicted tolerances to find the optimal setting.
 - **Correlation Validation**: Implements a robust validation system that ensures the selected model achieves sufficient correlation with experimental spectra, preventing the use of inappropriate models.
 - **Enhanced Spectrum Processing**: Uses OpenMS for spectrum file reading instead of ms2rescore_rs, providing better compatibility with a wider range of mzML files and formats.
+
+### AlphaPeptDeep Innovations
+
+- **Fine-tuning**: Leverages fine-tuning to adapt models to specific experimental/project conditions based on identifications file (idXML) from quantms, improving prediction accuracy for challenging datasets, such as PTM.
+- **Model Optimization**: Automatically benchmarks pretrained vs. retrained AlphaPeptDeep models for each dataset, selecting the one with the better Median PCC for MS2 intensity prediction.
+- **Enhanced Spectrum Processing**: AlphaPeptDeep does not support idXML input, so we use OpenMS for spectrum file reading and pass it to AlphaPeptDeep for prediction and fine-tuning.
+- **Correlation Validation**: Implements a robust validation system that ensures the pretrained and retrained models achieve sufficient correlation with experimental spectra, preventing the use of inappropriate models.
 
 ### DeepLC Innovations
 
@@ -69,9 +87,11 @@ Unlike traditional rescoring approaches, quantms-rescoring incorporates advanced
 
 ### Advantages Over Existing Tools
 
-- **Compared to MS2PIP**: Adds automatic model selection, validation, and tolerance optimization, eliminating the need for manual parameter tuning.
+- **Compared to MS2PIP**: Adds automatic model selection, validation, features calculations and tolerance optimization, eliminating the need for manual parameter tuning.
 - **Compared to DeepLC**: Provides automatic model selection between pretrained and retrained models, with per-run calibration for improved accuracy.
-- **Compared to MS2Rescore**: Offers a more comprehensive feature set including spectrum quality metrics, better integration with OpenMS, and improved handling of different fragmentation methods and MS levels.
+- **Compared to MS2Rescore**: Integrates a broader range of MS2 prediction models, including AlphaPeptDeep, and supports fine-tuning to generate project-specific models. It provides a richer feature set encompassing spectrum quality metrics, tighter integration with OpenMS, and more robust support for diverse fragmentation methods and MS levels. 
+- **Compared to AlphaPeptDeep**: Seamlessly integrates into the quantms workflow and natively supports the quantms identification results format. It introduces automatic model selection and validation, delivers an expanded feature set, and offers improved handling of different fragmentation methods and MS levels.
+
 
 ## Technical Implementation Details
 
@@ -80,6 +100,9 @@ Unlike traditional rescoring approaches, quantms-rescoring incorporates advanced
 - **MS2PIP Model Selection**: 
   - Automatically evaluate the quality of the MS2PIP model selected by the user. If the correlation between predicted and experimental spectra is lower than a given threshold, we will try to find the best model to use (`annotator.py`). For example, if the user provides as model parameter HCD for a CI experiment, the tool will try to find the best model for this experiment within the CID models available. 
   - If the `ms_tolerance` is to restrictive for the data (e.g. 0.05 Da for a 0.5 Da dataset), the tool will try to find the annotated tolerances in the idXML file and use the best model for this tolerance.
+- **AlphaPeptDeep Model**:
+  - Automatically evaluate the quality of the AlphaPeptDeep model weight passed by the user. If the correlation between predicted and experimental spectra is lower than a given threshold, we will skip MS2 features generation to avoid potential erroneous results.
+  - When enabling `transfer_learning`, the tool will try to fine-tune the AlphaPeptDeep model on the given idXML and mzML files and compare it with the pretrained model, finally using the best model based on similarity metrics.
 - **DeepLC Model Selection**: 
   - Automatically select the best DeepLC model for each run based on the retention time calibration and prediction accuracy. Different to ms2rescore, the tool will try to use the best model from MS2PIP and benchmark it with the same model by using transfer learning (`annotator.py`). The best model is selected to be used to predict the retention time of PSMs.
 
@@ -97,89 +120,89 @@ Unlike traditional rescoring approaches, quantms-rescoring incorporates advanced
   - Determines weighted standard deviation of m/z values for spectral complexity estimation
 - **Feature Selection**: The parameters `only_features` allows to select the features to be added to the idXML file. For example: `--only_features "DeepLC:RtDiff,DeepLC:PredictedRetentionTimeBest,Ms2pip:DotProd"`. 
 
-##### Features
+#### Features
 
 <details>
-<summary>MS2PIP Feature Mapping Table</summary>
+<summary>MS2PIP and AlphaPeptDeep Feature Mapping Table</summary>
 
-| MMS2Rescore MS2PIP Feature     | quantms-rescoring Name            |
-|--------------------------------|-----------------------------------|
-| spec_pearson                   | MS2PIP:SpecPearson                |
-| cos_norm                       | MS2PIP:SpecCosineNorm             |
-| spec_pearson_norm              | MS2PIP:SpecPearsonNorm            |
-| dotprod                        | MS2PIP:DotProd                    |
-| ionb_pearson_norm              | MS2PIP:IonBPearsonNorm            |
-| iony_pearson_norm              | MS2PIP:IonYPearsonNorm            |
-| spec_mse_norm                  | MS2PIP:SpecMseNorm                |
-| ionb_mse_norm                  | MS2PIP:IonBMseNorm                |
-| iony_mse_norm                  | MS2PIP:IonYMseNorm                |
-| min_abs_diff_norm              | MS2PIP:MinAbsDiffNorm             |
-| max_abs_diff_norm              | MS2PIP:MaxAbsDiffNorm             |
-| abs_diff_Q1_norm               | MS2PIP:AbsDiffQ1Norm              |
-| abs_diff_Q2_norm               | MS2PIP:AbsDiffQ2Norm              |
-| abs_diff_Q3_norm               | MS2PIP:AbsDiffQ3Norm              |
-| mean_abs_diff_norm             | MS2PIP:MeanAbsDiffNorm            |
-| std_abs_diff_norm              | MS2PIP:StdAbsDiffNorm             |
-| ionb_min_abs_diff_norm         | MS2PIP:IonBMinAbsDiffNorm         |
-| ionb_max_abs_diff_norm         | MS2PIP:IonBMaxAbsDiffNorm         |
-| ionb_abs_diff_Q1_norm          | MS2PIP:IonBAbsDiffQ1Norm          |
-| ionb_abs_diff_Q2_norm          | MS2PIP:IonBAbsDiffQ2Norm          |
-| ionb_abs_diff_Q3_norm          | MS2PIP:IonBAbsDiffQ3Norm          |
-| ionb_mean_abs_diff_norm        | MS2PIP:IonBMeanAbsDiffNorm        |
-| ionb_std_abs_diff_norm         | MS2PIP:IonBStdAbsDiffNorm         |
-| iony_min_abs_diff_norm         | MS2PIP:IonYMinAbsDiffNorm         |
-| iony_max_abs_diff_norm         | MS2PIP:IonYMaxAbsDiffNorm         |
-| iony_abs_diff_Q1_norm          | MS2PIP:IonYAbsDiffQ1Norm          |
-| iony_abs_diff_Q2_norm          | MS2PIP:IonYAbsDiffQ2Norm          |
-| iony_abs_diff_Q3_norm          | MS2PIP:IonYAbsDiffQ3Norm          |
-| iony_mean_abs_diff_norm        | MS2PIP:IonYMeanAbsDiffNorm        |
-| iony_std_abs_diff_norm         | MS2PIP:IonYStdAbsDiffNorm         |
-| dotprod_norm                   | MS2PIP:DotProdNorm                |
-| dotprod_ionb_norm              | MS2PIP:DotProdIonBNorm            |
-| dotprod_iony_norm              | MS2PIP:DotProdIonYNorm            |
-| cos_ionb_norm                  | MS2PIP:CosIonBNorm                |
-| cos_iony_norm                  | MS2PIP:CosIonYNorm                |
-| ionb_pearson                   | MS2PIP:IonBPearson                |
-| iony_pearson                   | MS2PIP:IonYPearson                |
-| spec_spearman                  | MS2PIP:SpecSpearman               |
-| ionb_spearman                  | MS2PIP:IonBSpearman               |
-| iony_spearman                  | MS2PIP:IonYSpearman               |
-| spec_mse                       | MS2PIP:SpecMse                    |
-| ionb_mse                       | MS2PIP:IonBMse                    |
-| iony_mse                       | MS2PIP:IonYMse                    |
-| min_abs_diff_iontype           | MS2PIP:MinAbsDiffIonType          |
-| max_abs_diff_iontype           | MS2PIP:MaxAbsDiffIonType          |
-| min_abs_diff                   | MS2PIP:MinAbsDiff                 |
-| max_abs_diff                   | MS2PIP:MaxAbsDiff                 |
-| abs_diff_Q1                    | MS2PIP:AbsDiffQ1                  |
-| abs_diff_Q2                    | MS2PIP:AbsDiffQ2                  |
-| abs_diff_Q3                    | MS2PIP:AbsDiffQ3                  |
-| mean_abs_diff                  | MS2PIP:MeanAbsDiff                |
-| std_abs_diff                   | MS2PIP:StdAbsDiff                 |
-| ionb_min_abs_diff              | MS2PIP:IonBMinAbsDiff             |
-| ionb_max_abs_diff              | MS2PIP:IonBMaxAbsDiff             |
-| ionb_abs_diff_Q1               | MS2PIP:IonBAbsDiffQ1              |
-| ionb_abs_diff_Q2               | MS2PIP:IonBAbsDiffQ2              |
-| ionb_abs_diff_Q3               | MS2PIP:IonBAbsDiffQ3              |
-| ionb_mean_abs_diff             | MS2PIP:IonBMeanAbsDiff            |
-| ionb_std_abs_diff              | MS2PIP:IonBStdAbsDiff             |
-| iony_min_abs_diff              | MS2PIP:IonYMinAbsDiff             |
-| iony_max_abs_diff              | MS2PIP:IonYMaxAbsDiff             |
-| iony_abs_diff_Q1               | MS2PIP:IonYAbsDiffQ1              |
-| iony_abs_diff_Q2               | MS2PIP:IonYAbsDiffQ2              |
-| iony_abs_diff_Q3               | MS2PIP:IonYAbsDiffQ3              |
-| iony_mean_abs_diff             | MS2PIP:IonYMeanAbsDiff            |
-| iony_std_abs_diff              | MS2PIP:IonYStdAbsDiff             |
-| dotprod_ionb                   | MS2PIP:DotProdIonB                |
-| dotprod_iony                   | MS2PIP:DotProdIonY                |
-| cos_ionb                       | MS2PIP:CosIonB                    |
-| cos_iony                       | MS2PIP:CosIonY                    |
+| MS2PIP and AlphaPeptDeep Feature | quantms-rescoring Name                   |
+|----------------------------------|------------------------------------------|
+| spec_pearson                     | MS2PIP/AlphaPeptDeep:SpecPearson         |
+| cos_norm                         | MS2PIP/AlphaPeptDeep:SpecCosineNorm      |
+| spec_pearson_norm                | MS2PIP/AlphaPeptDeep:SpecPearsonNorm     |
+| dotprod                          | MS2PIP/AlphaPeptDeep:DotProd             |
+| ionb_pearson_norm                | MS2PIP/AlphaPeptDeep:IonBPearsonNorm     |
+| iony_pearson_norm                | MS2PIP/AlphaPeptDeep:IonYPearsonNorm     |
+| spec_mse_norm                    | MS2PIP/AlphaPeptDeep:SpecMseNorm         |
+| ionb_mse_norm                    | MS2PIP/AlphaPeptDeep:IonBMseNorm         |
+| iony_mse_norm                    | MS2PIP/AlphaPeptDeep:IonYMseNorm         |
+| min_abs_diff_norm                | MS2PIP/AlphaPeptDeep:MinAbsDiffNorm      |
+| max_abs_diff_norm                | MS2PIP/AlphaPeptDeep:MaxAbsDiffNorm      |
+| abs_diff_Q1_norm                 | MS2PIP/AlphaPeptDeep:AbsDiffQ1Norm       |
+| abs_diff_Q2_norm                 | MS2PIP/AlphaPeptDeep:AbsDiffQ2Norm       |
+| abs_diff_Q3_norm                 | MS2PIP/AlphaPeptDeep:AbsDiffQ3Norm       |
+| mean_abs_diff_norm               | MS2PIP/AlphaPeptDeep:MeanAbsDiffNorm     |
+| std_abs_diff_norm                | MS2PIP/AlphaPeptDeep:StdAbsDiffNorm      |
+| ionb_min_abs_diff_norm           | MS2PIP/AlphaPeptDeep:IonBMinAbsDiffNorm  |
+| ionb_max_abs_diff_norm           | MS2PIP/AlphaPeptDeep:IonBMaxAbsDiffNorm  |
+| ionb_abs_diff_Q1_norm            | MS2PIP/AlphaPeptDeep:IonBAbsDiffQ1Norm   |
+| ionb_abs_diff_Q2_norm            | MS2PIP/AlphaPeptDeep:IonBAbsDiffQ2Norm   |
+| ionb_abs_diff_Q3_norm            | MS2PIP/AlphaPeptDeep:IonBAbsDiffQ3Norm   |
+| ionb_mean_abs_diff_norm          | MS2PIP/AlphaPeptDeep:IonBMeanAbsDiffNorm |
+| ionb_std_abs_diff_norm           | MS2PIP/AlphaPeptDeep:IonBStdAbsDiffNorm  |
+| iony_min_abs_diff_norm           | MS2PIP/AlphaPeptDeep:IonYMinAbsDiffNorm  |
+| iony_max_abs_diff_norm           | MS2PIP/AlphaPeptDeep:IonYMaxAbsDiffNorm  |
+| iony_abs_diff_Q1_norm            | MS2PIP/AlphaPeptDeep:IonYAbsDiffQ1Norm   |
+| iony_abs_diff_Q2_norm            | MS2PIP/AlphaPeptDeep:IonYAbsDiffQ2Norm   |
+| iony_abs_diff_Q3_norm            | MS2PIP/AlphaPeptDeep:IonYAbsDiffQ3Norm   |
+| iony_mean_abs_diff_norm          | MS2PIP/AlphaPeptDeep:IonYMeanAbsDiffNorm |
+| iony_std_abs_diff_norm           | MS2PIP/AlphaPeptDeep:IonYStdAbsDiffNorm  |
+| dotprod_norm                     | MS2PIP/AlphaPeptDeep:DotProdNorm         |
+| dotprod_ionb_norm                | MS2PIP/AlphaPeptDeep:DotProdIonBNorm     |
+| dotprod_iony_norm                | MS2PIP/AlphaPeptDeep:DotProdIonYNorm     |
+| cos_ionb_norm                    | MS2PIP/AlphaPeptDeep:CosIonBNorm         |
+| cos_iony_norm                    | MS2PIP/AlphaPeptDeep:CosIonYNorm         |
+| ionb_pearson                     | MS2PIP/AlphaPeptDeep:IonBPearson         |
+| iony_pearson                     | MS2PIP/AlphaPeptDeep:IonYPearson         |
+| spec_spearman                    | MS2PIP/AlphaPeptDeep:SpecSpearman        |
+| ionb_spearman                    | MS2PIP/AlphaPeptDeep:IonBSpearman        |
+| iony_spearman                    | MS2PIP/AlphaPeptDeep:IonYSpearman        |
+| spec_mse                         | MS2PIP/AlphaPeptDeep:SpecMse             |
+| ionb_mse                         | MS2PIP/AlphaPeptDeep:IonBMse             |
+| iony_mse                         | MS2PIP/AlphaPeptDeep:IonYMse             |
+| min_abs_diff_iontype             | MS2PIP/AlphaPeptDeep:MinAbsDiffIonType   |
+| max_abs_diff_iontype             | MS2PIP/AlphaPeptDeep:MaxAbsDiffIonType   |
+| min_abs_diff                     | MS2PIP/AlphaPeptDeep:MinAbsDiff          |
+| max_abs_diff                     | MS2PIP/AlphaPeptDeep:MaxAbsDiff          |
+| abs_diff_Q1                      | MS2PIP/AlphaPeptDeep:AbsDiffQ1           |
+| abs_diff_Q2                      | MS2PIP/AlphaPeptDeep:AbsDiffQ2           |
+| abs_diff_Q3                      | MS2PIP/AlphaPeptDeep:AbsDiffQ3           |
+| mean_abs_diff                    | MS2PIP/AlphaPeptDeep:MeanAbsDiff         |
+| std_abs_diff                     | MS2PIP/AlphaPeptDeep:StdAbsDiff          |
+| ionb_min_abs_diff                | MS2PIP/AlphaPeptDeep:IonBMinAbsDiff      |
+| ionb_max_abs_diff                | MS2PIP/AlphaPeptDeep:IonBMaxAbsDiff      |
+| ionb_abs_diff_Q1                 | MS2PIP/AlphaPeptDeep:IonBAbsDiffQ1       |
+| ionb_abs_diff_Q2                 | MS2PIP/AlphaPeptDeep:IonBAbsDiffQ2       |
+| ionb_abs_diff_Q3                 | MS2PIP/AlphaPeptDeep:IonBAbsDiffQ3       |
+| ionb_mean_abs_diff               | MS2PIP/AlphaPeptDeep:IonBMeanAbsDiff     |
+| ionb_std_abs_diff                | MS2PIP/AlphaPeptDeep:IonBStdAbsDiff      |
+| iony_min_abs_diff                | MS2PIP/AlphaPeptDeep:IonYMinAbsDiff      |
+| iony_max_abs_diff                | MS2PIP/AlphaPeptDeep:IonYMaxAbsDiff      |
+| iony_abs_diff_Q1                 | MS2PIP/AlphaPeptDeep:IonYAbsDiffQ1       |
+| iony_abs_diff_Q2                 | MS2PIP/AlphaPeptDeep:IonYAbsDiffQ2       |
+| iony_abs_diff_Q3                 | MS2PIP/AlphaPeptDeep:IonYAbsDiffQ3       |
+| iony_mean_abs_diff               | MS2PIP/AlphaPeptDeep:IonYMeanAbsDiff     |
+| iony_std_abs_diff                | MS2PIP/AlphaPeptDeep:IonYStdAbsDiff      |
+| dotprod_ionb                     | MS2PIP/AlphaPeptDeep:DotProdIonB         |
+| dotprod_iony                     | MS2PIP/AlphaPeptDeep:DotProdIonY         |
+| cos_ionb                         | MS2PIP/AlphaPeptDeep:CosIonB             |
+| cos_iony                         | MS2PIP/AlphaPeptDeep:CosIonY             |
 
 </details>
 
 <details>
 <summary>DeepLC Feature Mapping Table</summary>
-
+    
 | MMS2Rescore DeepLC Feature    | quantms-rescoring Name            |
 |-------------------------------|-----------------------------------|
 | observed_retention_time       | DeepLC:ObservedRetentionTime      |

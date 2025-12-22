@@ -21,7 +21,7 @@ def test_ms2rescore():
     result = runner.invoke(
         cli,
         [
-            "ms2rescore",
+            "msrescore2feature",
             "--idxml",
             "{}/test_data/TMT_Erwinia_1uLSike_Top10HCD_isol2_45stepped_60min_01_comet.idXML".format(
                 TESTS_DIR
@@ -45,7 +45,7 @@ def test_ms2rescore_failing():
     result = runner.invoke(
         cli,
         [
-            "ms2rescore",
+            "msrescore2feature",
             "--idxml",
             "{}/test_data/dae1cb16fb57893b94bfcb731b2bf7/Instrument1_sample14_S1R10_042116_Fr12_msgf.idXML".format(
                 TESTS_DIR
