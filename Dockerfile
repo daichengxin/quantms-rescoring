@@ -38,7 +38,6 @@ FROM python:3.11-slim AS final
 ENV DEBIAN_FRONTEND=noninteractive
 ENV LANG=en_US.UTF-8
 ENV LANGUAGE=en_US:en
-ENV LC_ALL=en_US.UTF-8
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
