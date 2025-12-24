@@ -68,7 +68,7 @@ ENV MPLCONFIGDIR=/home/app/.config/matplotlib
 RUN mkdir -p \
       /home/app/peptdeep/pretrained_models \
       /home/app/.config/matplotlib \
-    && chown -R app:app /home/app \
+    && chown -R app:app /home/app
 
 USER app
 
