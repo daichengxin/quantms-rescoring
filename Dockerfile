@@ -15,6 +15,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxslt1.1 \
     libssl3 \
     libffi-dev \
+    procps \
  && rm -rf /var/lib/apt/lists/*
 
 #RUN sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen && \
@@ -49,6 +50,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxslt1.1 \
     libssl3 \
     libffi-dev \
+    procps \
  && rm -rf /var/lib/apt/lists/*
 
 #RUN sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen && \
