@@ -15,6 +15,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxslt1.1 \
     libssl3 \
     libffi-dev \
+    procps \
  && rm -rf /var/lib/apt/lists/*
 
 #RUN sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen && \
@@ -48,6 +49,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxslt1.1 \
     libssl3 \
     libffi-dev \
+    procps \
  && rm -rf /var/lib/apt/lists/*
 
 #RUN sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen && \
@@ -57,6 +59,17 @@ COPY --from=builder /usr/local /usr/local
 
 RUN useradd --create-home --shell /bin/bash app && \
     mkdir /data && chown -R app:app /data
+
+ENV HOME=/home/app
+ENV PEPTDEEP_HOME=/home/app/peptdeep
+ENV MPLCONFIGDIR=/home/app/.config/matplotlib
+
+RUN mkdir -p \
+      /home/app/peptdeep/pretrained_models \
+      /home/app/.config/matplotlib \
+    && chown -R app:app /home/app \
+    && chmod -R 777 /home/app
+
 USER app
 
 WORKDIR /data
