@@ -57,21 +57,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY --from=builder /usr/local /usr/local
 
-RUN useradd --create-home --shell /bin/bash app && \
-    mkdir /data && chown -R app:app /data
+ENV HOME=/work
+ENV PEPTDEEP_HOME=/work
+ENV MPLCONFIGDIR=/work/.config/matplotlib
 
-ENV HOME=/home/app
-ENV PEPTDEEP_HOME=/home/app/peptdeep
-ENV MPLCONFIGDIR=/home/app/.config/matplotlib
-
-RUN mkdir -p \
-      /home/app/peptdeep/pretrained_models \
-      /home/app/.config/matplotlib \
-    && chown -R app:app /home/app \
-    && chmod -R 777 /home/app
-
-USER app
-
-WORKDIR /data
+WORKDIR /work
+RUN chmod -R 777 /work
 
 RUN python3.11 -c "import pyopenms; print('pyOpenMS imported successfully')"
