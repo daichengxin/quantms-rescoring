@@ -19,6 +19,7 @@ class SpectrumStats:
         self.missing_spectra: int = 0
         self.empty_spectra: int = 0
         self.invalid_score: int = 0
+        self.duplicates_psm: int = 0
         self.ms_level_counts: DefaultDict[int, int] = defaultdict(int)
         self.ms_level_dissociation_method: Dict[Tuple[int, str], int] = {}
 
@@ -156,10 +157,20 @@ class IdXMLReader:
         new_peptide_ids = []
         peptide_removed = 0
         search_engine = self.oms_proteins[0].getSearchEngine()
+        unique_spectrum_reference = set()
 
         for peptide_id in self.oms_peptides:
             spectrum = OpenMSHelper.get_spectrum_for_psm(peptide_id, self.exp, self.spec_lookup)
             spectrum_reference = OpenMSHelper.get_spectrum_reference(peptide_id)
+
+            if spectrum_reference in unique_spectrum_reference:
+                logger.warning(f"Duplicates PSM identification found for PSM {spectrum_reference}")
+                self._stats.duplicates_psm += 1
+                logger.debug(f"Removing duplicates PSM {spectrum_reference}")
+                peptide_removed += 1
+                continue
+            else:
+                unique_spectrum_reference.add(spectrum_reference)
 
             missing_spectrum, empty_spectrum, invalid_score = False, False, False
             ms_level = 2
