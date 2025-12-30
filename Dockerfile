@@ -57,19 +57,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY --from=builder /usr/local /usr/local
 
-RUN useradd --create-home --shell /bin/bash app && \
-    mkdir /data && chown -R app:app /data
-
 ENV HOME=/data
 ENV PEPTDEEP_HOME=/data
 ENV MPLCONFIGDIR=/data/.config/matplotlib
-
-RUN mkdir -p \
-      /data/peptdeep/pretrained_models \
-      /data/.config/matplotlib \
-    && chown -R app:app /data
-
-USER app
 
 WORKDIR /data
 
