@@ -60,15 +60,14 @@ COPY --from=builder /usr/local /usr/local
 RUN useradd --create-home --shell /bin/bash app && \
     mkdir /data && chown -R app:app /data
 
-ENV HOME=/home/app
-ENV PEPTDEEP_HOME=/home/app/peptdeep
+ENV HOME=/data
+ENV PEPTDEEP_HOME=/data
 ENV MPLCONFIGDIR=/home/app/.config/matplotlib
 
 RUN mkdir -p \
       /home/app/peptdeep/pretrained_models \
       /home/app/.config/matplotlib \
-    && chown -R app:app /home/app \
-    && chmod -R 777 /home/app
+    && chown -R app:app /home/app
 
 USER app
 
