@@ -62,5 +62,6 @@ ENV PEPTDEEP_HOME=/work
 ENV MPLCONFIGDIR=/work/.config/matplotlib
 
 WORKDIR /work
+RUN chmod -R 755 /work
 
 RUN python3.11 -c "import pyopenms; print('pyOpenMS imported successfully')"
