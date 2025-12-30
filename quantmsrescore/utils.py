@@ -169,7 +169,7 @@ class IdXMLReader:
                 logger.debug(f"Removing duplicates PSM {spectrum_reference}")
                 peptide_removed += 1
                 continue
-            else:
+            elif spectrum_reference is not None:
                 unique_spectrum_reference.add(spectrum_reference)
 
             missing_spectrum, empty_spectrum, invalid_score = False, False, False
