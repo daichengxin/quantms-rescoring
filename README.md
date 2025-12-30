@@ -335,10 +335,6 @@ This command downloads models for:
 
 Once downloaded, you can transfer the models to your offline environment and use them with the processing commands. For AlphaPeptDeep models, use the `--ms2_model_dir` option when running `msrescore2feature`.
 
-### TODO
-
-- [ ] Add support for multiple Files combined idXML and mzML
-
 ### Issues and Contributions
 
 For any issues or contributions, please open an issue in the [GitHub repository](https://github.com/bigbio/quantms/issues) - we use the quantms repo to control all issues—or PR in the [GitHub repository](https://github.com/bigbio/quantms-rescoring/pulls).
