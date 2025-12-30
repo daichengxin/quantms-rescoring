@@ -62,12 +62,12 @@ RUN useradd --create-home --shell /bin/bash app && \
 
 ENV HOME=/data
 ENV PEPTDEEP_HOME=/data
-ENV MPLCONFIGDIR=/home/app/.config/matplotlib
+ENV MPLCONFIGDIR=/data/.config/matplotlib
 
 RUN mkdir -p \
-      /home/app/peptdeep/pretrained_models \
-      /home/app/.config/matplotlib \
-    && chown -R app:app /home/app
+      /data/peptdeep/pretrained_models \
+      /data/.config/matplotlib \
+    && chown -R app:app /data
 
 USER app
 
