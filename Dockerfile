@@ -15,6 +15,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxslt1.1 \
     libssl3 \
     libffi-dev \
+    procps \
  && rm -rf /var/lib/apt/lists/*
 
 #RUN sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen && \
@@ -48,6 +49,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxslt1.1 \
     libssl3 \
     libffi-dev \
+    procps \
  && rm -rf /var/lib/apt/lists/*
 
 #RUN sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen && \
@@ -55,10 +57,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY --from=builder /usr/local /usr/local
 
-RUN useradd --create-home --shell /bin/bash app && \
-    mkdir /data && chown -R app:app /data
-USER app
+ENV HOME=/work
+ENV PEPTDEEP_HOME=/work
+ENV MPLCONFIGDIR=/work/.config/matplotlib
 
-WORKDIR /data
+WORKDIR /work
+RUN chmod -R 777 /work
 
 RUN python3.11 -c "import pyopenms; print('pyOpenMS imported successfully')"
