@@ -157,7 +157,7 @@ class IdXMLReader:
         new_peptide_ids = []
         peptide_removed = 0
         search_engine = self.oms_proteins[0].getSearchEngine()
-        unique_spectrum_reference = []
+        unique_spectrum_reference = set()
 
         for peptide_id in self.oms_peptides:
             spectrum = OpenMSHelper.get_spectrum_for_psm(peptide_id, self.exp, self.spec_lookup)
@@ -170,7 +170,7 @@ class IdXMLReader:
                 peptide_removed += 1
                 continue
             else:
-                unique_spectrum_reference.append(spectrum_reference)
+                unique_spectrum_reference.add(spectrum_reference)
 
             missing_spectrum, empty_spectrum, invalid_score = False, False, False
             ms_level = 2
