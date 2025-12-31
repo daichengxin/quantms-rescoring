@@ -21,7 +21,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 #RUN sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen && \
 #    locale-gen
 
-WORKDIR /app
+WORKDIR /work
 COPY . .
 
 RUN pip install --no-cache-dir pip==25.1.1 && \
@@ -58,10 +58,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=builder /usr/local /usr/local
 
 ENV HOME=/work
-ENV PEPTDEEP_HOME=/work
+ENV PEPTDEEP_HOME=/tmp
 ENV MPLCONFIGDIR=/work/.config/matplotlib
 
 WORKDIR /work
-RUN chmod -R 777 /work
+#RUN chmod -R 777 /work
 
 RUN python3.11 -c "import pyopenms; print('pyOpenMS imported successfully')"
