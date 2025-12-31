@@ -38,8 +38,9 @@ class MS2ModelManager(ModelManager):
             self.load_external_models(ms2_model_file=glob.glob(os.path.join(model_dir, "*ms2.pth"))[0])
             self.model_str = model_dir
         else:
-            _download_models(MODEL_ZIP_FILE_PATH)
-            self.load_installed_models()
+            self.download_model_path = "pretrained_models_v3.zip"
+            _download_models(self.download_model_path)
+            self.load_installed_models(self.download_model_path)
             self.model_str = "generic"
         self.pretrained_ms2_model = copy.deepcopy(self.ms2_model)
         self.reset_by_global_settings(reload_models=False)
@@ -67,6 +68,31 @@ class MS2ModelManager(ModelManager):
         self.force_transfer_learning = force_transfer_learning
         self.epoch_to_train_ms2 = epoch_to_train_ms2
         self.train_ms2_model(psms_df, match_intensity_df)
+
+    def load_installed_models(self, download_model_path: str = "pretrained_models_v3.zip", model_type: str = "generic"):
+        """Load built-in MS2/CCS/RT models.
+
+        Parameters
+        ----------
+        model_type : str, optional
+            To load the installed MS2/RT/CCS models or phos MS2/RT/CCS models.
+            It could be 'digly', 'phospho', 'HLA', or 'generic'.
+            Defaults to 'generic'.
+        download_model_path : str, optional
+            The path of model
+            Defaults to 'pretrained_models_v3.zip'.
+        """
+
+        self.ms2_model.load(
+            download_model_path, model_path_in_zip="generic/ms2.pth"
+        )
+        self.rt_model.load(download_model_path, model_path_in_zip="generic/rt.pth")
+        self.ccs_model.load(
+            download_model_path, model_path_in_zip="generic/ccs.pth"
+        )
+        self.charge_model.load(
+            download_model_path, model_path_in_zip="generic/charge.pth"
+        )
 
     def train_ms2_model(
             self,
