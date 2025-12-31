@@ -56,9 +56,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 #    locale-gen
 
 COPY --from=builder /usr/local /usr/local
-
-ENV HOME=/tmp
-ENV PEPTDEEP_HOME=/tmp
 ENV MPLCONFIGDIR=/tmp/.config/matplotlib
 
 #WORKDIR /work
