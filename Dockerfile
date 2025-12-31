@@ -57,9 +57,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY --from=builder /usr/local /usr/local
 
-#ENV HOME=/work
+ENV HOME=/tmp
 ENV PEPTDEEP_HOME=/tmp
-ENV MPLCONFIGDIR=/work/.config/matplotlib
+ENV MPLCONFIGDIR=/tmp/.config/matplotlib
 
 #WORKDIR /work
 #RUN chmod -R 777 /work
