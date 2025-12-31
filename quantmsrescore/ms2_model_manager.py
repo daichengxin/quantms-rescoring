@@ -20,7 +20,7 @@ class MS2ModelManager(ModelManager):
     def __init__(self,
                  mask_modloss: bool = False,
                  device: str = "gpu",
-                 model_dir: str = None,
+                 model_dir: str = ".",
                  ):
         self._train_psm_logging = True
 
@@ -34,11 +34,11 @@ class MS2ModelManager(ModelManager):
             device=device
         )
 
-        if model_dir is not None and len(glob.glob(os.path.join(model_dir, "*ms2.pth"))) > 0:
+        if len(glob.glob(os.path.join(model_dir, "*ms2.pth"))) > 0:
             self.load_external_models(ms2_model_file=glob.glob(os.path.join(model_dir, "*ms2.pth"))[0])
             self.model_str = model_dir
         else:
-            self.download_model_path = "pretrained_models_v3.zip"
+            self.download_model_path = os.path.join(model_dir, "pretrained_models_v3.zip")
             _download_models(self.download_model_path)
             self.load_installed_models(self.download_model_path)
             self.model_str = "generic"
