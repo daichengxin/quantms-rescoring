@@ -52,7 +52,8 @@ class MS2ModelManager(ModelManager):
     def __str__(self):
         return self.model_str
 
-    def _download_models(self, model_zip_file_path: str, overwrite: bool = True) -> None:
+    @staticmethod
+    def _download_models(model_zip_file_path: str, overwrite: bool = True) -> None:
         """Download models if not done yet."""
         url = global_settings["model_url"]
         if not os.path.exists(model_zip_file_path):
