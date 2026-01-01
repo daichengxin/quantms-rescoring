@@ -14,9 +14,7 @@ import numpy as np
 import warnings
 from typing import List, Tuple, Optional
 import copy
-from peptdeep.settings import global_settings
 import urllib
-import shutil
 import ssl
 import certifi
 
@@ -57,26 +55,26 @@ class MS2ModelManager(ModelManager):
     def _download_models(self, model_zip_file_path: str, overwrite: bool = True) -> None:
         """Download models if not done yet."""
         url = self.model_url
+        parsed = urllib.parse.urlparse(url)
+        if parsed.scheme not in ("http", "https"):
+            raise ValueError(f"Disallowed URL scheme: {parsed.scheme}")
+
         if not os.path.exists(model_zip_file_path):
             if not overwrite and os.path.exists(model_zip_file_path):
                 raise FileExistsError(f"Model file already exists: {model_zip_file_path}")
 
-            if not os.path.isfile(url):
-                logging.info(f"Downloading pretrained models from {url} to {model_zip_file_path} ...")
-                try:
-                    os.makedirs(os.path.dirname(model_zip_file_path), exist_ok=True)
-                    context = ssl.create_default_context(cafile=certifi.where())
-                    requests = urllib.request.urlopen(url, context=context, timeout=10)
-                    with open(model_zip_file_path, "wb") as f:
-                        f.write(requests.read())
-                except Exception as e:
-                    raise FileNotFoundError(
-                        f"Downloading model failed: {e}.\n" + MODEL_DOWNLOAD_INSTRUCTIONS
-                    ) from e
-            else:
-                logging.info(f"Copying pretrained models from {url} to {model_zip_file_path} ...")
+            logging.info(f"Downloading pretrained models from {url} to {model_zip_file_path} ...")
+            try:
                 os.makedirs(os.path.dirname(model_zip_file_path), exist_ok=True)
-                shutil.copy(url, model_zip_file_path)
+                context = ssl.create_default_context(cafile=certifi.where())
+                requests = urllib.request.urlopen(url, context=context, timeout=10)
+                with open(model_zip_file_path, "wb") as f:
+                    f.write(requests.read())
+            except Exception as e:
+                raise FileNotFoundError(
+                    f"Downloading model failed: {e}.\n" + MODEL_DOWNLOAD_INSTRUCTIONS
+                ) from e
+
             logging.info("Successfully downloaded pretrained models.")
         if not is_model_zip(model_zip_file_path):
             raise ValueError(
