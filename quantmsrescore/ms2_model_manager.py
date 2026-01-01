@@ -1,6 +1,6 @@
 import pandas as pd
-from peptdeep.pretrained_models import ModelManager, _download_models, model_mgr_settings, MODEL_ZIP_FILE_PATH, \
-    psm_sampling_with_important_mods
+from peptdeep.pretrained_models import ModelManager, model_mgr_settings, MODEL_DOWNLOAD_INSTRUCTIONS, \
+    psm_sampling_with_important_mods, is_model_zip
 from peptdeep.model.ms2 import pDeepModel, frag_types, max_frag_charge, ModelMS2Bert, calc_ms2_similarity
 from peptdeep.model.rt import AlphaRTModel
 from peptdeep.model.ccs import AlphaCCSModel
@@ -14,13 +14,16 @@ import numpy as np
 import warnings
 from typing import List, Tuple, Optional
 import copy
+import urllib
+import ssl
+import certifi
 
 
 class MS2ModelManager(ModelManager):
     def __init__(self,
                  mask_modloss: bool = False,
                  device: str = "gpu",
-                 model_dir: str = None,
+                 model_dir: str = ".",
                  ):
         self._train_psm_logging = True
 
@@ -33,19 +36,52 @@ class MS2ModelManager(ModelManager):
         self.charge_model: ChargeModelForModAASeq = ChargeModelForModAASeq(
             device=device
         )
+        self.model_url = "https://github.com/MannLabs/alphapeptdeep/releases/download/pre-trained-models/pretrained_models_v3.zip"
 
-        if model_dir is not None and len(glob.glob(os.path.join(model_dir, "*ms2.pth"))) > 0:
+        if len(glob.glob(os.path.join(model_dir, "*ms2.pth"))) > 0:
             self.load_external_models(ms2_model_file=glob.glob(os.path.join(model_dir, "*ms2.pth"))[0])
             self.model_str = model_dir
         else:
-            _download_models(MODEL_ZIP_FILE_PATH)
-            self.load_installed_models()
+            self.download_model_path = os.path.join(model_dir, "pretrained_models_v3.zip")
+            self._download_models(self.download_model_path)
+            self.load_installed_models(self.download_model_path)
             self.model_str = "generic"
         self.pretrained_ms2_model = copy.deepcopy(self.ms2_model)
         self.reset_by_global_settings(reload_models=False)
 
     def __str__(self):
         return self.model_str
+
+    def _download_models(self, model_zip_file_path: str, overwrite: bool = True) -> None:
+        """Download models if not done yet."""
+        url = self.model_url
+        parsed = urllib.parse.urlparse(url)
+        if parsed.scheme not in ("http", "https"):
+            raise ValueError(f"Disallowed URL scheme: {parsed.scheme}")
+
+        if not os.path.exists(model_zip_file_path):
+            if not overwrite and os.path.exists(model_zip_file_path):
+                raise FileExistsError(f"Model file already exists: {model_zip_file_path}")
+
+            logging.info(f"Downloading pretrained models from {url} to {model_zip_file_path} ...")
+            try:
+                os.makedirs(os.path.dirname(model_zip_file_path), exist_ok=True)
+                context = ssl.create_default_context(cafile=certifi.where())
+                requests = urllib.request.urlopen(url, context=context, timeout=10)  # nosec B310
+                with open(model_zip_file_path, "wb") as f:
+                    f.write(requests.read())
+            except Exception as e:
+                raise FileNotFoundError(
+                    f"Downloading model failed: {e}.\n" + MODEL_DOWNLOAD_INSTRUCTIONS
+                ) from e
+
+            logging.info("Successfully downloaded pretrained models.")
+        if not is_model_zip(model_zip_file_path):
+            raise ValueError(
+                f"Local model file is not a valid zip: {model_zip_file_path}.\n"
+                f"Please delete this file and try again.\n"
+                f"Or: {MODEL_DOWNLOAD_INSTRUCTIONS}"
+            )
 
     def ms2_fine_tuning(self, psms_df: pd.DataFrame,
                         match_intensity_df: pd.DataFrame,
@@ -67,6 +103,31 @@ class MS2ModelManager(ModelManager):
         self.force_transfer_learning = force_transfer_learning
         self.epoch_to_train_ms2 = epoch_to_train_ms2
         self.train_ms2_model(psms_df, match_intensity_df)
+
+    def load_installed_models(self, download_model_path: str = "pretrained_models_v3.zip", model_type: str = "generic"):
+        """Load built-in MS2/CCS/RT models.
+
+        Parameters
+        ----------
+        model_type : str, optional
+            To load the installed MS2/RT/CCS models or phos MS2/RT/CCS models.
+            It could be 'digly', 'phospho', 'HLA', or 'generic'.
+            Defaults to 'generic'.
+        download_model_path : str, optional
+            The path of model
+            Defaults to 'pretrained_models_v3.zip'.
+        """
+
+        self.ms2_model.load(
+            download_model_path, model_path_in_zip="generic/ms2.pth"
+        )
+        self.rt_model.load(download_model_path, model_path_in_zip="generic/rt.pth")
+        self.ccs_model.load(
+            download_model_path, model_path_in_zip="generic/ccs.pth"
+        )
+        self.charge_model.load(
+            download_model_path, model_path_in_zip="generic/charge.pth"
+        )
 
     def train_ms2_model(
             self,
@@ -220,14 +281,14 @@ class MS2pDeepModel(pDeepModel):
     """
 
     def __init__(
-        self,
-        charged_frag_types=get_charged_frag_types(frag_types, max_frag_charge),
-        dropout=0.1,
-        model_class: torch.nn.Module = ModelMS2Bert,
-        device: str = "gpu",
-        mask_modloss: Optional[bool] = None,
-        override_from_weights: bool = False,
-        **kwargs,  # model params
+            self,
+            charged_frag_types=get_charged_frag_types(frag_types, max_frag_charge),
+            dropout=0.1,
+            model_class: torch.nn.Module = ModelMS2Bert,
+            device: str = "gpu",
+            mask_modloss: Optional[bool] = None,
+            override_from_weights: bool = False,
+            **kwargs,  # model params
     ):
         super().__init__(
             charged_frag_types=charged_frag_types,
@@ -237,7 +298,7 @@ class MS2pDeepModel(pDeepModel):
             mask_modloss=mask_modloss,
             override_from_weights=override_from_weights,
             **kwargs,  # model params
-         )
+        )
         if mask_modloss is not None:
             warnings.warn(
                 "mask_modloss is deprecated and will be removed in the future. To mask the modloss fragments, "
@@ -245,10 +306,10 @@ class MS2pDeepModel(pDeepModel):
             )
 
     def _set_batch_predict_data(
-        self,
-        batch_df: pd.DataFrame,
-        predicts: np.ndarray,
-        **kwargs,
+            self,
+            batch_df: pd.DataFrame,
+            predicts: np.ndarray,
+            **kwargs,
     ):
         apex_intens = predicts.reshape((len(batch_df), -1)).max(axis=1)
         apex_intens[apex_intens <= 0] = 1
@@ -262,7 +323,7 @@ class MS2pDeepModel(pDeepModel):
 
         if self._predict_in_order:
             self.predict_df.values[
-                batch_df.frag_start_idx.values[0] : batch_df.frag_stop_idx.values[-1], :
+            batch_df.frag_start_idx.values[0]: batch_df.frag_stop_idx.values[-1], :
             ] = predicts.reshape((-1, len(self.charged_frag_types)))
         else:
             update_sliced_fragment_dataframe(
@@ -273,11 +334,11 @@ class MS2pDeepModel(pDeepModel):
             )
 
     def test(
-        self,
-        precursor_df: pd.DataFrame,
-        fragment_intensity_df: pd.DataFrame,
-        default_instrument: str = "Lumos",
-        default_nce: float = 30.0,
+            self,
+            precursor_df: pd.DataFrame,
+            fragment_intensity_df: pd.DataFrame,
+            default_instrument: str = "Lumos",
+            default_nce: float = 30.0,
     ) -> pd.DataFrame:
         if "instrument" not in precursor_df.columns:
             precursor_df["instrument"] = default_instrument
