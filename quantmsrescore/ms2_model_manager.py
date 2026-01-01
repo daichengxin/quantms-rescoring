@@ -67,7 +67,7 @@ class MS2ModelManager(ModelManager):
             try:
                 os.makedirs(os.path.dirname(model_zip_file_path), exist_ok=True)
                 context = ssl.create_default_context(cafile=certifi.where())
-                requests = urllib.request.urlopen(url, context=context, timeout=10)
+                requests = urllib.request.urlopen(url, context=context, timeout=10)  # nosec B310
                 with open(model_zip_file_path, "wb") as f:
                     f.write(requests.read())
             except Exception as e:
@@ -281,14 +281,14 @@ class MS2pDeepModel(pDeepModel):
     """
 
     def __init__(
-        self,
-        charged_frag_types=get_charged_frag_types(frag_types, max_frag_charge),
-        dropout=0.1,
-        model_class: torch.nn.Module = ModelMS2Bert,
-        device: str = "gpu",
-        mask_modloss: Optional[bool] = None,
-        override_from_weights: bool = False,
-        **kwargs,  # model params
+            self,
+            charged_frag_types=get_charged_frag_types(frag_types, max_frag_charge),
+            dropout=0.1,
+            model_class: torch.nn.Module = ModelMS2Bert,
+            device: str = "gpu",
+            mask_modloss: Optional[bool] = None,
+            override_from_weights: bool = False,
+            **kwargs,  # model params
     ):
         super().__init__(
             charged_frag_types=charged_frag_types,
@@ -298,7 +298,7 @@ class MS2pDeepModel(pDeepModel):
             mask_modloss=mask_modloss,
             override_from_weights=override_from_weights,
             **kwargs,  # model params
-         )
+        )
         if mask_modloss is not None:
             warnings.warn(
                 "mask_modloss is deprecated and will be removed in the future. To mask the modloss fragments, "
@@ -306,10 +306,10 @@ class MS2pDeepModel(pDeepModel):
             )
 
     def _set_batch_predict_data(
-        self,
-        batch_df: pd.DataFrame,
-        predicts: np.ndarray,
-        **kwargs,
+            self,
+            batch_df: pd.DataFrame,
+            predicts: np.ndarray,
+            **kwargs,
     ):
         apex_intens = predicts.reshape((len(batch_df), -1)).max(axis=1)
         apex_intens[apex_intens <= 0] = 1
@@ -323,7 +323,7 @@ class MS2pDeepModel(pDeepModel):
 
         if self._predict_in_order:
             self.predict_df.values[
-                batch_df.frag_start_idx.values[0] : batch_df.frag_stop_idx.values[-1], :
+            batch_df.frag_start_idx.values[0]: batch_df.frag_stop_idx.values[-1], :
             ] = predicts.reshape((-1, len(self.charged_frag_types)))
         else:
             update_sliced_fragment_dataframe(
@@ -334,11 +334,11 @@ class MS2pDeepModel(pDeepModel):
             )
 
     def test(
-        self,
-        precursor_df: pd.DataFrame,
-        fragment_intensity_df: pd.DataFrame,
-        default_instrument: str = "Lumos",
-        default_nce: float = 30.0,
+            self,
+            precursor_df: pd.DataFrame,
+            fragment_intensity_df: pd.DataFrame,
+            default_instrument: str = "Lumos",
+            default_nce: float = 30.0,
     ) -> pd.DataFrame:
         if "instrument" not in precursor_df.columns:
             precursor_df["instrument"] = default_instrument
