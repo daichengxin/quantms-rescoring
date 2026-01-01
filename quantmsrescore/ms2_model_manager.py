@@ -18,6 +18,7 @@ from peptdeep.settings import global_settings
 import urllib
 import shutil
 import ssl
+import certifi
 
 
 class MS2ModelManager(ModelManager):
@@ -37,6 +38,7 @@ class MS2ModelManager(ModelManager):
         self.charge_model: ChargeModelForModAASeq = ChargeModelForModAASeq(
             device=device
         )
+        self.model_url = "https://github.com/MannLabs/alphapeptdeep/releases/download/pre-trained-models/pretrained_models_v3.zip"
 
         if len(glob.glob(os.path.join(model_dir, "*ms2.pth"))) > 0:
             self.load_external_models(ms2_model_file=glob.glob(os.path.join(model_dir, "*ms2.pth"))[0])
@@ -52,10 +54,9 @@ class MS2ModelManager(ModelManager):
     def __str__(self):
         return self.model_str
 
-    @staticmethod
-    def _download_models(model_zip_file_path: str, overwrite: bool = True) -> None:
+    def _download_models(self, model_zip_file_path: str, overwrite: bool = True) -> None:
         """Download models if not done yet."""
-        url = global_settings["model_url"]
+        url = self.model_url
         if not os.path.exists(model_zip_file_path):
             if not overwrite and os.path.exists(model_zip_file_path):
                 raise FileExistsError(f"Model file already exists: {model_zip_file_path}")
@@ -64,7 +65,7 @@ class MS2ModelManager(ModelManager):
                 logging.info(f"Downloading pretrained models from {url} to {model_zip_file_path} ...")
                 try:
                     os.makedirs(os.path.dirname(model_zip_file_path), exist_ok=True)
-                    context = ssl._create_unverified_context()
+                    context = ssl.create_default_context(cafile=certifi.where())
                     requests = urllib.request.urlopen(url, context=context, timeout=10)
                     with open(model_zip_file_path, "wb") as f:
                         f.write(requests.read())
@@ -76,7 +77,7 @@ class MS2ModelManager(ModelManager):
                 logging.info(f"Copying pretrained models from {url} to {model_zip_file_path} ...")
                 os.makedirs(os.path.dirname(model_zip_file_path), exist_ok=True)
                 shutil.copy(url, model_zip_file_path)
-            logging.info(f"Successfully downloaded pretrained models.")
+            logging.info("Successfully downloaded pretrained models.")
         if not is_model_zip(model_zip_file_path):
             raise ValueError(
                 f"Local model file is not a valid zip: {model_zip_file_path}.\n"
