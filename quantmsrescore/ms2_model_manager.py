@@ -1,6 +1,6 @@
 import pandas as pd
-from peptdeep.pretrained_models import ModelManager, _download_models, model_mgr_settings, MODEL_ZIP_FILE_PATH, \
-    psm_sampling_with_important_mods
+from peptdeep.pretrained_models import ModelManager, model_mgr_settings, MODEL_DOWNLOAD_INSTRUCTIONS, \
+    psm_sampling_with_important_mods, is_model_zip
 from peptdeep.model.ms2 import pDeepModel, frag_types, max_frag_charge, ModelMS2Bert, calc_ms2_similarity
 from peptdeep.model.rt import AlphaRTModel
 from peptdeep.model.ccs import AlphaCCSModel
@@ -14,6 +14,10 @@ import numpy as np
 import warnings
 from typing import List, Tuple, Optional
 import copy
+from peptdeep.settings import global_settings
+import urllib
+import shutil
+import ssl
 
 
 class MS2ModelManager(ModelManager):
@@ -39,7 +43,7 @@ class MS2ModelManager(ModelManager):
             self.model_str = model_dir
         else:
             self.download_model_path = os.path.join(model_dir, "pretrained_models_v3.zip")
-            _download_models(self.download_model_path)
+            self._download_models(self.download_model_path)
             self.load_installed_models(self.download_model_path)
             self.model_str = "generic"
         self.pretrained_ms2_model = copy.deepcopy(self.ms2_model)
@@ -47,6 +51,37 @@ class MS2ModelManager(ModelManager):
 
     def __str__(self):
         return self.model_str
+
+    def _download_models(self, model_zip_file_path: str, overwrite: bool = True) -> None:
+        """Download models if not done yet."""
+        url = global_settings["model_url"]
+        if not os.path.exists(model_zip_file_path):
+            if not overwrite and os.path.exists(model_zip_file_path):
+                raise FileExistsError(f"Model file already exists: {model_zip_file_path}")
+
+            if not os.path.isfile(url):
+                logging.info(f"Downloading pretrained models from {url} to {model_zip_file_path} ...")
+                try:
+                    os.makedirs(os.path.dirname(model_zip_file_path), exist_ok=True)
+                    context = ssl._create_unverified_context()
+                    requests = urllib.request.urlopen(url, context=context, timeout=10)
+                    with open(model_zip_file_path, "wb") as f:
+                        f.write(requests.read())
+                except Exception as e:
+                    raise FileNotFoundError(
+                        f"Downloading model failed: {e}.\n" + MODEL_DOWNLOAD_INSTRUCTIONS
+                    ) from e
+            else:
+                logging.info(f"Copying pretrained models from {url} to {model_zip_file_path} ...")
+                os.makedirs(os.path.dirname(model_zip_file_path), exist_ok=True)
+                shutil.copy(url, model_zip_file_path)
+            logging.info(f"Successfully downloaded pretrained models.")
+        if not is_model_zip(model_zip_file_path):
+            raise ValueError(
+                f"Local model file is not a valid zip: {model_zip_file_path}.\n"
+                f"Please delete this file and try again.\n"
+                f"Or: {MODEL_DOWNLOAD_INSTRUCTIONS}"
+            )
 
     def ms2_fine_tuning(self, psms_df: pd.DataFrame,
                         match_intensity_df: pd.DataFrame,
