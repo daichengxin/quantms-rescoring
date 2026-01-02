@@ -118,16 +118,18 @@ class MS2ModelManager(ModelManager):
         self.ms2_model.load(
             download_model_path, model_path_in_zip="generic/ms2.pth"
         )
-        self.rt_model.load(download_model_path, model_path_in_zip="generic/rt.pth")
+        self.ms2_model.load(
+            download_model_path, model_path_in_zip=f"{model_type}/ms2.pth"
+        )
+        self.rt_model.load(
+            download_model_path, model_path_in_zip=f"{model_type}/rt.pth"
+        )
         self.ccs_model.load(
-            download_model_path, model_path_in_zip="generic/ccs.pth"
+            download_model_path, model_path_in_zip=f"{model_type}/ccs.pth"
         )
         self.charge_model.load(
-            download_model_path, model_path_in_zip="generic/charge.pth"
+            download_model_path, model_path_in_zip=f"{model_type}/charge.pth"
         )
-
-    def train_ms2_model(
-            self,
             psm_df: pd.DataFrame,
             matched_intensity_df: pd.DataFrame,
     ):
