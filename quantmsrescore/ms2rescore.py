@@ -39,7 +39,9 @@ configure_logging()
 @click.option("--log_level", help="Logging level (default: `info`)", default="info")
 @click.option(
     "--processes",
-    help="Number of parallel processes available to MS²Rescore (default: 4)",
+    help="Number of parallel processes (e.g., Nextflow's $task.cpus). "
+         "Each process uses 1 internal thread to avoid HPC resource contention. "
+         "Default: 4",
     type=int,
     default=4,
 )
@@ -131,14 +133,6 @@ configure_logging()
               help="Epochs to train AlphaPeptDeep MS2 model",
               type=int,
               default=20)
-@click.option(
-    "--threads_per_process",
-    help="Number of threads per worker process for numerical libraries (MKL, OpenBLAS, PyTorch). "
-         "Default is 1 for HPC safety. Total parallelism = processes × threads_per_process. "
-         "Set higher only on dedicated machines.",
-    type=int,
-    default=1,
-)
 @click.pass_context
 def msrescore2feature(
         ctx,
@@ -165,7 +159,6 @@ def msrescore2feature(
         transfer_learning_test_ratio,
         save_retrain_model,
         epoch_to_train_ms2,
-        threads_per_process,
 ):
     """
     Annotate PSMs in an idXML file with additional features using specified models.
@@ -189,7 +182,8 @@ def msrescore2feature(
     log_level : str
         The logging level for the CLI command.
     processes : int
-        The number of parallel processes available for MS²Rescore.
+        The number of parallel processes available (e.g., Nextflow's $task.cpus).
+        Each process uses 1 internal thread for HPC safety.
     feature_generators : str
         Comma-separated list of feature generators to use for annotation.
     only_features : str
@@ -227,14 +221,12 @@ def msrescore2feature(
         Defaults to False.
     epoch_to_train_ms2: int, optional
         Number of epochs to train AlphaPeptDeep MS2 model. Defaults to 20.
-    threads_per_process: int, optional
-        Number of threads per worker process for numerical libraries.
-        Defaults to 1 for HPC safety.
     """
     # Configure threading for HPC environments
-    # This must be done early, before heavy computation starts
-    configure_threading(n_threads=threads_per_process, verbose=True)
-    configure_torch_threads(n_threads=threads_per_process)
+    # Use 1 thread per process to avoid thread explosion with multiprocessing
+    # This is critical for Nextflow/Slurm where $task.cpus defines total parallelism
+    configure_threading(n_threads=1, verbose=True)
+    configure_torch_threads(n_threads=1)
 
     annotator = FeatureAnnotator(
         feature_generators=feature_generators,

@@ -45,7 +45,9 @@ logger = get_logger(__name__)
 )
 @click.option(
     "--processes",
-    help="Number of parallel processes available to parse file (default: 4)",
+    help="Number of parallel processes (e.g., Nextflow's $task.cpus). "
+         "Each process uses 1 internal thread to avoid HPC resource contention. "
+         "Default: 4",
     type=int,
     default=4,
 )
@@ -96,12 +98,6 @@ logger = get_logger(__name__)
     is_flag=True,
 )
 @click.option("--log_level", help="Logging level (default: `info`)", default="info")
-@click.option(
-    "--threads_per_process",
-    help="Number of threads per worker process for numerical libraries. Default is 1 for HPC safety.",
-    type=int,
-    default=1,
-)
 @click.pass_context
 def transfer_learning(
         ctx,
@@ -119,7 +115,6 @@ def transfer_learning(
         epoch_to_train_ms2,
         force_transfer_learning,
         log_level,
-        threads_per_process,
 ):
     """
     Annotate PSMs in an idXML file with additional features using specified models.
@@ -141,7 +136,8 @@ def transfer_learning(
     save_model_dir : str
         Path for the retrained model.
     processes : int
-        The number of parallel processes available for MS²Rescore.
+        The number of parallel processes available (e.g., Nextflow's $task.cpus).
+        Each process uses 1 internal thread for HPC safety.
     ms2_tolerance : float
         The tolerance for MS²PIP annotation.
     ms2_tolerance_unit : str, optional
@@ -166,13 +162,12 @@ def transfer_learning(
         Defaults to False.
     log_level : str
         The logging level for the CLI command.
-    threads_per_process : int, optional
-        Number of threads per worker process for numerical libraries.
-        Defaults to 1 for HPC safety.
     """
     # Configure threading for HPC environments
-    configure_threading(n_threads=threads_per_process, verbose=True)
-    configure_torch_threads(n_threads=threads_per_process)
+    # Use 1 thread per process to avoid thread explosion with multiprocessing
+    # This is critical for Nextflow/Slurm where $task.cpus defines total parallelism
+    configure_threading(n_threads=1, verbose=True)
+    configure_torch_threads(n_threads=1)
 
     annotator = AlphaPeptdeepTrainer(
         ms2_model_path=ms2_model_dir,

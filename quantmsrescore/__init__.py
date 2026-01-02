@@ -15,10 +15,68 @@
 # =============================================================================
 
 import os
-from typing import Optional
+from typing import Optional, Tuple
 
 # Default threads per worker process
 _DEFAULT_THREADS_PER_PROCESS = 1
+
+
+def calculate_optimal_parallelism(
+    total_cpus: int,
+    memory_gb: Optional[float] = None,
+    memory_per_process_gb: float = 4.0,
+) -> Tuple[int, int]:
+    """
+    Calculate optimal number of processes and threads per process.
+
+    This function determines the best split between process-level and
+    thread-level parallelism for a given number of CPUs.
+
+    Parameters
+    ----------
+    total_cpus : int
+        Total number of CPUs available (e.g., from Nextflow's $task.cpus).
+    memory_gb : float, optional
+        Available memory in GB. If provided, limits processes based on memory.
+    memory_per_process_gb : float, optional
+        Estimated memory per process in GB. Default is 4 GB.
+
+    Returns
+    -------
+    Tuple[int, int]
+        (n_processes, threads_per_process) where:
+        - n_processes: Number of worker processes to spawn
+        - threads_per_process: Number of threads each process should use
+
+    Notes
+    -----
+    Strategy:
+    - For multiprocessing workloads (MS2PIP, feature calculation), we prefer
+      more processes with 1 thread each (better CPU utilization, less GIL contention)
+    - Each process gets 1 thread to avoid thread explosion
+    - Memory constraints may reduce the number of processes
+
+    Example
+    -------
+    >>> calculate_optimal_parallelism(8)
+    (8, 1)  # 8 processes, 1 thread each
+
+    >>> calculate_optimal_parallelism(8, memory_gb=16.0, memory_per_process_gb=4.0)
+    (4, 1)  # Limited by memory: 16GB / 4GB = 4 processes
+    """
+    if total_cpus < 1:
+        total_cpus = 1
+
+    # Default: use all CPUs as separate processes, 1 thread each
+    n_processes = total_cpus
+    threads_per_process = 1
+
+    # Apply memory constraint if provided
+    if memory_gb is not None and memory_per_process_gb > 0:
+        memory_limited_processes = max(1, int(memory_gb / memory_per_process_gb))
+        n_processes = min(n_processes, memory_limited_processes)
+
+    return n_processes, threads_per_process
 
 
 def configure_threading(n_threads: Optional[int] = None, verbose: bool = False) -> None:
@@ -39,16 +97,10 @@ def configure_threading(n_threads: Optional[int] = None, verbose: bool = False) 
 
     Notes
     -----
-    For Slurm/HPC environments, the recommended approach is:
-        - Set n_threads=1 (default)
-        - Use --processes to control parallelism at the process level
-        - Total parallelism = processes × n_threads
-
-    Example
-    -------
-    For a 32-core node with --processes 8:
-        - n_threads=1: 8 processes × 1 thread = 8 parallel units (safe)
-        - n_threads=4: 8 processes × 4 threads = 32 parallel units (full utilization)
+    For Nextflow/Slurm/HPC environments, the recommended approach is:
+        - Pass $task.cpus as --processes
+        - Let the tool use 1 thread per process (default)
+        - Total parallelism = number of processes
     """
     if n_threads is None:
         n_threads = _DEFAULT_THREADS_PER_PROCESS
@@ -84,7 +136,7 @@ def configure_threading(n_threads: Optional[int] = None, verbose: bool = False) 
     os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
 
     if verbose:
-        print(f"[quantms-rescoring] Thread configuration: {n_threads} threads per process")
+        print(f"[quantms-rescoring] Thread configuration: {n_threads} thread(s) per process")
 
 
 def configure_torch_threads(n_threads: Optional[int] = None) -> None:
@@ -120,7 +172,7 @@ def get_safe_process_count(requested: int, memory_per_process_gb: float = 4.0) -
     Parameters
     ----------
     requested : int
-        Requested number of processes.
+        Requested number of processes (e.g., from --processes or $task.cpus).
     memory_per_process_gb : float, optional
         Estimated memory per process in GB. Default is 4 GB.
 
@@ -167,6 +219,7 @@ __version__ = "0.0.14"
 __all__ = [
     "configure_threading",
     "configure_torch_threads",
+    "calculate_optimal_parallelism",
     "get_safe_process_count",
     "__version__",
 ]
