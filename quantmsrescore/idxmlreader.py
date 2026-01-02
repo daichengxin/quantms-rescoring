@@ -236,11 +236,27 @@ class IdXMLRescoringReader(IdXMLReader):
             logger.warning("Spectrum lookup not initialized, cannot filter for MS2 spectra")
             only_ms2 = False
 
+        filename = None
+        if self.oms_proteins and self.oms_proteins[0] is not None:
+            spectra_data = None
+            try:
+                spectra_data = self.oms_proteins[0].getMetaValue("spectra_data")
+            except Exception as e:
+                logger.warning(f"Could not retrieve 'spectra_data' meta value: {e}")
+            if spectra_data and len(spectra_data) > 0:
+                filename = spectra_data[0].decode()
+            else:
+                logger.warning("'spectra_data' meta value is missing or empty in the first protein entry.")
+        else:
+            logger.warning("self.oms_proteins is empty or first element is None; cannot retrieve 'spectra_data'.")
+
         for peptide_id in self.oms_peptides:
             if self.high_score_better is None:
                 self.high_score_better = peptide_id.isHigherScoreBetter()
             elif self.high_score_better != peptide_id.isHigherScoreBetter():
                 logger.warning("Inconsistent score direction found in idXML file")
+
+            spectrum_ref = peptide_id.getMetaValue("spectrum_reference")
 
             for psm_hit in peptide_id.getHits():
                 if (
@@ -268,7 +284,12 @@ class IdXMLRescoringReader(IdXMLReader):
                                              "mod_sites": mod_sites,
                                              "nce": nce,
                                              "provenance_data": next(iter(psm.provenance_data.keys())),
-                                             "instrument": instrument}, ignore_index=True)
+                                             "instrument": instrument,
+                                             "spectrum_ref": spectrum_ref,
+                                             "filename": Path(filename).stem,
+                                             "is_decoy": OpenMSHelper.is_decoy_peptide_hit(psm_hit),
+                                             "rank": psm_hit.getRank() + 1,
+                                             "score": psm_hit.getScore()}, ignore_index=True)
 
         self._psms = PSMList(psm_list=psm_list)
         self._psms_df = psm_df
@@ -285,7 +306,17 @@ def extract_modifications(peptidoform, mods_name_dict):
     pre_len = 0
     for i, v in enumerate(list(pattern.finditer(peptidoform))):
         if peptidoform.startswith(".") and i == 0:
-            mods_res.append(v.group(0)[1:-1] + "@" + mods_name_dict[v.group(0)[1:-1]].replace(" ", "_"))
+            modsites = mods_name_dict[v.group(0)[1:-1]].split(" ")
+            if "".join(modsites[0]) == "N-term":
+                if len(modsites) == 2:
+                    mods_res.append(v.group(0)[1:-1] + "@" + modsites[-1] + "^Any_N-term")
+                else:
+                    mods_res.append(v.group(0)[1:-1] + "@" + "Any_N-term")
+            else:
+                if len(modsites) == 3:
+                    mods_res.append(v.group(0)[1:-1] + "@" + modsites[-1] + "^" + "_".join(modsites[:-1]))
+                else:
+                    mods_res.append(v.group(0)[1:-1] + "@" + "_".join(modsites))
             mod_sites.append("0")
             pre_len += 1 + len(mods[0])
         else:

@@ -7,10 +7,10 @@ channels:
 dependencies:
   - python >=3.9,<3.12
   - click
-  - pyopenms>=3.0
+  - pyopenms>3.1.0
   - pandas >=1
   - numpy>=1.25
-  - ms2rescore=3.1.4
+  - ms2rescore=3.2.0.post1
   - deepLC>=3.0
   - psm-utils
   - scipy
@@ -19,4 +19,4 @@ dependencies:
   - pytest
   - ms2pip>=4.0
   - pip:
-    - peptdeep
+    - peptdeep==1.4.0
