@@ -91,6 +91,7 @@ logger = get_logger(__name__)
     help="Forced save fine-tune model when it is not better than pretrained for test dataset",
     is_flag=True,
 )
+@click.option("--log_level", help="Logging level (default: `info`)", default="info")
 @click.pass_context
 def transfer_learning(
         ctx,
@@ -106,7 +107,8 @@ def transfer_learning(
         consider_modloss,
         transfer_learning_test_ratio,
         epoch_to_train_ms2,
-        force_transfer_learning
+        force_transfer_learning,
+        log_level
 ):
     """
     Annotate PSMs in an idXML file with additional features using specified models.
@@ -151,6 +153,8 @@ def transfer_learning(
     force_transfer_learning: bool, optional
         Forced save fine-tune model when it is not better than pretrained for test dataset.
         Defaults to False.
+    log_level : str
+        The logging level for the CLI command.
     """
 
     annotator = AlphaPeptdeepTrainer(
@@ -164,7 +168,8 @@ def transfer_learning(
         transfer_learning_test_ratio=transfer_learning_test_ratio,
         epoch_to_train_ms2=epoch_to_train_ms2,
         force_transfer_learning=force_transfer_learning,
-        save_model_dir=save_model_dir
+        save_model_dir=save_model_dir,
+        log_level=log_level.upper()
     )
     annotator.build_idxml_data(idxml, mzml)
     annotator.fine_tune()
@@ -180,7 +185,8 @@ class AlphaPeptdeepTrainer:
                  consider_modloss: bool = False,
                  transfer_learning_test_ratio: float = 0.3,
                  epoch_to_train_ms2: int = 20,
-                 force_transfer_learning: bool = False):
+                 force_transfer_learning: bool = False,
+                 log_level: str = "INFO"):
         self._idxml_reader = None
         self._higher_score_better = None
         self.spec_file = None
@@ -196,6 +202,11 @@ class AlphaPeptdeepTrainer:
         self._ms2_tolerance_unit = ms2_tolerance_unit
         self._model_dir = ms2_model_path
         self._save_model_dir = save_model_dir
+
+        # Set up logging
+        from quantmsrescore.logging_config import configure_logging
+
+        configure_logging(log_level)
 
     def _read_idxml_file(self, idxml_path, spectrum_paths):
         # Load the idXML file and corresponding mzML file
