@@ -52,10 +52,10 @@ def _shallow_copy_psm_list(psm_list: PSMList) -> PSMList:
             precursor_mz=psm.precursor_mz,
             retention_time=psm.retention_time,
             ion_mobility=psm.ion_mobility,
-            protein_list=psm.protein_list,
+            protein_list=psm.protein_list.copy() if psm.protein_list else [],
             rank=psm.rank,
             source=psm.source,
-            provenance_data=psm.provenance_data,  # Can share as keys are read-only
+            provenance_data=psm.provenance_data.copy() if psm.provenance_data else {},  # Can share as keys are read-only
             metadata=psm.metadata.copy() if psm.metadata else {},
             rescoring_features={},  # Fresh dict - this is what will be modified
         )
