@@ -41,6 +41,14 @@ class MS2ModelManager(ModelManager):
         if len(glob.glob(os.path.join(model_dir, "*ms2.pth"))) > 0:
             self.load_external_models(ms2_model_file=glob.glob(os.path.join(model_dir, "*ms2.pth"))[0])
             self.model_str = model_dir
+        elif os.path.exists(os.path.join(model_dir, "pretrained_models_v3.zip")):
+            try:
+                self.load_installed_models(self.download_model_path)
+            except ValueError:
+                self.download_model_path = os.path.join(model_dir, "pretrained_models_v3.zip")
+                self._download_models(self.download_model_path)
+                self.load_installed_models(self.download_model_path)
+                self.model_str = "generic"
         else:
             self.download_model_path = os.path.join(model_dir, "pretrained_models_v3.zip")
             self._download_models(self.download_model_path)
