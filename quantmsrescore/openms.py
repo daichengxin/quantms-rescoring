@@ -37,12 +37,9 @@ logger = get_logger(__name__)
 OPENMS_DECOY_FIELD = "target_decoy"
 SPECTRUM_PATTERN = r"(spectrum|scan)=(\d+)"
 
-# =============================================================================
-# Global spectrum file cache for memory efficiency
-# =============================================================================
-# This cache prevents loading the same mzML file multiple times when both
-# MS2PIP and AlphaPeptDeep process the same file.
 _SPECTRUM_FILE_CACHE: Dict[str, Tuple[oms.MSExperiment, SpectrumLookup]] = {}
+_SPECTRUM_FILE_ACCESS_ORDER: List[str] = []  # Track access order for LRU eviction
+MAX_CACHE_SIZE = 3  # Maximum number of mzML files to keep in cache
 
 
 def get_cached_spectrum_data(
@@ -56,6 +53,10 @@ def get_cached_spectrum_data(
     multiple feature generators (MS2PIP, AlphaPeptDeep, DeepLC) process
     the same spectrum file.
 
+    The cache is bounded to MAX_CACHE_SIZE (default: 3) entries. When the
+    limit is reached, the least recently used entry is evicted. This prevents
+    unbounded memory growth when processing many spectrum files sequentially.
+
     Parameters
     ----------
     mzml_file : Union[str, Path]
@@ -67,15 +68,34 @@ def get_cached_spectrum_data(
     -------
     Tuple[oms.MSExperiment, SpectrumLookup]
         Cached or freshly loaded experiment and lookup.
+
+    Notes
+    -----
+    For explicit memory management, call clear_spectrum_cache() after
+    completing annotation on a file or batch of files.
     """
     mzml_path = str(mzml_file) if isinstance(mzml_file, Path) else mzml_file
 
     if force_reload or mzml_path not in _SPECTRUM_FILE_CACHE:
         logger.debug(f"Loading mzML file into cache: {mzml_path}")
+
+        # Evict oldest entry if cache is full (LRU eviction)
+        if len(_SPECTRUM_FILE_CACHE) >= MAX_CACHE_SIZE:
+            if _SPECTRUM_FILE_ACCESS_ORDER:
+                oldest = _SPECTRUM_FILE_ACCESS_ORDER.pop(0)
+                if oldest in _SPECTRUM_FILE_CACHE:
+                    del _SPECTRUM_FILE_CACHE[oldest]
+                    logger.debug(f"Evicted from cache (LRU): {oldest}")
+
         exp, lookup = OpenMSHelper.get_spectrum_lookup_indexer(mzml_path)
         _SPECTRUM_FILE_CACHE[mzml_path] = (exp, lookup)
+        _SPECTRUM_FILE_ACCESS_ORDER.append(mzml_path)
     else:
         logger.debug(f"Using cached mzML data: {mzml_path}")
+        # Move to end of access order (most recently used)
+        if mzml_path in _SPECTRUM_FILE_ACCESS_ORDER:
+            _SPECTRUM_FILE_ACCESS_ORDER.remove(mzml_path)
+            _SPECTRUM_FILE_ACCESS_ORDER.append(mzml_path)
 
     return _SPECTRUM_FILE_CACHE[mzml_path]
 
@@ -84,19 +104,25 @@ def clear_spectrum_cache(mzml_file: Optional[Union[str, Path]] = None) -> None:
     """
     Clear the spectrum file cache to free memory.
 
+    Call this function after completing annotation on a file or batch of files
+    to reclaim memory. The annotator calls this automatically at the end of
+    annotation.
+
     Parameters
     ----------
     mzml_file : Optional[Union[str, Path]], optional
         Specific file to remove from cache. If None, clears entire cache.
     """
-    global _SPECTRUM_FILE_CACHE
     if mzml_file is None:
         _SPECTRUM_FILE_CACHE.clear()
+        _SPECTRUM_FILE_ACCESS_ORDER.clear()
         logger.debug("Cleared entire spectrum cache")
     else:
         mzml_path = str(mzml_file) if isinstance(mzml_file, Path) else mzml_file
         if mzml_path in _SPECTRUM_FILE_CACHE:
             del _SPECTRUM_FILE_CACHE[mzml_path]
+            if mzml_path in _SPECTRUM_FILE_ACCESS_ORDER:
+                _SPECTRUM_FILE_ACCESS_ORDER.remove(mzml_path)
             logger.debug(f"Removed from spectrum cache: {mzml_path}")
 
 
