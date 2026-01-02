@@ -37,9 +37,49 @@ logger = get_logger(__name__)
 OPENMS_DECOY_FIELD = "target_decoy"
 SPECTRUM_PATTERN = r"(spectrum|scan)=(\d+)"
 
+# =============================================================================
+# Caching infrastructure for performance
+# =============================================================================
+
+# Spectrum file cache (LRU bounded)
 _SPECTRUM_FILE_CACHE: Dict[str, Tuple[oms.MSExperiment, SpectrumLookup]] = {}
 _SPECTRUM_FILE_ACCESS_ORDER: List[str] = []  # Track access order for LRU eviction
 MAX_CACHE_SIZE = 3  # Maximum number of mzML files to keep in cache
+
+# Compiled regex cache to avoid repeated compilation
+_REGEX_CACHE: Dict[str, re.Pattern] = {}
+
+
+def get_compiled_regex(pattern: Optional[str]) -> re.Pattern:
+    """
+    Get a compiled regex pattern from cache or compile and cache it.
+
+    This prevents repeated regex compilation in loops, which is a common
+    performance issue when processing many spectra.
+
+    Parameters
+    ----------
+    pattern : Optional[str]
+        The regex pattern to compile. If None or empty, defaults to "(.*)".
+
+    Returns
+    -------
+    re.Pattern
+        The compiled regex pattern.
+    """
+    if not pattern:
+        pattern = r"(.*)"
+
+    if pattern not in _REGEX_CACHE:
+        try:
+            _REGEX_CACHE[pattern] = re.compile(pattern)
+        except re.error as e:
+            logger.warning(f"Invalid regex pattern '{pattern}': {e}. Using default.")
+            pattern = r"(.*)"
+            if pattern not in _REGEX_CACHE:
+                _REGEX_CACHE[pattern] = re.compile(pattern)
+
+    return _REGEX_CACHE[pattern]
 
 
 def get_cached_spectrum_data(
@@ -124,6 +164,74 @@ def clear_spectrum_cache(mzml_file: Optional[Union[str, Path]] = None) -> None:
             if mzml_path in _SPECTRUM_FILE_ACCESS_ORDER:
                 _SPECTRUM_FILE_ACCESS_ORDER.remove(mzml_path)
             logger.debug(f"Removed from spectrum cache: {mzml_path}")
+
+
+# =============================================================================
+# Shared utility functions for MS2PIP and AlphaPeptDeep
+# =============================================================================
+# These functions are used by both alphapeptdeep.py and ms2pip.py to avoid
+# code duplication.
+
+
+def organize_psms_by_spectrum_id(
+    enumerated_psm_list: List[Any]
+) -> Dict[str, List[Tuple[int, Any]]]:
+    """
+    Organize PSMs by spectrum ID for efficient lookup.
+
+    This function creates a dictionary mapping spectrum IDs to lists of
+    (index, PSM) tuples, enabling O(1) lookup when iterating through spectra.
+
+    Parameters
+    ----------
+    enumerated_psm_list : List[Any]
+        List of PSMs. Can be either:
+        - List[PSM]: Will be enumerated internally
+        - List[Tuple[int, PSM]]: Already enumerated tuples
+
+    Returns
+    -------
+    Dict[str, List[Tuple[int, Any]]]
+        Dictionary mapping spectrum IDs to lists of (index, PSM) tuples.
+    """
+    from collections import defaultdict
+    psms_by_specid = defaultdict(list)
+
+    for item in enumerated_psm_list:
+        # Handle both enumerated tuples and raw PSM objects
+        if isinstance(item, tuple) and len(item) == 2:
+            psm_index, psm = item
+        else:
+            # Assume it's a PSM object, enumerate on the fly
+            psm_index = enumerated_psm_list.index(item)
+            psm = item
+
+        psms_by_specid[str(psm.spectrum_id)].append((psm_index, psm))
+
+    return psms_by_specid
+
+
+def calculate_correlations(results: List[Any]) -> None:
+    """
+    Calculate and add Pearson correlations to list of ProcessingResult objects.
+
+    This function modifies the results in-place, adding a correlation
+    attribute to each result based on predicted vs observed intensities.
+
+    Parameters
+    ----------
+    results : List[Any]
+        List of ProcessingResult objects with predicted_intensity and
+        observed_intensity attributes.
+    """
+    for result in results:
+        if result.predicted_intensity and result.observed_intensity:
+            pred_int = np.concatenate([i for i in result.predicted_intensity.values()])
+            obs_int = np.concatenate([i for i in result.observed_intensity.values()])
+            result.correlation = np.corrcoef(pred_int, obs_int)[0][1]
+        else:
+            result.correlation = None
+            logger.debug(f"Empty intensities for result: {result}")
 
 
 class OpenMSHelper:

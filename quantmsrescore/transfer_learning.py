@@ -6,7 +6,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from quantmsrescore import configure_threading, configure_torch_threads
 from quantmsrescore.idxmlreader import IdXMLRescoringReader
 from quantmsrescore.logging_config import get_logger
-from quantmsrescore.openms import OpenMSHelper
+from quantmsrescore.openms import OpenMSHelper, get_compiled_regex
 from quantmsrescore.alphapeptdeep import read_spectrum_file, _get_targets_df_for_psm
 from alphabase.peptide.fragment import create_fragment_mz_dataframe
 from quantmsrescore.ms2_model_manager import MS2ModelManager
@@ -327,11 +327,8 @@ class AlphaPeptdeepTrainer:
         theoretical_mz_df = create_fragment_mz_dataframe(precursor_df, frag_types)
         precursor_df = precursor_df.set_index("provenance_data")
 
-        # Compile regex for spectrum ID matching
-        try:
-            spectrum_id_regex = re.compile(self._spectrum_id_pattern)
-        except TypeError:
-            spectrum_id_regex = re.compile(r"(.*)")
+        # Get cached compiled regex for spectrum ID matching
+        spectrum_id_regex = get_compiled_regex(self._spectrum_id_pattern)
 
         match_intensity_df = []
         current_index = 0

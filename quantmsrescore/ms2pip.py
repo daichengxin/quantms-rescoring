@@ -27,7 +27,12 @@ from psm_utils import PSMList, PSM
 from quantmsrescore.constants import SUPPORTED_MODELS_MS2PIP
 from quantmsrescore.exceptions import Ms2pipIncorrectModelException
 from quantmsrescore.logging_config import get_logger
-from quantmsrescore.openms import OpenMSHelper
+from quantmsrescore.openms import (
+    OpenMSHelper,
+    get_compiled_regex,
+    organize_psms_by_spectrum_id,
+    calculate_correlations,
+)
 
 # Get logger for this module
 logger = get_logger(__name__)
@@ -541,18 +546,6 @@ class MS2PIPAnnotator(MS2PIPFeatureGenerator):
             return results
 
 
-def calculate_correlations(results: List[ProcessingResult]) -> None:
-    """Calculate and add Pearson correlations to list of results."""
-    for result in results:
-        if result.predicted_intensity and result.observed_intensity:
-            pred_int = np.concatenate([i for i in result.predicted_intensity.values()])
-            obs_int = np.concatenate([i for i in result.observed_intensity.values()])
-            result.correlation = np.corrcoef(pred_int, obs_int)[0][1]
-        else:
-            result.correlation = None
-            logger.info("Results {} is empty".format(result))
-
-
 def read_spectrum_file(spec_file: str, use_cache: bool = True) -> Generator[ObservedSpectrum, None, None]:
     """
     Read MS2 spectra from a supported file format; inferring the type from the filename extension.
@@ -613,28 +606,6 @@ def read_spectrum_file(spec_file: str, use_cache: bool = True) -> Generator[Obse
         ):
             continue
         yield obs_spectrum
-
-
-def _organize_psms_by_spectrum_id(
-        enumerated_psm_list: List[Tuple[int, PSM]]
-) -> Dict[str, List[Tuple[int, PSM]]]:
-    """
-    Organize PSMs by spectrum ID for efficient lookup.
-
-    Parameters
-    ----------
-    enumerated_psm_list
-        List of tuples of (index, PSM) for each PSM in the input file.
-
-    Returns
-    -------
-    Dict[str, List[Tuple[int, PSM]]]
-        Dictionary mapping spectrum IDs to lists of (index, PSM) tuples.
-    """
-    psms_by_specid = defaultdict(list)
-    for psm_index, psm in enumerated_psm_list:
-        psms_by_specid[str(psm.spectrum_id)].append((psm_index, psm))
-    return psms_by_specid
 
 
 def _preprocess_spectrum(spectrum: ObservedSpectrum, model: str) -> None:
@@ -838,14 +809,11 @@ def _custom_process_spectra(
     results = []
     ion_types = [it.lower() for it in MODELS[model]["ion_types"]]
 
-    # Compile regex for spectrum ID matching
-    try:
-        spectrum_id_regex = re.compile(spectrum_id_pattern)
-    except TypeError:
-        spectrum_id_regex = re.compile(r"(.*)")
+    # Get cached compiled regex for spectrum ID matching
+    spectrum_id_regex = get_compiled_regex(spectrum_id_pattern)
 
     # Organize PSMs by spectrum ID
-    psms_by_specid = _organize_psms_by_spectrum_id(enumerated_psm_list)
+    psms_by_specid = organize_psms_by_spectrum_id(enumerated_psm_list)
 
     # Process each spectrum
     for spectrum in read_spectrum_file(spec_file):

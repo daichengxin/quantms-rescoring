@@ -7,7 +7,12 @@ from typing import Optional, Tuple, List, Union, Generator, Dict, Any
 
 from psm_utils import PSMList, PSM
 from quantmsrescore.logging_config import get_logger
-from quantmsrescore.openms import OpenMSHelper
+from quantmsrescore.openms import (
+    OpenMSHelper,
+    get_compiled_regex,
+    organize_psms_by_spectrum_id,
+    calculate_correlations,
+)
 from quantmsrescore.ms2_model_manager import MS2ModelManager
 from ms2rescore.utils import infer_spectrum_path
 import ms2pip.exceptions as exceptions
@@ -823,14 +828,11 @@ def ms2_fine_tune(enumerated_psm_list, psms_df, spec_file, spectrum_id_pattern, 
 
         precursor_df = precursor_df.set_index("provenance_data")
 
-        # Compile regex for spectrum ID matching
-        try:
-            spectrum_id_regex = re.compile(spectrum_id_pattern)
-        except TypeError:
-            spectrum_id_regex = re.compile(r"(.*)")
+        # Get cached compiled regex for spectrum ID matching
+        spectrum_id_regex = get_compiled_regex(spectrum_id_pattern)
 
         # Organize PSMs by spectrum ID
-        psms_by_specid = _organize_psms_by_spectrum_id(calibration_set)
+        psms_by_specid = organize_psms_by_spectrum_id(calibration_set)
 
         match_intensity_df = []
         current_index = 0
@@ -897,14 +899,12 @@ def ms2_fine_tune(enumerated_psm_list, psms_df, spec_file, spectrum_id_pattern, 
 
     b_cols = [col for col in theoretical_mz_df.columns if col.startswith('b')]
     y_cols = [col for col in theoretical_mz_df.columns if col.startswith('y')]
-    # Compile regex for spectrum ID matching
-    try:
-        spectrum_id_regex = re.compile(spectrum_id_pattern)
-    except TypeError:
-        spectrum_id_regex = re.compile(r"(.*)")
+
+    # Get cached compiled regex for spectrum ID matching
+    spectrum_id_regex = get_compiled_regex(spectrum_id_pattern)
 
     # Organize PSMs by spectrum ID
-    psms_by_specid = _organize_psms_by_spectrum_id(enumerated_psm_list)
+    psms_by_specid = organize_psms_by_spectrum_id(enumerated_psm_list)
 
     # Process each spectrum
     for spectrum in read_spectrum_file(spec_file):
@@ -955,18 +955,6 @@ def ms2_fine_tune(enumerated_psm_list, psms_df, spec_file, spectrum_id_pattern, 
             ))
 
     return results, model_mgr
-
-
-def calculate_correlations(results: List[ProcessingResult]) -> None:
-    """Calculate and add Pearson correlations to list of results."""
-    for result in results:
-        if result.predicted_intensity and result.observed_intensity:
-            pred_int = np.concatenate([i for i in result.predicted_intensity.values()])
-            obs_int = np.concatenate([i for i in result.observed_intensity.values()])
-            result.correlation = np.corrcoef(pred_int, obs_int)[0][1]
-        else:
-            result.correlation = None
-            logger.info("Results {} is empty".format(result))
 
 
 def read_spectrum_file(spec_file: str, use_cache: bool = True) -> Generator[ObservedSpectrum, None, None]:
@@ -1029,28 +1017,6 @@ def read_spectrum_file(spec_file: str, use_cache: bool = True) -> Generator[Obse
         ):
             continue
         yield obs_spectrum
-
-
-def _organize_psms_by_spectrum_id(
-        enumerated_psm_list: List[PSM]
-) -> Dict[str, List[Tuple[int, PSM]]]:
-    """
-    Organize PSMs by spectrum ID for efficient lookup.
-
-    Parameters
-    ----------
-    enumerated_psm_list
-        List of tuples of (index, PSM) for each PSM in the input file.
-
-    Returns
-    -------
-    Dict[str, List[Tuple[int, PSM]]]
-        Dictionary mapping spectrum IDs to lists of (index, PSM) tuples.
-    """
-    psms_by_specid = defaultdict(list)
-    for index, psm in enumerate(enumerated_psm_list):
-        psms_by_specid[str(psm.spectrum_id)].append((index, psm))
-    return psms_by_specid
 
 
 def _preprocess_spectrum(spectrum: ObservedSpectrum, model: str) -> None:

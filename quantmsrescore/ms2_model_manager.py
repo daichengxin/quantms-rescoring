@@ -17,6 +17,7 @@ import copy
 import urllib
 import ssl
 import certifi
+import shutil
 
 def _configure_torch_for_hpc(n_threads: int = 1) -> None:
     """
@@ -86,7 +87,12 @@ class MS2ModelManager(ModelManager):
         return self.model_str
 
     def _download_models(self, model_zip_file_path: str, overwrite: bool = True) -> None:
-        """Download models if not done yet."""
+        """
+        Download models if not done yet.
+
+        Uses streaming download to avoid loading entire file into memory,
+        and a longer timeout (300s) for large files on slow connections.
+        """
         url = self.model_url
         parsed = urllib.parse.urlparse(url)
         if parsed.scheme not in ("http", "https"):
@@ -101,10 +107,18 @@ class MS2ModelManager(ModelManager):
             try:
                 os.makedirs(os.path.dirname(model_zip_file_path), exist_ok=True)
                 context = ssl.create_default_context(cafile=certifi.where())
-                requests = urllib.request.urlopen(url, context=context, timeout=10)  # nosec B310
-                with open(model_zip_file_path, "wb") as f:
-                    f.write(requests.read())
+                # Use streaming download with longer timeout for large model files
+                # timeout=300s (5 min) for slow connections; stream in 1MB chunks
+                with urllib.request.urlopen(url, context=context, timeout=300) as response:  # nosec B310
+                    with open(model_zip_file_path, "wb") as out_file:
+                        shutil.copyfileobj(response, out_file, length=1024 * 1024)  # 1MB chunks
             except Exception as e:
+                # Clean up partial download on failure
+                if os.path.exists(model_zip_file_path):
+                    try:
+                        os.remove(model_zip_file_path)
+                    except OSError:
+                        pass
                 raise FileNotFoundError(
                     f"Downloading model failed: {e}.\n" + MODEL_DOWNLOAD_INSTRUCTIONS
                 ) from e
