@@ -553,14 +553,21 @@ def calculate_correlations(results: List[ProcessingResult]) -> None:
             logger.info("Results {} is empty".format(result))
 
 
-def read_spectrum_file(spec_file: str) -> Generator[ObservedSpectrum, None, None]:
+def read_spectrum_file(spec_file: str, use_cache: bool = True) -> Generator[ObservedSpectrum, None, None]:
     """
     Read MS2 spectra from a supported file format; inferring the type from the filename extension.
 
+    This function uses a global cache to prevent loading the same mzML file
+    multiple times when both MS2PIP and AlphaPeptDeep process the same file.
+
     Parameters
     ----------
-    spec_file:
+    spec_file : str
         Path to MGF or mzML file.
+    use_cache : bool, optional
+        If True, use the global spectrum cache. Default is True.
+        This prevents duplicate file loading when multiple feature generators
+        process the same spectrum file.
 
     Yields
     ------
@@ -570,10 +577,12 @@ def read_spectrum_file(spec_file: str) -> Generator[ObservedSpectrum, None, None
     ------
     UnsupportedSpectrumFiletypeError
         If the file extension is not supported.
-
     """
     try:
-        spectra = OpenMSHelper.get_mslevel_spectra(file_name=str(spec_file), ms_level=2)
+        # Use iterator version for memory efficiency
+        spectra = OpenMSHelper.iter_mslevel_spectra(
+            file_name=str(spec_file), ms_level=2, use_cache=use_cache
+        )
     except ValueError:
         raise exceptions.UnsupportedSpectrumFiletypeError(Path(spec_file).suffixes)
 

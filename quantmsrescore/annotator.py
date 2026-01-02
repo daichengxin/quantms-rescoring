@@ -1,19 +1,66 @@
 import copy
+import gc
 from pathlib import Path
 from typing import Optional, Set, Union
 
-from psm_utils import PSMList
+from psm_utils import PSMList, PSM
 
 from quantmsrescore.deeplc import DeepLCAnnotator
 from quantmsrescore.exceptions import Ms2pipIncorrectModelException
 from quantmsrescore.idxmlreader import IdXMLRescoringReader
 from quantmsrescore.logging_config import get_logger
 from quantmsrescore.ms2pip import MS2PIPAnnotator
-from quantmsrescore.openms import OpenMSHelper
+from quantmsrescore.openms import OpenMSHelper, clear_spectrum_cache
 from quantmsrescore.alphapeptdeep import AlphaPeptDeepAnnotator
 
 # Get logger for this module
 logger = get_logger(__name__)
+
+
+def _shallow_copy_psm_list(psm_list: PSMList) -> PSMList:
+    """
+    Create a shallow copy of a PSMList with fresh rescoring_features dicts.
+
+    This is much more memory-efficient than copy.deepcopy() because it only
+    creates new containers for mutable data that will be modified (rescoring_features),
+    while sharing immutable data like peptide sequences and spectrum IDs.
+
+    Parameters
+    ----------
+    psm_list : PSMList
+        The PSMList to copy.
+
+    Returns
+    -------
+    PSMList
+        A new PSMList with shallow-copied PSMs.
+    """
+    copied_psms = []
+    for psm in psm_list.psm_list:
+        # Create a new PSM with the same attributes but a fresh rescoring_features dict
+        # PSM attributes are mostly immutable (strings, numbers, tuples)
+        new_psm = PSM(
+            peptidoform=psm.peptidoform,
+            spectrum_id=psm.spectrum_id,
+            run=psm.run,
+            collection=psm.collection,
+            spectrum=psm.spectrum,
+            is_decoy=psm.is_decoy,
+            score=psm.score,
+            qvalue=psm.qvalue,
+            pep=psm.pep,
+            precursor_mz=psm.precursor_mz,
+            retention_time=psm.retention_time,
+            ion_mobility=psm.ion_mobility,
+            protein_list=psm.protein_list,
+            rank=psm.rank,
+            source=psm.source,
+            provenance_data=psm.provenance_data,  # Can share as keys are read-only
+            metadata=psm.metadata.copy() if psm.metadata else {},
+            rescoring_features={},  # Fresh dict - this is what will be modified
+        )
+        copied_psms.append(new_psm)
+    return PSMList(psm_list=copied_psms)
 
 
 class FeatureAnnotator:
@@ -231,6 +278,10 @@ class FeatureAnnotator:
         # Convert features to OpenMS format if any annotations were added
         if self._ms2pip or self._alphapeptdeep or self._find_best_model or self._deepLC:
             self._convert_features_psms_to_oms_peptides()
+
+        # Clear spectrum cache to free memory after annotation is complete
+        clear_spectrum_cache()
+        gc.collect()
 
         logger.info("Annotation complete")
 
@@ -647,21 +698,31 @@ class FeatureAnnotator:
         -------
         DeepLCAnnotator
             The DeepLC annotator with the lowest MAE (best performance).
-        """
-        # Get base PSMs for comparison
-        base_psms = self._idxml_reader.psms.psm_list
 
-        # Evaluate retrained model
-        retrained_psms = PSMList(psm_list=copy.deepcopy(base_psms))
+        Notes
+        -----
+        Uses shallow copies of PSM lists instead of deep copies for memory efficiency.
+        The rescoring_features dict is the only mutable part that needs to be fresh.
+        """
+        # Evaluate retrained model using shallow copy (memory efficient)
+        retrained_psms = _shallow_copy_psm_list(self._idxml_reader.psms)
         retrained_model = self._create_deeplc_annotator(retrain=True, calibration_set_size=0.6)
         retrained_model.add_features(retrained_psms)
         mae_retrained = self._get_mae_from_psm_list(retrained_psms)
 
-        # Evaluate pretrained model
-        pretrained_psms = PSMList(psm_list=copy.deepcopy(base_psms))
+        # Clean up retrained PSMs if we don't need them
+        del retrained_psms
+        gc.collect()
+
+        # Evaluate pretrained model using shallow copy (memory efficient)
+        pretrained_psms = _shallow_copy_psm_list(self._idxml_reader.psms)
         pretrained_model = self._create_deeplc_annotator(retrain=False, calibration_set_size=0.6)
         pretrained_model.add_features(pretrained_psms)
         mae_pretrained = self._get_mae_from_psm_list(pretrained_psms)
+
+        # Clean up pretrained PSMs
+        del pretrained_psms
+        gc.collect()
 
         # Select model with lower MAE
         if mae_retrained < mae_pretrained:

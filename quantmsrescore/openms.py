@@ -1,6 +1,6 @@
 import re
 from pathlib import Path
-from typing import List, Union, Optional, Tuple
+from typing import List, Union, Optional, Tuple, Generator, Dict, Any
 from warnings import filterwarnings
 
 filterwarnings(
@@ -36,6 +36,68 @@ logger = get_logger(__name__)
 
 OPENMS_DECOY_FIELD = "target_decoy"
 SPECTRUM_PATTERN = r"(spectrum|scan)=(\d+)"
+
+# =============================================================================
+# Global spectrum file cache for memory efficiency
+# =============================================================================
+# This cache prevents loading the same mzML file multiple times when both
+# MS2PIP and AlphaPeptDeep process the same file.
+_SPECTRUM_FILE_CACHE: Dict[str, Tuple[oms.MSExperiment, SpectrumLookup]] = {}
+
+
+def get_cached_spectrum_data(
+    mzml_file: Union[str, Path],
+    force_reload: bool = False
+) -> Tuple[oms.MSExperiment, SpectrumLookup]:
+    """
+    Get spectrum data from cache or load it.
+
+    This function prevents duplicate loading of the same mzML file when
+    multiple feature generators (MS2PIP, AlphaPeptDeep, DeepLC) process
+    the same spectrum file.
+
+    Parameters
+    ----------
+    mzml_file : Union[str, Path]
+        Path to the mzML file.
+    force_reload : bool, optional
+        If True, reload the file even if cached. Default is False.
+
+    Returns
+    -------
+    Tuple[oms.MSExperiment, SpectrumLookup]
+        Cached or freshly loaded experiment and lookup.
+    """
+    mzml_path = str(mzml_file) if isinstance(mzml_file, Path) else mzml_file
+
+    if force_reload or mzml_path not in _SPECTRUM_FILE_CACHE:
+        logger.debug(f"Loading mzML file into cache: {mzml_path}")
+        exp, lookup = OpenMSHelper.get_spectrum_lookup_indexer(mzml_path)
+        _SPECTRUM_FILE_CACHE[mzml_path] = (exp, lookup)
+    else:
+        logger.debug(f"Using cached mzML data: {mzml_path}")
+
+    return _SPECTRUM_FILE_CACHE[mzml_path]
+
+
+def clear_spectrum_cache(mzml_file: Optional[Union[str, Path]] = None) -> None:
+    """
+    Clear the spectrum file cache to free memory.
+
+    Parameters
+    ----------
+    mzml_file : Optional[Union[str, Path]], optional
+        Specific file to remove from cache. If None, clears entire cache.
+    """
+    global _SPECTRUM_FILE_CACHE
+    if mzml_file is None:
+        _SPECTRUM_FILE_CACHE.clear()
+        logger.debug("Cleared entire spectrum cache")
+    else:
+        mzml_path = str(mzml_file) if isinstance(mzml_file, Path) else mzml_file
+        if mzml_path in _SPECTRUM_FILE_CACHE:
+            del _SPECTRUM_FILE_CACHE[mzml_path]
+            logger.debug(f"Removed from spectrum cache: {mzml_path}")
 
 
 class OpenMSHelper:
@@ -609,16 +671,73 @@ class OpenMSHelper:
         return tol_da, "Da"
 
     @staticmethod
-    def get_mslevel_spectra(file_name, ms_level):
+    def get_mslevel_spectra(
+        file_name: Union[str, Path],
+        ms_level: int,
+        use_cache: bool = True
+    ) -> List[oms.MSSpectrum]:
         """
-        Get the mslevel spectra from an mzML file.
+        Get spectra of a specific MS level from an mzML file.
+
+        Parameters
+        ----------
+        file_name : Union[str, Path]
+            Path to the mzML file.
+        ms_level : int
+            MS level to filter (e.g., 2 for MS2).
+        use_cache : bool, optional
+            If True, use the global spectrum cache. Default is True.
+
+        Returns
+        -------
+        List[oms.MSSpectrum]
+            List of spectra at the specified MS level.
         """
-        exp = OpenMSHelper.get_spectrum_lookup_indexer(file_name)[0]
+        if use_cache:
+            exp, _ = get_cached_spectrum_data(file_name)
+        else:
+            exp = OpenMSHelper.get_spectrum_lookup_indexer(str(file_name))[0]
+
         spectra = []
         for spec in exp:
             if spec.getMSLevel() == ms_level:
                 spectra.append(spec)
         return spectra
+
+    @staticmethod
+    def iter_mslevel_spectra(
+        file_name: Union[str, Path],
+        ms_level: int,
+        use_cache: bool = True
+    ) -> Generator[oms.MSSpectrum, None, None]:
+        """
+        Iterate over spectra of a specific MS level (memory-efficient generator).
+
+        This is more memory-efficient than get_mslevel_spectra() when you don't
+        need all spectra at once.
+
+        Parameters
+        ----------
+        file_name : Union[str, Path]
+            Path to the mzML file.
+        ms_level : int
+            MS level to filter (e.g., 2 for MS2).
+        use_cache : bool, optional
+            If True, use the global spectrum cache. Default is True.
+
+        Yields
+        ------
+        oms.MSSpectrum
+            Spectra at the specified MS level.
+        """
+        if use_cache:
+            exp, _ = get_cached_spectrum_data(file_name)
+        else:
+            exp = OpenMSHelper.get_spectrum_lookup_indexer(str(file_name))[0]
+
+        for spec in exp:
+            if spec.getMSLevel() == ms_level:
+                yield spec
 
     @staticmethod
     def get_instrument(exp: oms.MSExperiment):
