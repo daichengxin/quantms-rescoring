@@ -4,6 +4,8 @@
 
 import click
 
+# Import thread configuration FIRST before other heavy imports
+from quantmsrescore import configure_threading, configure_torch_threads
 from quantmsrescore.annotator import FeatureAnnotator
 from quantmsrescore.logging_config import configure_logging
 
@@ -129,6 +131,14 @@ configure_logging()
               help="Epochs to train AlphaPeptDeep MS2 model",
               type=int,
               default=20)
+@click.option(
+    "--threads_per_process",
+    help="Number of threads per worker process for numerical libraries (MKL, OpenBLAS, PyTorch). "
+         "Default is 1 for HPC safety. Total parallelism = processes × threads_per_process. "
+         "Set higher only on dedicated machines.",
+    type=int,
+    default=1,
+)
 @click.pass_context
 def msrescore2feature(
         ctx,
@@ -154,7 +164,8 @@ def msrescore2feature(
         transfer_learning,
         transfer_learning_test_ratio,
         save_retrain_model,
-        epoch_to_train_ms2
+        epoch_to_train_ms2,
+        threads_per_process,
 ):
     """
     Annotate PSMs in an idXML file with additional features using specified models.
@@ -216,7 +227,14 @@ def msrescore2feature(
         Defaults to False.
     epoch_to_train_ms2: int, optional
         Number of epochs to train AlphaPeptDeep MS2 model. Defaults to 20.
+    threads_per_process: int, optional
+        Number of threads per worker process for numerical libraries.
+        Defaults to 1 for HPC safety.
     """
+    # Configure threading for HPC environments
+    # This must be done early, before heavy computation starts
+    configure_threading(n_threads=threads_per_process, verbose=True)
+    configure_torch_threads(n_threads=threads_per_process)
 
     annotator = FeatureAnnotator(
         feature_generators=feature_generators,

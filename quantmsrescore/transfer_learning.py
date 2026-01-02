@@ -1,6 +1,9 @@
 import click
 from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor, as_completed
+
+# Import thread configuration FIRST before other heavy imports
+from quantmsrescore import configure_threading, configure_torch_threads
 from quantmsrescore.idxmlreader import IdXMLRescoringReader
 from quantmsrescore.logging_config import get_logger
 from quantmsrescore.openms import OpenMSHelper
@@ -11,6 +14,7 @@ import pandas as pd
 import re
 import ms2pip.exceptions as exceptions
 import pyopenms as oms
+
 # Get logger for this module
 logger = get_logger(__name__)
 
@@ -92,6 +96,12 @@ logger = get_logger(__name__)
     is_flag=True,
 )
 @click.option("--log_level", help="Logging level (default: `info`)", default="info")
+@click.option(
+    "--threads_per_process",
+    help="Number of threads per worker process for numerical libraries. Default is 1 for HPC safety.",
+    type=int,
+    default=1,
+)
 @click.pass_context
 def transfer_learning(
         ctx,
@@ -108,7 +118,8 @@ def transfer_learning(
         transfer_learning_test_ratio,
         epoch_to_train_ms2,
         force_transfer_learning,
-        log_level
+        log_level,
+        threads_per_process,
 ):
     """
     Annotate PSMs in an idXML file with additional features using specified models.
@@ -155,7 +166,13 @@ def transfer_learning(
         Defaults to False.
     log_level : str
         The logging level for the CLI command.
+    threads_per_process : int, optional
+        Number of threads per worker process for numerical libraries.
+        Defaults to 1 for HPC safety.
     """
+    # Configure threading for HPC environments
+    configure_threading(n_threads=threads_per_process, verbose=True)
+    configure_torch_threads(n_threads=threads_per_process)
 
     annotator = AlphaPeptdeepTrainer(
         ms2_model_path=ms2_model_dir,

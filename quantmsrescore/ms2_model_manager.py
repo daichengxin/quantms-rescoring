@@ -18,6 +18,43 @@ import urllib
 import ssl
 import certifi
 
+# Import thread configuration from package init
+from quantmsrescore import configure_torch_threads
+
+
+def _configure_torch_for_hpc(n_threads: int = 1) -> None:
+    """
+    Configure PyTorch thread settings for HPC environments.
+
+    This function limits PyTorch's internal threading to prevent
+    thread explosion when using multiprocessing.
+
+    Parameters
+    ----------
+    n_threads : int, optional
+        Number of threads per PyTorch operation. Default is 1.
+
+    Notes
+    -----
+    In HPC/Slurm environments, each worker process should use minimal
+    internal threads to avoid:
+    - Thread competition for CPU cores
+    - Excessive memory from thread stacks
+    - Performance degradation from context switching
+    """
+    try:
+        # Limit intra-op parallelism (within single operations)
+        torch.set_num_threads(n_threads)
+        # Limit inter-op parallelism (between independent operations)
+        torch.set_num_interop_threads(n_threads)
+    except RuntimeError:
+        # Threads already configured (can only be set once per process)
+        pass
+
+
+# Apply PyTorch thread limits immediately
+_configure_torch_for_hpc(n_threads=1)
+
 
 class MS2ModelManager(ModelManager):
     def __init__(self,

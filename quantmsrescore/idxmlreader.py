@@ -222,9 +222,18 @@ class IdXMLRescoringReader(IdXMLReader):
         -------
         PSMList
             A list of parsed PSM objects.
+
+        Notes
+        -----
+        This method uses a list-based approach to collect PSM records and then
+        creates a DataFrame in one operation. This is O(n) instead of O(n²)
+        which occurs when using DataFrame.append() in a loop.
         """
         psm_list = []
-        psm_df = pd.DataFrame()
+        # Use list of dicts instead of DataFrame.append() for O(n) performance
+        # DataFrame.append() in a loop is O(n²) due to repeated memory allocation
+        psm_records = []
+
         fixed_mods = self.oms_proteins[0].getSearchParameters().fixed_modifications
         var_mods = self.oms_proteins[0].getSearchParameters().variable_modifications
         mods_name_dict = {}
@@ -278,21 +287,25 @@ class IdXMLRescoringReader(IdXMLReader):
                 nce = OpenMSHelper.get_nce_psm(peptide_id, self.spec_lookup, self.exp)
                 if psm is not None:
                     psm_list.append(psm)
-                    psm_df = psm_df._append({"sequence": sequence,
-                                             "charge": psm_hit.getCharge(),
-                                             "mods": mods,
-                                             "mod_sites": mod_sites,
-                                             "nce": nce,
-                                             "provenance_data": next(iter(psm.provenance_data.keys())),
-                                             "instrument": instrument,
-                                             "spectrum_ref": spectrum_ref,
-                                             "filename": Path(filename).stem,
-                                             "is_decoy": OpenMSHelper.is_decoy_peptide_hit(psm_hit),
-                                             "rank": psm_hit.getRank() + 1,
-                                             "score": psm_hit.getScore()}, ignore_index=True)
+                    # Append to list of records (O(1) amortized) instead of DataFrame (O(n))
+                    psm_records.append({
+                        "sequence": sequence,
+                        "charge": psm_hit.getCharge(),
+                        "mods": mods,
+                        "mod_sites": mod_sites,
+                        "nce": nce,
+                        "provenance_data": next(iter(psm.provenance_data.keys())),
+                        "instrument": instrument,
+                        "spectrum_ref": spectrum_ref,
+                        "filename": Path(filename).stem,
+                        "is_decoy": OpenMSHelper.is_decoy_peptide_hit(psm_hit),
+                        "rank": psm_hit.getRank() + 1,
+                        "score": psm_hit.getScore(),
+                    })
 
         self._psms = PSMList(psm_list=psm_list)
-        self._psms_df = psm_df
+        # Create DataFrame from list of records in one operation (O(n))
+        self._psms_df = pd.DataFrame(psm_records) if psm_records else pd.DataFrame()
         logger.info(f"Loaded {len(self._psms)} PSMs from {self.filename}")
 
         return self._psms, self._psms_df
