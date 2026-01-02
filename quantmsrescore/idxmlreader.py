@@ -297,7 +297,7 @@ class IdXMLRescoringReader(IdXMLReader):
                         "provenance_data": next(iter(psm.provenance_data.keys())),
                         "instrument": instrument,
                         "spectrum_ref": spectrum_ref,
-                        "filename": Path(filename).stem,
+                        "filename": Path(filename).stem if filename else None,
                         "is_decoy": OpenMSHelper.is_decoy_peptide_hit(psm_hit),
                         "rank": psm_hit.getRank() + 1,
                         "score": psm_hit.getScore(),
