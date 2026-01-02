@@ -59,10 +59,11 @@ class MS2ModelManager(ModelManager):
         if parsed.scheme not in ("http", "https"):
             raise ValueError(f"Disallowed URL scheme: {parsed.scheme}")
 
-        if not os.path.exists(model_zip_file_path):
-            if not overwrite and os.path.exists(model_zip_file_path):
+        if os.path.exists(model_zip_file_path):
+            if not overwrite:
                 raise FileExistsError(f"Model file already exists: {model_zip_file_path}")
-
+            # File exists and overwrite is True, skip download
+        else:
             logging.info(f"Downloading pretrained models from {url} to {model_zip_file_path} ...")
             try:
                 os.makedirs(os.path.dirname(model_zip_file_path), exist_ok=True)
@@ -104,17 +105,13 @@ class MS2ModelManager(ModelManager):
         self.epoch_to_train_ms2 = epoch_to_train_ms2
         self.train_ms2_model(psms_df, match_intensity_df)
 
-    def load_installed_models(self, download_model_path: str = "pretrained_models_v3.zip", model_type: str = "generic"):
+    def load_installed_models(self, download_model_path: str = "pretrained_models_v3.zip"):
         """Load built-in MS2/CCS/RT models.
 
         Parameters
         ----------
-        model_type : str, optional
-            To load the installed MS2/RT/CCS models or phos MS2/RT/CCS models.
-            It could be 'digly', 'phospho', 'HLA', or 'generic'.
-            Defaults to 'generic'.
         download_model_path : str, optional
-            The path of model
+            The path of model zip file.
             Defaults to 'pretrained_models_v3.zip'.
         """
 
