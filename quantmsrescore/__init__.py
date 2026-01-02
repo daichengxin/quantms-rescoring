@@ -199,11 +199,20 @@ def get_safe_process_count(requested: int, memory_per_process_gb: float = 4.0) -
 
 
 # =============================================================================
-# Apply default thread configuration immediately on import
+# Opt-in thread configuration via environment variable
 # =============================================================================
-# This ensures that any subsequent imports of numpy, torch, etc. respect
-# the thread limits. Users can call configure_threading() again to adjust.
-configure_threading(n_threads=_DEFAULT_THREADS_PER_PROCESS)
+# Set QUANTMS_HPC_MODE=1 to automatically apply HPC-safe thread limits at import.
+# This ensures that subsequent imports of numpy, torch, etc. use limited threads.
+#
+# For explicit control (recommended), call configure_threading() directly:
+#   from quantmsrescore import configure_threading, configure_torch_threads
+#   configure_threading(n_threads=1)
+#   configure_torch_threads(n_threads=1)
+#
+# Note: The CLI commands (ms2rescore, transfer_learning) always apply thread
+# limits regardless of this setting.
+if os.environ.get("QUANTMS_HPC_MODE", "").lower() in ("1", "true", "yes"):
+    configure_threading(n_threads=_DEFAULT_THREADS_PER_PROCESS)
 
 
 # =============================================================================

@@ -19,7 +19,7 @@ import ssl
 import certifi
 import shutil
 
-def _configure_torch_for_hpc(n_threads: int = 1) -> None:
+def configure_torch_for_hpc(n_threads: int = 1) -> None:
     """
     Configure PyTorch thread settings for HPC environments.
 
@@ -49,8 +49,11 @@ def _configure_torch_for_hpc(n_threads: int = 1) -> None:
         pass
 
 
-# Apply PyTorch thread limits immediately
-_configure_torch_for_hpc(n_threads=1)
+# Opt-in PyTorch thread configuration via environment variable
+# Set QUANTMS_HPC_MODE=1 to enable automatic thread limiting at import time
+# For explicit control, call configure_torch_for_hpc() directly in your code
+if os.environ.get("QUANTMS_HPC_MODE", "").lower() in ("1", "true", "yes"):
+    configure_torch_for_hpc(n_threads=1)
 
 
 class MS2ModelManager(ModelManager):
@@ -86,12 +89,20 @@ class MS2ModelManager(ModelManager):
     def __str__(self):
         return self.model_str
 
-    def _download_models(self, model_zip_file_path: str, overwrite: bool = True) -> None:
+    def _download_models(self, model_zip_file_path: str, skip_if_exists: bool = True) -> None:
         """
         Download models if not done yet.
 
         Uses streaming download to avoid loading entire file into memory,
         and a longer timeout (300s) for large files on slow connections.
+
+        Parameters
+        ----------
+        model_zip_file_path : str
+            Path where the model zip file will be saved.
+        skip_if_exists : bool, optional
+            If True (default), skip download when file already exists.
+            If False, raise FileExistsError when file exists.
         """
         url = self.model_url
         parsed = urllib.parse.urlparse(url)
@@ -99,9 +110,9 @@ class MS2ModelManager(ModelManager):
             raise ValueError(f"Disallowed URL scheme: {parsed.scheme}")
 
         if os.path.exists(model_zip_file_path):
-            if not overwrite:
+            if not skip_if_exists:
                 raise FileExistsError(f"Model file already exists: {model_zip_file_path}")
-            # File exists and overwrite is True, skip download
+            logging.debug(f"Model file already exists, skipping download: {model_zip_file_path}")
         else:
             logging.info(f"Downloading pretrained models from {url} to {model_zip_file_path} ...")
             try:
@@ -326,7 +337,7 @@ class MS2pDeepModel(pDeepModel):
 
     def __init__(
             self,
-            charged_frag_types=get_charged_frag_types(frag_types, max_frag_charge),
+            charged_frag_types=None,
             dropout=0.1,
             model_class: torch.nn.Module = ModelMS2Bert,
             device: str = "gpu",
@@ -334,6 +345,11 @@ class MS2pDeepModel(pDeepModel):
             override_from_weights: bool = False,
             **kwargs,  # model params
     ):
+        # Avoid function call in default argument (Ruff B008)
+        # Evaluated once at definition time, not at each call
+        if charged_frag_types is None:
+            charged_frag_types = get_charged_frag_types(frag_types, max_frag_charge)
+
         super().__init__(
             charged_frag_types=charged_frag_types,
             dropout=dropout,
