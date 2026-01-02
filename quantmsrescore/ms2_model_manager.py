@@ -18,10 +18,6 @@ import urllib
 import ssl
 import certifi
 
-# Import thread configuration from package init
-from quantmsrescore import configure_torch_threads
-
-
 def _configure_torch_for_hpc(n_threads: int = 1) -> None:
     """
     Configure PyTorch thread settings for HPC environments.
