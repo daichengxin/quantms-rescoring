@@ -371,6 +371,7 @@ configure_torch_threads(n_threads=1)
 ```
 
 This prevents thread explosion where `processes × cpu_count` threads compete for `cpu_count` cores, which can cause:
+
 - Excessive memory usage from thread stacks
 - Node OOM kills in Slurm clusters
 - Performance degradation from context switching
