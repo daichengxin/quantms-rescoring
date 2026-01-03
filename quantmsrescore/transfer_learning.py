@@ -1,9 +1,12 @@
 import click
 from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor, as_completed
+
+# Import thread configuration FIRST before other heavy imports
+from quantmsrescore import configure_threading, configure_torch_threads
 from quantmsrescore.idxmlreader import IdXMLRescoringReader
 from quantmsrescore.logging_config import get_logger
-from quantmsrescore.openms import OpenMSHelper
+from quantmsrescore.openms import OpenMSHelper, get_compiled_regex
 from quantmsrescore.alphapeptdeep import read_spectrum_file, _get_targets_df_for_psm
 from alphabase.peptide.fragment import create_fragment_mz_dataframe
 from quantmsrescore.ms2_model_manager import MS2ModelManager
@@ -11,6 +14,7 @@ import pandas as pd
 import re
 import ms2pip.exceptions as exceptions
 import pyopenms as oms
+
 # Get logger for this module
 logger = get_logger(__name__)
 
@@ -41,7 +45,9 @@ logger = get_logger(__name__)
 )
 @click.option(
     "--processes",
-    help="Number of parallel processes available to parse file (default: 4)",
+    help="Number of parallel processes (e.g., Nextflow's $task.cpus). "
+         "Each process uses 1 internal thread to avoid HPC resource contention. "
+         "Default: 4",
     type=int,
     default=4,
 )
@@ -108,7 +114,7 @@ def transfer_learning(
         transfer_learning_test_ratio,
         epoch_to_train_ms2,
         force_transfer_learning,
-        log_level
+        log_level,
 ):
     """
     Annotate PSMs in an idXML file with additional features using specified models.
@@ -130,7 +136,8 @@ def transfer_learning(
     save_model_dir : str
         Path for the retrained model.
     processes : int
-        The number of parallel processes available for MS²Rescore.
+        The number of parallel processes available (e.g., Nextflow's $task.cpus).
+        Each process uses 1 internal thread for HPC safety.
     ms2_tolerance : float
         The tolerance for MS²PIP annotation.
     ms2_tolerance_unit : str, optional
@@ -156,6 +163,11 @@ def transfer_learning(
     log_level : str
         The logging level for the CLI command.
     """
+    # Configure threading for HPC environments
+    # Use 1 thread per process to avoid thread explosion with multiprocessing
+    # This is critical for Nextflow/Slurm where $task.cpus defines total parallelism
+    configure_threading(n_threads=1, verbose=True)
+    configure_torch_threads(n_threads=1)
 
     annotator = AlphaPeptdeepTrainer(
         ms2_model_path=ms2_model_dir,
@@ -315,11 +327,8 @@ class AlphaPeptdeepTrainer:
         theoretical_mz_df = create_fragment_mz_dataframe(precursor_df, frag_types)
         precursor_df = precursor_df.set_index("provenance_data")
 
-        # Compile regex for spectrum ID matching
-        try:
-            spectrum_id_regex = re.compile(self._spectrum_id_pattern)
-        except TypeError:
-            spectrum_id_regex = re.compile(r"(.*)")
+        # Get cached compiled regex for spectrum ID matching
+        spectrum_id_regex = get_compiled_regex(self._spectrum_id_pattern)
 
         match_intensity_df = []
         current_index = 0

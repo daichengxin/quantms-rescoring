@@ -17,6 +17,43 @@ import copy
 import urllib
 import ssl
 import certifi
+import shutil
+
+def configure_torch_for_hpc(n_threads: int = 1) -> None:
+    """
+    Configure PyTorch thread settings for HPC environments.
+
+    This function limits PyTorch's internal threading to prevent
+    thread explosion when using multiprocessing.
+
+    Parameters
+    ----------
+    n_threads : int, optional
+        Number of threads per PyTorch operation. Default is 1.
+
+    Notes
+    -----
+    In HPC/Slurm environments, each worker process should use minimal
+    internal threads to avoid:
+    - Thread competition for CPU cores
+    - Excessive memory from thread stacks
+    - Performance degradation from context switching
+    """
+    try:
+        # Limit intra-op parallelism (within single operations)
+        torch.set_num_threads(n_threads)
+        # Limit inter-op parallelism (between independent operations)
+        torch.set_num_interop_threads(n_threads)
+    except RuntimeError:
+        # Threads already configured (can only be set once per process)
+        pass
+
+
+# Opt-in PyTorch thread configuration via environment variable
+# Set QUANTMS_HPC_MODE=1 to enable automatic thread limiting at import time
+# For explicit control, call configure_torch_for_hpc() directly in your code
+if os.environ.get("QUANTMS_HPC_MODE", "").lower() in ("1", "true", "yes"):
+    configure_torch_for_hpc(n_threads=1)
 
 
 class MS2ModelManager(ModelManager):
@@ -52,25 +89,47 @@ class MS2ModelManager(ModelManager):
     def __str__(self):
         return self.model_str
 
-    def _download_models(self, model_zip_file_path: str, overwrite: bool = True) -> None:
-        """Download models if not done yet."""
+    def _download_models(self, model_zip_file_path: str, skip_if_exists: bool = True) -> None:
+        """
+        Download models if not done yet.
+
+        Uses streaming download to avoid loading entire file into memory,
+        and a longer timeout (300s) for large files on slow connections.
+
+        Parameters
+        ----------
+        model_zip_file_path : str
+            Path where the model zip file will be saved.
+        skip_if_exists : bool, optional
+            If True (default), skip download when file already exists.
+            If False, raise FileExistsError when file exists.
+        """
         url = self.model_url
         parsed = urllib.parse.urlparse(url)
         if parsed.scheme not in ("http", "https"):
             raise ValueError(f"Disallowed URL scheme: {parsed.scheme}")
 
-        if not os.path.exists(model_zip_file_path):
-            if not overwrite and os.path.exists(model_zip_file_path):
+        if os.path.exists(model_zip_file_path):
+            if not skip_if_exists:
                 raise FileExistsError(f"Model file already exists: {model_zip_file_path}")
-
+            logging.debug(f"Model file already exists, skipping download: {model_zip_file_path}")
+        else:
             logging.info(f"Downloading pretrained models from {url} to {model_zip_file_path} ...")
             try:
                 os.makedirs(os.path.dirname(model_zip_file_path), exist_ok=True)
                 context = ssl.create_default_context(cafile=certifi.where())
-                requests = urllib.request.urlopen(url, context=context, timeout=10)  # nosec B310
-                with open(model_zip_file_path, "wb") as f:
-                    f.write(requests.read())
+                # Use streaming download with longer timeout for large model files
+                # timeout=300s (5 min) for slow connections; stream in 1MB chunks
+                with urllib.request.urlopen(url, context=context, timeout=300) as response:  # nosec B310
+                    with open(model_zip_file_path, "wb") as out_file:
+                        shutil.copyfileobj(response, out_file, length=1024 * 1024)  # 1MB chunks
             except Exception as e:
+                # Clean up partial download on failure
+                if os.path.exists(model_zip_file_path):
+                    try:
+                        os.remove(model_zip_file_path)
+                    except OSError:
+                        pass
                 raise FileNotFoundError(
                     f"Downloading model failed: {e}.\n" + MODEL_DOWNLOAD_INSTRUCTIONS
                 ) from e
@@ -104,17 +163,13 @@ class MS2ModelManager(ModelManager):
         self.epoch_to_train_ms2 = epoch_to_train_ms2
         self.train_ms2_model(psms_df, match_intensity_df)
 
-    def load_installed_models(self, download_model_path: str = "pretrained_models_v3.zip", model_type: str = "generic"):
+    def load_installed_models(self, download_model_path: str = "pretrained_models_v3.zip"):
         """Load built-in MS2/CCS/RT models.
 
         Parameters
         ----------
-        model_type : str, optional
-            To load the installed MS2/RT/CCS models or phos MS2/RT/CCS models.
-            It could be 'digly', 'phospho', 'HLA', or 'generic'.
-            Defaults to 'generic'.
         download_model_path : str, optional
-            The path of model
+            The path of model zip file.
             Defaults to 'pretrained_models_v3.zip'.
         """
 
@@ -282,7 +337,7 @@ class MS2pDeepModel(pDeepModel):
 
     def __init__(
             self,
-            charged_frag_types=get_charged_frag_types(frag_types, max_frag_charge),
+            charged_frag_types=None,
             dropout=0.1,
             model_class: torch.nn.Module = ModelMS2Bert,
             device: str = "gpu",
@@ -290,6 +345,11 @@ class MS2pDeepModel(pDeepModel):
             override_from_weights: bool = False,
             **kwargs,  # model params
     ):
+        # Avoid function call in default argument (Ruff B008)
+        # Evaluated once at definition time, not at each call
+        if charged_frag_types is None:
+            charged_frag_types = get_charged_frag_types(frag_types, max_frag_charge)
+
         super().__init__(
             charged_frag_types=charged_frag_types,
             dropout=dropout,

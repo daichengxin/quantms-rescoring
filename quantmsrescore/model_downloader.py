@@ -267,8 +267,9 @@ def download_alphapeptdeep_models(model_dir: Optional[Path] = None) -> None:
     try:
         logger.info("Downloading AlphaPeptDeep models...")
 
-        # Download models to default location
-        MS2ModelManager(model_dir=model_dir)
+        # Download models to specified location or default
+        target_dir = str(model_dir) if model_dir else "."
+        MS2ModelManager(model_dir=target_dir)
         logger.info("AlphaPeptDeep models downloaded successfully.")
 
     except ImportError:
