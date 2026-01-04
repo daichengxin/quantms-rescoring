@@ -1,9 +1,12 @@
 import click
 from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor, as_completed
+
+# Import thread configuration FIRST before other heavy imports
+from quantmsrescore import configure_threading, configure_torch_threads
 from quantmsrescore.idxmlreader import IdXMLRescoringReader
 from quantmsrescore.logging_config import get_logger
-from quantmsrescore.openms import OpenMSHelper
+from quantmsrescore.openms import OpenMSHelper, get_compiled_regex
 from quantmsrescore.alphapeptdeep import read_spectrum_file, _get_targets_df_for_psm
 from alphabase.peptide.fragment import create_fragment_mz_dataframe
 from quantmsrescore.ms2_model_manager import MS2ModelManager
@@ -11,6 +14,7 @@ import pandas as pd
 import re
 import ms2pip.exceptions as exceptions
 import pyopenms as oms
+
 # Get logger for this module
 logger = get_logger(__name__)
 
@@ -41,7 +45,9 @@ logger = get_logger(__name__)
 )
 @click.option(
     "--processes",
-    help="Number of parallel processes available to parse file (default: 4)",
+    help="Number of parallel processes (e.g., Nextflow's $task.cpus). "
+         "Each process uses 1 internal thread to avoid HPC resource contention. "
+         "Default: 4",
     type=int,
     default=4,
 )
@@ -91,6 +97,7 @@ logger = get_logger(__name__)
     help="Forced save fine-tune model when it is not better than pretrained for test dataset",
     is_flag=True,
 )
+@click.option("--log_level", help="Logging level (default: `info`)", default="info")
 @click.pass_context
 def transfer_learning(
         ctx,
@@ -106,7 +113,8 @@ def transfer_learning(
         consider_modloss,
         transfer_learning_test_ratio,
         epoch_to_train_ms2,
-        force_transfer_learning
+        force_transfer_learning,
+        log_level,
 ):
     """
     Annotate PSMs in an idXML file with additional features using specified models.
@@ -128,7 +136,8 @@ def transfer_learning(
     save_model_dir : str
         Path for the retrained model.
     processes : int
-        The number of parallel processes available for MS²Rescore.
+        The number of parallel processes available (e.g., Nextflow's $task.cpus).
+        Each process uses 1 internal thread for HPC safety.
     ms2_tolerance : float
         The tolerance for MS²PIP annotation.
     ms2_tolerance_unit : str, optional
@@ -151,7 +160,14 @@ def transfer_learning(
     force_transfer_learning: bool, optional
         Forced save fine-tune model when it is not better than pretrained for test dataset.
         Defaults to False.
+    log_level : str
+        The logging level for the CLI command.
     """
+    # Configure threading for HPC environments
+    # Use 1 thread per process to avoid thread explosion with multiprocessing
+    # This is critical for Nextflow/Slurm where $task.cpus defines total parallelism
+    configure_threading(n_threads=1, verbose=True)
+    configure_torch_threads(n_threads=1)
 
     annotator = AlphaPeptdeepTrainer(
         ms2_model_path=ms2_model_dir,
@@ -164,7 +180,8 @@ def transfer_learning(
         transfer_learning_test_ratio=transfer_learning_test_ratio,
         epoch_to_train_ms2=epoch_to_train_ms2,
         force_transfer_learning=force_transfer_learning,
-        save_model_dir=save_model_dir
+        save_model_dir=save_model_dir,
+        log_level=log_level.upper()
     )
     annotator.build_idxml_data(idxml, mzml)
     annotator.fine_tune()
@@ -180,7 +197,8 @@ class AlphaPeptdeepTrainer:
                  consider_modloss: bool = False,
                  transfer_learning_test_ratio: float = 0.3,
                  epoch_to_train_ms2: int = 20,
-                 force_transfer_learning: bool = False):
+                 force_transfer_learning: bool = False,
+                 log_level: str = "INFO"):
         self._idxml_reader = None
         self._higher_score_better = None
         self.spec_file = None
@@ -196,6 +214,11 @@ class AlphaPeptdeepTrainer:
         self._ms2_tolerance_unit = ms2_tolerance_unit
         self._model_dir = ms2_model_path
         self._save_model_dir = save_model_dir
+
+        # Set up logging
+        from quantmsrescore.logging_config import configure_logging
+
+        configure_logging(log_level)
 
     def _read_idxml_file(self, idxml_path, spectrum_paths):
         # Load the idXML file and corresponding mzML file
@@ -304,11 +327,8 @@ class AlphaPeptdeepTrainer:
         theoretical_mz_df = create_fragment_mz_dataframe(precursor_df, frag_types)
         precursor_df = precursor_df.set_index("provenance_data")
 
-        # Compile regex for spectrum ID matching
-        try:
-            spectrum_id_regex = re.compile(self._spectrum_id_pattern)
-        except TypeError:
-            spectrum_id_regex = re.compile(r"(.*)")
+        # Get cached compiled regex for spectrum ID matching
+        spectrum_id_regex = get_compiled_regex(self._spectrum_id_pattern)
 
         match_intensity_df = []
         current_index = 0

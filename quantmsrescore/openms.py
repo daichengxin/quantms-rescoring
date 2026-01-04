@@ -1,6 +1,6 @@
 import re
 from pathlib import Path
-from typing import List, Union, Optional, Tuple
+from typing import List, Union, Optional, Tuple, Generator, Dict, Any
 from warnings import filterwarnings
 
 filterwarnings(
@@ -36,6 +36,202 @@ logger = get_logger(__name__)
 
 OPENMS_DECOY_FIELD = "target_decoy"
 SPECTRUM_PATTERN = r"(spectrum|scan)=(\d+)"
+
+# =============================================================================
+# Caching infrastructure for performance
+# =============================================================================
+
+# Spectrum file cache (LRU bounded)
+_SPECTRUM_FILE_CACHE: Dict[str, Tuple[oms.MSExperiment, SpectrumLookup]] = {}
+_SPECTRUM_FILE_ACCESS_ORDER: List[str] = []  # Track access order for LRU eviction
+MAX_CACHE_SIZE = 3  # Maximum number of mzML files to keep in cache
+
+# Compiled regex cache to avoid repeated compilation
+_REGEX_CACHE: Dict[str, re.Pattern] = {}
+
+
+def get_compiled_regex(pattern: Optional[str]) -> re.Pattern:
+    """
+    Get a compiled regex pattern from cache or compile and cache it.
+
+    This prevents repeated regex compilation in loops, which is a common
+    performance issue when processing many spectra.
+
+    Parameters
+    ----------
+    pattern : Optional[str]
+        The regex pattern to compile. If None or empty, defaults to "(.*)".
+
+    Returns
+    -------
+    re.Pattern
+        The compiled regex pattern.
+    """
+    if not pattern:
+        pattern = r"(.*)"
+
+    if pattern not in _REGEX_CACHE:
+        try:
+            _REGEX_CACHE[pattern] = re.compile(pattern)
+        except re.error as e:
+            logger.warning(f"Invalid regex pattern '{pattern}': {e}. Using default.")
+            pattern = r"(.*)"
+            if pattern not in _REGEX_CACHE:
+                _REGEX_CACHE[pattern] = re.compile(pattern)
+
+    return _REGEX_CACHE[pattern]
+
+
+def get_cached_spectrum_data(
+    mzml_file: Union[str, Path],
+    force_reload: bool = False
+) -> Tuple[oms.MSExperiment, SpectrumLookup]:
+    """
+    Get spectrum data from cache or load it.
+
+    This function prevents duplicate loading of the same mzML file when
+    multiple feature generators (MS2PIP, AlphaPeptDeep, DeepLC) process
+    the same spectrum file.
+
+    The cache is bounded to MAX_CACHE_SIZE (default: 3) entries. When the
+    limit is reached, the least recently used entry is evicted. This prevents
+    unbounded memory growth when processing many spectrum files sequentially.
+
+    Parameters
+    ----------
+    mzml_file : Union[str, Path]
+        Path to the mzML file.
+    force_reload : bool, optional
+        If True, reload the file even if cached. Default is False.
+
+    Returns
+    -------
+    Tuple[oms.MSExperiment, SpectrumLookup]
+        Cached or freshly loaded experiment and lookup.
+
+    Notes
+    -----
+    For explicit memory management, call clear_spectrum_cache() after
+    completing annotation on a file or batch of files.
+    """
+    mzml_path = str(mzml_file) if isinstance(mzml_file, Path) else mzml_file
+
+    if force_reload or mzml_path not in _SPECTRUM_FILE_CACHE:
+        logger.debug(f"Loading mzML file into cache: {mzml_path}")
+
+        # Evict oldest entry if cache is full (LRU eviction)
+        if len(_SPECTRUM_FILE_CACHE) >= MAX_CACHE_SIZE:
+            if _SPECTRUM_FILE_ACCESS_ORDER:
+                oldest = _SPECTRUM_FILE_ACCESS_ORDER.pop(0)
+                if oldest in _SPECTRUM_FILE_CACHE:
+                    del _SPECTRUM_FILE_CACHE[oldest]
+                    logger.debug(f"Evicted from cache (LRU): {oldest}")
+
+        exp, lookup = OpenMSHelper.get_spectrum_lookup_indexer(mzml_path)
+        _SPECTRUM_FILE_CACHE[mzml_path] = (exp, lookup)
+        _SPECTRUM_FILE_ACCESS_ORDER.append(mzml_path)
+    else:
+        logger.debug(f"Using cached mzML data: {mzml_path}")
+        # Move to end of access order (most recently used)
+        if mzml_path in _SPECTRUM_FILE_ACCESS_ORDER:
+            _SPECTRUM_FILE_ACCESS_ORDER.remove(mzml_path)
+            _SPECTRUM_FILE_ACCESS_ORDER.append(mzml_path)
+
+    return _SPECTRUM_FILE_CACHE[mzml_path]
+
+
+def clear_spectrum_cache(mzml_file: Optional[Union[str, Path]] = None) -> None:
+    """
+    Clear the spectrum file cache to free memory.
+
+    Call this function after completing annotation on a file or batch of files
+    to reclaim memory. The annotator calls this automatically at the end of
+    annotation.
+
+    Parameters
+    ----------
+    mzml_file : Optional[Union[str, Path]], optional
+        Specific file to remove from cache. If None, clears entire cache.
+    """
+    if mzml_file is None:
+        _SPECTRUM_FILE_CACHE.clear()
+        _SPECTRUM_FILE_ACCESS_ORDER.clear()
+        logger.debug("Cleared entire spectrum cache")
+    else:
+        mzml_path = str(mzml_file) if isinstance(mzml_file, Path) else mzml_file
+        if mzml_path in _SPECTRUM_FILE_CACHE:
+            del _SPECTRUM_FILE_CACHE[mzml_path]
+            if mzml_path in _SPECTRUM_FILE_ACCESS_ORDER:
+                _SPECTRUM_FILE_ACCESS_ORDER.remove(mzml_path)
+            logger.debug(f"Removed from spectrum cache: {mzml_path}")
+
+
+# =============================================================================
+# Shared utility functions for MS2PIP and AlphaPeptDeep
+# =============================================================================
+# These functions are used by both alphapeptdeep.py and ms2pip.py to avoid
+# code duplication.
+
+
+def organize_psms_by_spectrum_id(
+    enumerated_psm_list: List[Any]
+) -> Dict[str, List[Tuple[int, Any]]]:
+    """
+    Organize PSMs by spectrum ID for efficient lookup.
+
+    This function creates a dictionary mapping spectrum IDs to lists of
+    (index, PSM) tuples, enabling O(1) lookup when iterating through spectra.
+
+    Parameters
+    ----------
+    enumerated_psm_list : List[Any]
+        List of PSMs. Can be either:
+        - List[PSM]: Will be enumerated internally
+        - List[Tuple[int, PSM]]: Already enumerated tuples
+
+    Returns
+    -------
+    Dict[str, List[Tuple[int, Any]]]
+        Dictionary mapping spectrum IDs to lists of (index, PSM) tuples.
+    """
+    from collections import defaultdict
+    psms_by_specid = defaultdict(list)
+
+    for item in enumerated_psm_list:
+        # Handle both enumerated tuples and raw PSM objects
+        if isinstance(item, tuple) and len(item) == 2:
+            psm_index, psm = item
+        else:
+            # Assume it's a PSM object, enumerate on the fly
+            psm_index = enumerated_psm_list.index(item)
+            psm = item
+
+        psms_by_specid[str(psm.spectrum_id)].append((psm_index, psm))
+
+    return psms_by_specid
+
+
+def calculate_correlations(results: List[Any]) -> None:
+    """
+    Calculate and add Pearson correlations to list of ProcessingResult objects.
+
+    This function modifies the results in-place, adding a correlation
+    attribute to each result based on predicted vs observed intensities.
+
+    Parameters
+    ----------
+    results : List[Any]
+        List of ProcessingResult objects with predicted_intensity and
+        observed_intensity attributes.
+    """
+    for result in results:
+        if result.predicted_intensity and result.observed_intensity:
+            pred_int = np.concatenate([i for i in result.predicted_intensity.values()])
+            obs_int = np.concatenate([i for i in result.observed_intensity.values()])
+            result.correlation = np.corrcoef(pred_int, obs_int)[0][1]
+        else:
+            result.correlation = None
+            logger.debug(f"Empty intensities for result: {result}")
 
 
 class OpenMSHelper:
@@ -609,16 +805,73 @@ class OpenMSHelper:
         return tol_da, "Da"
 
     @staticmethod
-    def get_mslevel_spectra(file_name, ms_level):
+    def get_mslevel_spectra(
+        file_name: Union[str, Path],
+        ms_level: int,
+        use_cache: bool = True
+    ) -> List[oms.MSSpectrum]:
         """
-        Get the mslevel spectra from an mzML file.
+        Get spectra of a specific MS level from an mzML file.
+
+        Parameters
+        ----------
+        file_name : Union[str, Path]
+            Path to the mzML file.
+        ms_level : int
+            MS level to filter (e.g., 2 for MS2).
+        use_cache : bool, optional
+            If True, use the global spectrum cache. Default is True.
+
+        Returns
+        -------
+        List[oms.MSSpectrum]
+            List of spectra at the specified MS level.
         """
-        exp = OpenMSHelper.get_spectrum_lookup_indexer(file_name)[0]
+        if use_cache:
+            exp, _ = get_cached_spectrum_data(file_name)
+        else:
+            exp = OpenMSHelper.get_spectrum_lookup_indexer(str(file_name))[0]
+
         spectra = []
         for spec in exp:
             if spec.getMSLevel() == ms_level:
                 spectra.append(spec)
         return spectra
+
+    @staticmethod
+    def iter_mslevel_spectra(
+        file_name: Union[str, Path],
+        ms_level: int,
+        use_cache: bool = True
+    ) -> Generator[oms.MSSpectrum, None, None]:
+        """
+        Iterate over spectra of a specific MS level (memory-efficient generator).
+
+        This is more memory-efficient than get_mslevel_spectra() when you don't
+        need all spectra at once.
+
+        Parameters
+        ----------
+        file_name : Union[str, Path]
+            Path to the mzML file.
+        ms_level : int
+            MS level to filter (e.g., 2 for MS2).
+        use_cache : bool, optional
+            If True, use the global spectrum cache. Default is True.
+
+        Yields
+        ------
+        oms.MSSpectrum
+            Spectra at the specified MS level.
+        """
+        if use_cache:
+            exp, _ = get_cached_spectrum_data(file_name)
+        else:
+            exp = OpenMSHelper.get_spectrum_lookup_indexer(str(file_name))[0]
+
+        for spec in exp:
+            if spec.getMSLevel() == ms_level:
+                yield spec
 
     @staticmethod
     def get_instrument(exp: oms.MSExperiment):
