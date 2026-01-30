@@ -26,7 +26,7 @@ from psm_utils import PSMList, PSM
 
 from quantmsrescore.constants import SUPPORTED_MODELS_MS2PIP
 from quantmsrescore.exceptions import Ms2pipIncorrectModelException
-from quantmsrescore.logging_config import get_logger
+from quantmsrescore.logging_config import get_logger, configure_worker_process
 from quantmsrescore.openms import (
     OpenMSHelper,
     get_compiled_regex,
@@ -36,6 +36,9 @@ from quantmsrescore.openms import (
 
 # Get logger for this module
 logger = get_logger(__name__)
+
+# Timeout for pool.get() operations in seconds (1 hour per chunk)
+_POOL_GET_TIMEOUT = 3600
 
 
 class PatchParallelized(_Parallelized):
@@ -177,7 +180,12 @@ class PatchParallelized(_Parallelized):
             mp_results = [
                 pool.apply_async(func, args=(psm_list_chunk, *args)) for psm_list_chunk in chunks
             ]
-            results = [r.get() for r in mp_results]
+            try:
+                results = [r.get(timeout=_POOL_GET_TIMEOUT) for r in mp_results]
+            except multiprocessing.TimeoutError:
+                logger.error(f"Pool operation timed out after {_POOL_GET_TIMEOUT} seconds")
+                pool.terminate()
+                raise
 
             pool.close()
             pool.join()
@@ -210,7 +218,10 @@ class PatchParallelized(_Parallelized):
             )
             return multiprocessing.dummy.Pool(1)
 
-        return multiprocessing.get_context("spawn").Pool(self.processes)
+        return multiprocessing.get_context("spawn").Pool(
+            self.processes,
+            initializer=configure_worker_process
+        )
 
 
 class MS2PIPAnnotator(MS2PIPFeatureGenerator):
@@ -661,7 +672,8 @@ def _get_targets_for_psm(
     """
     try:
         enc_peptidoform = encoder.encode_peptidoform(psm.peptidoform)
-    except exceptions.InvalidAminoAcidError:
+    except exceptions.InvalidAminoAcidError as e:
+        logger.debug(f"Invalid amino acid in peptidoform {psm.peptidoform}: {e}")
         return None, {}
 
     # Get targets
@@ -758,7 +770,8 @@ def _create_result_for_mode(
         except (
                 exceptions.InvalidPeptidoformError,
                 exceptions.InvalidAminoAcidError,
-        ):
+        ) as e:
+            logger.debug(f"Invalid peptidoform for PSM index {psm_index}: {e}")
             result = ProcessingResult(psm_index=psm_index, psm=psm)
         else:
             result.observed_intensity = targets

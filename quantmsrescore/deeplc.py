@@ -13,6 +13,31 @@ from quantmsrescore.logging_config import get_logger
 logger = get_logger(__name__)
 
 
+@contextlib.contextmanager
+def _suppress_stdout_if_not_verbose(verbose: bool):
+    """
+    Suppress stdout when not verbose, properly managing file handle.
+
+    This context manager fixes a file handle leak that occurs when using
+    `open(os.devnull, "w")` directly in a conditional context manager expression.
+    The file handle must be explicitly closed in a finally block.
+
+    Parameters
+    ----------
+    verbose : bool
+        If True, stdout is not suppressed. If False, stdout is redirected to devnull.
+    """
+    if not verbose and os.devnull is not None:
+        devnull = open(os.devnull, "w", encoding="utf-8")
+        try:
+            with contextlib.redirect_stdout(devnull):
+                yield
+        finally:
+            devnull.close()
+    else:
+        yield
+
+
 class DeepLCAnnotator(DeepLCFeatureGenerator):
 
     def add_features(self, psm_list: PSMList) -> None:
@@ -32,68 +57,69 @@ class DeepLCAnnotator(DeepLCFeatureGenerator):
             self.deeplc_predictor = None
             self.selected_model = None
             for run, psms in runs.items():
-                peptide_rt_diff_dict = defaultdict(
-                    lambda: {
-                        "observed_retention_time_best": np.inf,
-                        "predicted_retention_time_best": np.inf,
-                        "rt_diff_best": np.inf,
-                    }
-                )
-                logger.info(
-                    f"Running DeepLC for PSMs from run ({current_run}/{total_runs}): `{run}`..."
-                )
-
-                # Disable wild logging to stdout by Tensorflow, unless in debug mode
-                with (
-                    contextlib.redirect_stdout(open(os.devnull, "w", encoding="utf-8"))
-                    if not self._verbose and os.devnull is not None
-                    else contextlib.nullcontext()
-                ):
-                    # Make new PSM list for this run (chain PSMs per spectrum to flat list)
-                    psm_list_run = PSMList(psm_list=list(chain.from_iterable(psms.values())))
-
-                    psm_list_calibration = self._get_calibration_psms(psm_list_run)
-                    logger.debug(f"Calibrating DeepLC with {len(psm_list_calibration)} PSMs...")
-                    self.deeplc_predictor = self.DeepLC(
-                        n_jobs=self.processes,
-                        verbose=self._verbose,
-                        path_model=self.selected_model or self.user_model,
-                        **self.deeplc_kwargs,
+                try:
+                    peptide_rt_diff_dict = defaultdict(
+                        lambda: {
+                            "observed_retention_time_best": np.inf,
+                            "predicted_retention_time_best": np.inf,
+                            "rt_diff_best": np.inf,
+                        }
                     )
-                    self.deeplc_predictor.calibrate_preds(
-                        psm_list=psm_list_calibration, return_plotly_report=True
+                    logger.info(
+                        f"Running DeepLC for PSMs from run ({current_run}/{total_runs}): `{run}`..."
                     )
-                    # Still calibrate for each run, but do not try out all model options.
-                    # Just use the model that was selected based on the first run
-                    self.selected_model = list(self.deeplc_predictor.model.keys())
-                    logger.debug(
-                        f"Selected DeepLC model {self.selected_model} based on "
-                        "calibration of first run. Using this model (after new "
-                        "calibrations) for the remaining runs."
-                    )
-                    logger.debug("Predicting retention times...")
-                    predictions = np.array(self.deeplc_predictor.make_preds(psm_list_run))
-                    observations = psm_list_run["retention_time"]
-                    rt_diffs_run = np.abs(predictions - observations)
 
-                    logger.debug("Adding features to PSMs...")
-                    for i, psm in enumerate(psm_list_run):
-                        psm["rescoring_features"].update(
-                            {
-                                "observed_retention_time": observations[i],
-                                "predicted_retention_time": predictions[i],
-                                "rt_diff": rt_diffs_run[i],
-                            }
+                    # Disable wild logging to stdout by Tensorflow, unless in debug mode
+                    with _suppress_stdout_if_not_verbose(self._verbose):
+                        # Make new PSM list for this run (chain PSMs per spectrum to flat list)
+                        psm_list_run = PSMList(psm_list=list(chain.from_iterable(psms.values())))
+
+                        psm_list_calibration = self._get_calibration_psms(psm_list_run)
+                        logger.debug(f"Calibrating DeepLC with {len(psm_list_calibration)} PSMs...")
+                        self.deeplc_predictor = self.DeepLC(
+                            n_jobs=self.processes,
+                            verbose=self._verbose,
+                            path_model=self.selected_model or self.user_model,
+                            **self.deeplc_kwargs,
                         )
-                        peptide = psm.peptidoform.proforma.split("\\")[0]  # remove charge
-                        if peptide_rt_diff_dict[peptide]["rt_diff_best"] > rt_diffs_run[i]:
-                            peptide_rt_diff_dict[peptide] = {
-                                "observed_retention_time_best": observations[i],
-                                "predicted_retention_time_best": predictions[i],
-                                "rt_diff_best": rt_diffs_run[i],
-                            }
-                    for psm in psm_list_run:
-                        psm["rescoring_features"].update(
-                            peptide_rt_diff_dict[psm.peptidoform.proforma.split("\\")[0]]
+                        self.deeplc_predictor.calibrate_preds(
+                            psm_list=psm_list_calibration, return_plotly_report=True
                         )
-                current_run += 1
+                        # Still calibrate for each run, but do not try out all model options.
+                        # Just use the model that was selected based on the first run
+                        self.selected_model = list(self.deeplc_predictor.model.keys())
+                        logger.debug(
+                            f"Selected DeepLC model {self.selected_model} based on "
+                            "calibration of first run. Using this model (after new "
+                            "calibrations) for the remaining runs."
+                        )
+                        logger.debug("Predicting retention times...")
+                        predictions = np.array(self.deeplc_predictor.make_preds(psm_list_run))
+                        observations = psm_list_run["retention_time"]
+                        rt_diffs_run = np.abs(predictions - observations)
+
+                        logger.debug("Adding features to PSMs...")
+                        for i, psm in enumerate(psm_list_run):
+                            psm["rescoring_features"].update(
+                                {
+                                    "observed_retention_time": observations[i],
+                                    "predicted_retention_time": predictions[i],
+                                    "rt_diff": rt_diffs_run[i],
+                                }
+                            )
+                            peptide = psm.peptidoform.proforma.split("\\")[0]  # remove charge
+                            if peptide_rt_diff_dict[peptide]["rt_diff_best"] > rt_diffs_run[i]:
+                                peptide_rt_diff_dict[peptide] = {
+                                    "observed_retention_time_best": observations[i],
+                                    "predicted_retention_time_best": predictions[i],
+                                    "rt_diff_best": rt_diffs_run[i],
+                                }
+                        for psm in psm_list_run:
+                            psm["rescoring_features"].update(
+                                peptide_rt_diff_dict[psm.peptidoform.proforma.split("\\")[0]]
+                            )
+                except Exception as e:
+                    logger.error(f"Failed to process DeepLC for run {run}: {e}", exc_info=True)
+                    raise
+                finally:
+                    current_run += 1

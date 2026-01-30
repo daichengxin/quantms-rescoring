@@ -364,7 +364,7 @@ class FeatureAnnotator:
             logger.info(f"Successfully applied MS2PIP annotation using model: {model_to_use}")
 
         except Exception as e:
-            logger.error(f"Failed to apply MS2PIP annotation: {e}")
+            logger.error(f"Failed to apply MS2PIP annotation: {e}", exc_info=True)
             return  # Indicate failure through early return
 
         return  # Successful completion
@@ -406,10 +406,10 @@ class FeatureAnnotator:
             alphapeptdeep_generator.model = model_to_use
             alphapeptdeep_generator.add_features(psm_list, psms_df)
             logger.info(
-                f"Successfully applied AlphaPeptDeep annotation using model: {alphapeptdeep_generator._peptdeep_model}")
+                f"Successfully applied AlphaPeptDeep annotation using model: {str(alphapeptdeep_generator._peptdeep_model)}")
 
         except Exception as e:
-            logger.error(f"Failed to apply AlphaPeptDeep annotation: {e}")
+            logger.error(f"Failed to apply AlphaPeptDeep annotation: {e}", exc_info=True)
             return  # Indicate failure through early return
 
         return  # Successful completion
@@ -816,7 +816,8 @@ class FeatureAnnotator:
                 existing_set = set(features_existing.split(","))
             else:
                 existing_set = set()
-        except Exception:
+        except (KeyError, AttributeError, RuntimeError) as e:
+            logger.debug(f"No existing extra_features found: {e}")
             existing_set = set()
 
         # Combine existing and new features

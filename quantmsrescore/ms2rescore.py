@@ -225,7 +225,8 @@ def msrescore2feature(
     # Configure threading for HPC environments
     # Use 1 thread per process to avoid thread explosion with multiprocessing
     # This is critical for Nextflow/Slurm where $task.cpus defines total parallelism
-    configure_threading(n_threads=1, verbose=True)
+    # disable_gpu=True prevents CUDA initialization errors on CPU-only nodes
+    configure_threading(n_threads=1, verbose=True, disable_gpu=True)
     configure_torch_threads(n_threads=1)
 
     annotator = FeatureAnnotator(

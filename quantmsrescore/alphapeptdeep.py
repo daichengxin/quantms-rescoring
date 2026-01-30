@@ -6,7 +6,7 @@ from ms2rescore.feature_generators.base import FeatureGeneratorBase, FeatureGene
 from typing import Optional, Tuple, List, Union, Generator, Dict, Any
 
 from psm_utils import PSMList, PSM
-from quantmsrescore.logging_config import get_logger
+from quantmsrescore.logging_config import get_logger, configure_worker_process
 from quantmsrescore.openms import (
     OpenMSHelper,
     get_compiled_regex,
@@ -215,12 +215,41 @@ class AlphaPeptDeepFeatureGenerator(FeatureGeneratorBase):
                 self._calculate_features(psm_list_run, alphapeptdeep_results)
                 current_run += 1
 
+    def _get_pool(self):
+        """Get multiprocessing pool with recursion/daemon protection."""
+        processes = int(self.processes)
+        logger.debug(f"Starting workers (processes={processes})...")
+
+        if multiprocessing.current_process().daemon:
+            logger.warning(
+                "Running in a daemon process. Disabling multiprocessing as daemonic "
+                "processes cannot have children."
+            )
+            return multiprocessing.dummy.Pool(1)
+
+        if processes == 1:
+            logger.debug("Using dummy multiprocessing pool.")
+            return multiprocessing.dummy.Pool(1)
+
+        # Check if already inside a worker process
+        if multiprocessing.parent_process() is not None:
+            logger.warning(
+                "Attempting to create a pool inside a worker process! "
+                "Returning a dummy pool instead."
+            )
+            return multiprocessing.dummy.Pool(1)
+
+        return multiprocessing.get_context("spawn").Pool(
+            processes,
+            initializer=configure_worker_process
+        )
+
     def _calculate_features(
             self, psm_list: PSMList, alphapeptdeep_results: List[ProcessingResult]
     ) -> None:
         """Calculate features from all AlphaPeptDeep results and add to PSMs."""
         logger.debug("Calculating features from predicted spectra")
-        with multiprocessing.Pool(int(self.processes)) as pool:
+        with self._get_pool() as pool:
             # Use imap, so we can use a progress bar
             counts_failed = 0
             for result, features in zip(
@@ -236,7 +265,8 @@ class AlphaPeptDeepFeatureGenerator(FeatureGeneratorBase):
                     # Cannot use result.psm directly, as it is a copy from AlphaPeptDeep multiprocessing
                     try:
                         psm_list[result.psm_index]["rescoring_features"].update(features)
-                    except (AttributeError, TypeError):
+                    except (AttributeError, TypeError) as e:
+                        logger.debug(f"Initializing rescoring_features for PSM {result.psm_index}: {e}")
                         psm_list[result.psm_index]["rescoring_features"] = features
                 else:
                     counts_failed += 1
