@@ -57,11 +57,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY --from=builder /usr/local /usr/local
 
-ENV HOME=/work
-ENV PEPTDEEP_HOME=/work
-ENV MPLCONFIGDIR=/work/.config/matplotlib
+ENV HOME=/app
+ENV PEPTDEEP_HOME=/app
+ENV MPLCONFIGDIR=/app/.config/matplotlib
 
-WORKDIR /work
-RUN chmod -R 755 /work
+WORKDIR /app
+RUN chmod -R 755 /app
 
 RUN python3.11 -c "import pyopenms; print('pyOpenMS imported successfully')"

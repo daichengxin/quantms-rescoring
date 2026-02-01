@@ -4,6 +4,8 @@
 
 import click
 
+# Import thread configuration FIRST before other heavy imports
+from quantmsrescore import configure_threading, configure_torch_threads
 from quantmsrescore.annotator import FeatureAnnotator
 from quantmsrescore.logging_config import configure_logging
 
@@ -37,7 +39,9 @@ configure_logging()
 @click.option("--log_level", help="Logging level (default: `info`)", default="info")
 @click.option(
     "--processes",
-    help="Number of parallel processes available to MS²Rescore (default: 4)",
+    help="Number of parallel processes (e.g., Nextflow's $task.cpus). "
+         "Each process uses 1 internal thread to avoid HPC resource contention. "
+         "Default: 4",
     type=int,
     default=4,
 )
@@ -154,7 +158,7 @@ def msrescore2feature(
         transfer_learning,
         transfer_learning_test_ratio,
         save_retrain_model,
-        epoch_to_train_ms2
+        epoch_to_train_ms2,
 ):
     """
     Annotate PSMs in an idXML file with additional features using specified models.
@@ -178,7 +182,8 @@ def msrescore2feature(
     log_level : str
         The logging level for the CLI command.
     processes : int
-        The number of parallel processes available for MS²Rescore.
+        The number of parallel processes available (e.g., Nextflow's $task.cpus).
+        Each process uses 1 internal thread for HPC safety.
     feature_generators : str
         Comma-separated list of feature generators to use for annotation.
     only_features : str
@@ -217,6 +222,12 @@ def msrescore2feature(
     epoch_to_train_ms2: int, optional
         Number of epochs to train AlphaPeptDeep MS2 model. Defaults to 20.
     """
+    # Configure threading for HPC environments
+    # Use 1 thread per process to avoid thread explosion with multiprocessing
+    # This is critical for Nextflow/Slurm where $task.cpus defines total parallelism
+    # disable_gpu=True prevents CUDA initialization errors on CPU-only nodes
+    configure_threading(n_threads=1, verbose=True, disable_gpu=True)
+    configure_torch_threads(n_threads=1)
 
     annotator = FeatureAnnotator(
         feature_generators=feature_generators,

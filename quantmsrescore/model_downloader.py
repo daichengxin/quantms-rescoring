@@ -13,6 +13,7 @@ import click
 from ms2pip._utils.xgb_models import validate_requested_xgb_model
 from quantmsrescore.logging_config import configure_logging, get_logger
 from quantmsrescore import exceptions
+from quantmsrescore.ms2_model_manager import MS2ModelManager
 
 # Get logger for this module
 logger = get_logger(__name__)
@@ -264,45 +265,12 @@ def download_alphapeptdeep_models(model_dir: Optional[Path] = None) -> None:
         If model download fails.
     """
     try:
-        from peptdeep.pretrained_models import (
-            MODEL_ZIP_FILE_PATH,
-            _download_models,
-        )
-
         logger.info("Downloading AlphaPeptDeep models...")
 
-        # Download models to default location
-        _download_models(MODEL_ZIP_FILE_PATH)
-
+        # Download models to specified location or default
+        target_dir = str(model_dir) if model_dir else "."
+        MS2ModelManager(model_dir=target_dir)
         logger.info("AlphaPeptDeep models downloaded successfully.")
-        logger.info(f"Models cached at: {MODEL_ZIP_FILE_PATH}")
-
-        # If a custom model_dir is specified, copy models there
-        if model_dir:
-            model_dir = Path(model_dir)
-            model_dir.mkdir(parents=True, exist_ok=True)
-
-            # Find the peptdeep models directory
-            models_path = Path(MODEL_ZIP_FILE_PATH)
-
-            if not models_path:
-                logger.warning(
-                    "Could not locate peptdeep package models directory. "
-                    "Models are still available in the default cache."
-                )
-                return
-
-            if models_path.exists():
-                logger.info(f"Copying models to {model_dir}...")
-                target_file = model_dir / models_path.name
-                shutil.copy2(MODEL_ZIP_FILE_PATH, target_file)
-                logger.info(f"Copied {models_path.name} to {target_file}")
-
-            else:
-                logger.warning(
-                    f"Could not find models at {models_path}. "
-                    "Models are still available in the default cache."
-                )
 
     except ImportError:
         logger.error("peptdeep package not found. Please install peptdeep")

@@ -6,8 +6,13 @@ from ms2rescore.feature_generators.base import FeatureGeneratorBase, FeatureGene
 from typing import Optional, Tuple, List, Union, Generator, Dict, Any
 
 from psm_utils import PSMList, PSM
-from quantmsrescore.logging_config import get_logger
-from quantmsrescore.openms import OpenMSHelper
+from quantmsrescore.logging_config import get_logger, configure_worker_process
+from quantmsrescore.openms import (
+    OpenMSHelper,
+    get_compiled_regex,
+    organize_psms_by_spectrum_id,
+    calculate_correlations,
+)
 from quantmsrescore.ms2_model_manager import MS2ModelManager
 from ms2rescore.utils import infer_spectrum_path
 import ms2pip.exceptions as exceptions
@@ -210,12 +215,41 @@ class AlphaPeptDeepFeatureGenerator(FeatureGeneratorBase):
                 self._calculate_features(psm_list_run, alphapeptdeep_results)
                 current_run += 1
 
+    def _get_pool(self):
+        """Get multiprocessing pool with recursion/daemon protection."""
+        processes = int(self.processes)
+        logger.debug(f"Starting workers (processes={processes})...")
+
+        if multiprocessing.current_process().daemon:
+            logger.warning(
+                "Running in a daemon process. Disabling multiprocessing as daemonic "
+                "processes cannot have children."
+            )
+            return multiprocessing.dummy.Pool(1)
+
+        if processes == 1:
+            logger.debug("Using dummy multiprocessing pool.")
+            return multiprocessing.dummy.Pool(1)
+
+        # Check if already inside a worker process
+        if multiprocessing.parent_process() is not None:
+            logger.warning(
+                "Attempting to create a pool inside a worker process! "
+                "Returning a dummy pool instead."
+            )
+            return multiprocessing.dummy.Pool(1)
+
+        return multiprocessing.get_context("spawn").Pool(
+            processes,
+            initializer=configure_worker_process
+        )
+
     def _calculate_features(
             self, psm_list: PSMList, alphapeptdeep_results: List[ProcessingResult]
     ) -> None:
         """Calculate features from all AlphaPeptDeep results and add to PSMs."""
         logger.debug("Calculating features from predicted spectra")
-        with multiprocessing.Pool(int(self.processes)) as pool:
+        with self._get_pool() as pool:
             # Use imap, so we can use a progress bar
             counts_failed = 0
             for result, features in zip(
@@ -231,7 +265,8 @@ class AlphaPeptDeepFeatureGenerator(FeatureGeneratorBase):
                     # Cannot use result.psm directly, as it is a copy from AlphaPeptDeep multiprocessing
                     try:
                         psm_list[result.psm_index]["rescoring_features"].update(features)
-                    except (AttributeError, TypeError):
+                    except (AttributeError, TypeError) as e:
+                        logger.debug(f"Initializing rescoring_features for PSM {result.psm_index}: {e}")
                         psm_list[result.psm_index]["rescoring_features"] = features
                 else:
                     counts_failed += 1
@@ -823,14 +858,11 @@ def ms2_fine_tune(enumerated_psm_list, psms_df, spec_file, spectrum_id_pattern, 
 
         precursor_df = precursor_df.set_index("provenance_data")
 
-        # Compile regex for spectrum ID matching
-        try:
-            spectrum_id_regex = re.compile(spectrum_id_pattern)
-        except TypeError:
-            spectrum_id_regex = re.compile(r"(.*)")
+        # Get cached compiled regex for spectrum ID matching
+        spectrum_id_regex = get_compiled_regex(spectrum_id_pattern)
 
         # Organize PSMs by spectrum ID
-        psms_by_specid = _organize_psms_by_spectrum_id(calibration_set)
+        psms_by_specid = organize_psms_by_spectrum_id(calibration_set)
 
         match_intensity_df = []
         current_index = 0
@@ -897,14 +929,12 @@ def ms2_fine_tune(enumerated_psm_list, psms_df, spec_file, spectrum_id_pattern, 
 
     b_cols = [col for col in theoretical_mz_df.columns if col.startswith('b')]
     y_cols = [col for col in theoretical_mz_df.columns if col.startswith('y')]
-    # Compile regex for spectrum ID matching
-    try:
-        spectrum_id_regex = re.compile(spectrum_id_pattern)
-    except TypeError:
-        spectrum_id_regex = re.compile(r"(.*)")
+
+    # Get cached compiled regex for spectrum ID matching
+    spectrum_id_regex = get_compiled_regex(spectrum_id_pattern)
 
     # Organize PSMs by spectrum ID
-    psms_by_specid = _organize_psms_by_spectrum_id(enumerated_psm_list)
+    psms_by_specid = organize_psms_by_spectrum_id(enumerated_psm_list)
 
     # Process each spectrum
     for spectrum in read_spectrum_file(spec_file):
@@ -957,26 +987,21 @@ def ms2_fine_tune(enumerated_psm_list, psms_df, spec_file, spectrum_id_pattern, 
     return results, model_mgr
 
 
-def calculate_correlations(results: List[ProcessingResult]) -> None:
-    """Calculate and add Pearson correlations to list of results."""
-    for result in results:
-        if result.predicted_intensity and result.observed_intensity:
-            pred_int = np.concatenate([i for i in result.predicted_intensity.values()])
-            obs_int = np.concatenate([i for i in result.observed_intensity.values()])
-            result.correlation = np.corrcoef(pred_int, obs_int)[0][1]
-        else:
-            result.correlation = None
-            logger.info("Results {} is empty".format(result))
-
-
-def read_spectrum_file(spec_file: str) -> Generator[ObservedSpectrum, None, None]:
+def read_spectrum_file(spec_file: str, use_cache: bool = True) -> Generator[ObservedSpectrum, None, None]:
     """
     Read MS2 spectra from a supported file format; inferring the type from the filename extension.
 
+    This function uses a global cache to prevent loading the same mzML file
+    multiple times when both MS2PIP and AlphaPeptDeep process the same file.
+
     Parameters
     ----------
-    spec_file:
+    spec_file : str
         Path to MGF or mzML file.
+    use_cache : bool, optional
+        If True, use the global spectrum cache. Default is True.
+        This prevents duplicate file loading when multiple feature generators
+        process the same spectrum file.
 
     Yields
     ------
@@ -986,10 +1011,12 @@ def read_spectrum_file(spec_file: str) -> Generator[ObservedSpectrum, None, None
     ------
     UnsupportedSpectrumFiletypeError
         If the file extension is not supported.
-
     """
     try:
-        spectra = OpenMSHelper.get_mslevel_spectra(file_name=str(spec_file), ms_level=2)
+        # Use iterator version for memory efficiency
+        spectra = OpenMSHelper.iter_mslevel_spectra(
+            file_name=str(spec_file), ms_level=2, use_cache=use_cache
+        )
     except ValueError:
         raise exceptions.UnsupportedSpectrumFiletypeError(Path(spec_file).suffixes)
 
@@ -1020,28 +1047,6 @@ def read_spectrum_file(spec_file: str) -> Generator[ObservedSpectrum, None, None
         ):
             continue
         yield obs_spectrum
-
-
-def _organize_psms_by_spectrum_id(
-        enumerated_psm_list: List[PSM]
-) -> Dict[str, List[Tuple[int, PSM]]]:
-    """
-    Organize PSMs by spectrum ID for efficient lookup.
-
-    Parameters
-    ----------
-    enumerated_psm_list
-        List of tuples of (index, PSM) for each PSM in the input file.
-
-    Returns
-    -------
-    Dict[str, List[Tuple[int, PSM]]]
-        Dictionary mapping spectrum IDs to lists of (index, PSM) tuples.
-    """
-    psms_by_specid = defaultdict(list)
-    for index, psm in enumerate(enumerated_psm_list):
-        psms_by_specid[str(psm.spectrum_id)].append((index, psm))
-    return psms_by_specid
 
 
 def _preprocess_spectrum(spectrum: ObservedSpectrum, model: str) -> None:

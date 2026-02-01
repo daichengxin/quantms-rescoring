@@ -310,6 +310,88 @@ Install quantms-rescoring using one of the following methods:
 ❯ ./scripts/test-docker.sh latest
 ```
 
+### HPC and Nextflow Integration
+
+quantms-rescoring is optimized for HPC/Slurm environments and Nextflow workflows. The tool automatically manages thread allocation, GPU configuration, and multiprocessing stability to prevent resource contention and failures.
+
+#### Thread Configuration
+
+The tool uses a single `--processes` parameter that directly maps to available CPUs. Each process uses 1 internal thread to avoid thread explosion when using multiprocessing.
+
+**For Nextflow workflows:**
+
+```groovy
+process MS2Rescore {
+    container 'ghcr.io/bigbio/quantms-rescoring:latest'
+
+    input:
+    path idxml
+    path mzml
+
+    output:
+    path "*.idXML"
+
+    script:
+    """
+    rescoring msrescore2feature \\
+        --idxml ${idxml} \\
+        --mzml ${mzml} \\
+        --output ${idxml.baseName}_rescored.idXML \\
+        --processes ${task.cpus}
+    """
+}
+```
+
+**For standalone HPC usage:**
+
+```sh
+# Set environment variable for automatic thread configuration (optional)
+# This also disables GPU to prevent CUDA initialization errors on CPU-only nodes
+export QUANTMS_HPC_MODE=1
+
+# Run with explicit process count
+rescoring msrescore2feature \\
+    --idxml input.idXML \\
+    --mzml input.mzML \\
+    --output output.idXML \\
+    --processes 8
+```
+
+#### HPC Stability Features
+
+The tool includes several stability features designed for reliable operation on HPC clusters:
+
+- **GPU/CUDA Disabled by Default**: CLI commands automatically disable GPU (`CUDA_VISIBLE_DEVICES=""`) to prevent CUDA initialization errors on CPU-only nodes. This eliminates the "CUDA Error 303" and TensorFlow/cuDNN warning spam.
+
+- **Worker Process Initialization**: Spawned worker processes are properly initialized with warning filters to prevent log spam from pyopenms, TensorFlow, and other libraries.
+
+- **Pool Timeout Protection**: Multiprocessing pool operations have a 1-hour timeout to prevent indefinite hangs. If a worker becomes unresponsive, the pool is terminated gracefully.
+
+- **Daemon Process Protection**: The tool detects when running inside daemon processes (common in some job schedulers) and automatically falls back to single-threaded mode to avoid "daemonic processes cannot have children" errors.
+
+- **File Handle Management**: Proper cleanup of file handles when suppressing stdout from verbose libraries like TensorFlow.
+
+**Thread Management Details:**
+
+- **Automatic Configuration**: CLI commands (`msrescore2feature`, `transfer_learning`) automatically configure thread limits for all numerical libraries (NumPy, PyTorch, TensorFlow, etc.)
+- **Opt-in Import-time Configuration**: Set `QUANTMS_HPC_MODE=1` to automatically apply thread limits and disable GPU when importing the library in Python scripts
+- **Explicit Configuration**: For programmatic use, call `configure_threading()` and `configure_torch_threads()` directly:
+
+```python
+from quantmsrescore import configure_threading, configure_torch_threads
+
+# Configure before importing heavy libraries
+# disable_gpu=True prevents CUDA initialization errors on CPU-only nodes
+configure_threading(n_threads=1, verbose=True, disable_gpu=True)
+configure_torch_threads(n_threads=1)
+```
+
+This prevents thread explosion where `processes × cpu_count` threads compete for `cpu_count` cores, which can cause:
+
+- Excessive memory usage from thread stacks
+- Node OOM kills in Slurm clusters
+- Performance degradation from context switching
+
 ### Offline Model Download
 
 For environments without internet access (e.g., HPC clusters), you can download all required models ahead of time using the `download_models` command:

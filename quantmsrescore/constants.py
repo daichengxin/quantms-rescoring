@@ -67,6 +67,7 @@ MS2PIP_FEATURES = {
     "MS2PIP:IonYStdAbsDiff": "iony_std_abs_diff",
     "MS2PIP:DotProdIonB": "dotprod_ionb",
     "MS2PIP:DotProdIonY": "dotprod_iony",
+    "MS2PIP:Cos": "cos",
     "MS2PIP:CosIonB": "cos_ionb",
     "MS2PIP:CosIonY": "cos_iony",
 }

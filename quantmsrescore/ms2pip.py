@@ -26,11 +26,19 @@ from psm_utils import PSMList, PSM
 
 from quantmsrescore.constants import SUPPORTED_MODELS_MS2PIP
 from quantmsrescore.exceptions import Ms2pipIncorrectModelException
-from quantmsrescore.logging_config import get_logger
-from quantmsrescore.openms import OpenMSHelper
+from quantmsrescore.logging_config import get_logger, configure_worker_process
+from quantmsrescore.openms import (
+    OpenMSHelper,
+    get_compiled_regex,
+    organize_psms_by_spectrum_id,
+    calculate_correlations,
+)
 
 # Get logger for this module
 logger = get_logger(__name__)
+
+# Timeout for pool.get() operations in seconds (1 hour per chunk)
+_POOL_GET_TIMEOUT = 3600
 
 
 class PatchParallelized(_Parallelized):
@@ -172,7 +180,12 @@ class PatchParallelized(_Parallelized):
             mp_results = [
                 pool.apply_async(func, args=(psm_list_chunk, *args)) for psm_list_chunk in chunks
             ]
-            results = [r.get() for r in mp_results]
+            try:
+                results = [r.get(timeout=_POOL_GET_TIMEOUT) for r in mp_results]
+            except multiprocessing.TimeoutError:
+                logger.error(f"Pool operation timed out after {_POOL_GET_TIMEOUT} seconds")
+                pool.terminate()
+                raise
 
             pool.close()
             pool.join()
@@ -205,7 +218,10 @@ class PatchParallelized(_Parallelized):
             )
             return multiprocessing.dummy.Pool(1)
 
-        return multiprocessing.get_context("spawn").Pool(self.processes)
+        return multiprocessing.get_context("spawn").Pool(
+            self.processes,
+            initializer=configure_worker_process
+        )
 
 
 class MS2PIPAnnotator(MS2PIPFeatureGenerator):
@@ -541,26 +557,21 @@ class MS2PIPAnnotator(MS2PIPFeatureGenerator):
             return results
 
 
-def calculate_correlations(results: List[ProcessingResult]) -> None:
-    """Calculate and add Pearson correlations to list of results."""
-    for result in results:
-        if result.predicted_intensity and result.observed_intensity:
-            pred_int = np.concatenate([i for i in result.predicted_intensity.values()])
-            obs_int = np.concatenate([i for i in result.observed_intensity.values()])
-            result.correlation = np.corrcoef(pred_int, obs_int)[0][1]
-        else:
-            result.correlation = None
-            logger.info("Results {} is empty".format(result))
-
-
-def read_spectrum_file(spec_file: str) -> Generator[ObservedSpectrum, None, None]:
+def read_spectrum_file(spec_file: str, use_cache: bool = True) -> Generator[ObservedSpectrum, None, None]:
     """
     Read MS2 spectra from a supported file format; inferring the type from the filename extension.
 
+    This function uses a global cache to prevent loading the same mzML file
+    multiple times when both MS2PIP and AlphaPeptDeep process the same file.
+
     Parameters
     ----------
-    spec_file:
+    spec_file : str
         Path to MGF or mzML file.
+    use_cache : bool, optional
+        If True, use the global spectrum cache. Default is True.
+        This prevents duplicate file loading when multiple feature generators
+        process the same spectrum file.
 
     Yields
     ------
@@ -570,10 +581,12 @@ def read_spectrum_file(spec_file: str) -> Generator[ObservedSpectrum, None, None
     ------
     UnsupportedSpectrumFiletypeError
         If the file extension is not supported.
-
     """
     try:
-        spectra = OpenMSHelper.get_mslevel_spectra(file_name=str(spec_file), ms_level=2)
+        # Use iterator version for memory efficiency
+        spectra = OpenMSHelper.iter_mslevel_spectra(
+            file_name=str(spec_file), ms_level=2, use_cache=use_cache
+        )
     except ValueError:
         raise exceptions.UnsupportedSpectrumFiletypeError(Path(spec_file).suffixes)
 
@@ -604,28 +617,6 @@ def read_spectrum_file(spec_file: str) -> Generator[ObservedSpectrum, None, None
         ):
             continue
         yield obs_spectrum
-
-
-def _organize_psms_by_spectrum_id(
-        enumerated_psm_list: List[Tuple[int, PSM]]
-) -> Dict[str, List[Tuple[int, PSM]]]:
-    """
-    Organize PSMs by spectrum ID for efficient lookup.
-
-    Parameters
-    ----------
-    enumerated_psm_list
-        List of tuples of (index, PSM) for each PSM in the input file.
-
-    Returns
-    -------
-    Dict[str, List[Tuple[int, PSM]]]
-        Dictionary mapping spectrum IDs to lists of (index, PSM) tuples.
-    """
-    psms_by_specid = defaultdict(list)
-    for psm_index, psm in enumerated_psm_list:
-        psms_by_specid[str(psm.spectrum_id)].append((psm_index, psm))
-    return psms_by_specid
 
 
 def _preprocess_spectrum(spectrum: ObservedSpectrum, model: str) -> None:
@@ -681,7 +672,8 @@ def _get_targets_for_psm(
     """
     try:
         enc_peptidoform = encoder.encode_peptidoform(psm.peptidoform)
-    except exceptions.InvalidAminoAcidError:
+    except exceptions.InvalidAminoAcidError as e:
+        logger.debug(f"Invalid amino acid in peptidoform {psm.peptidoform}: {e}")
         return None, {}
 
     # Get targets
@@ -778,7 +770,8 @@ def _create_result_for_mode(
         except (
                 exceptions.InvalidPeptidoformError,
                 exceptions.InvalidAminoAcidError,
-        ):
+        ) as e:
+            logger.debug(f"Invalid peptidoform for PSM index {psm_index}: {e}")
             result = ProcessingResult(psm_index=psm_index, psm=psm)
         else:
             result.observed_intensity = targets
@@ -829,14 +822,11 @@ def _custom_process_spectra(
     results = []
     ion_types = [it.lower() for it in MODELS[model]["ion_types"]]
 
-    # Compile regex for spectrum ID matching
-    try:
-        spectrum_id_regex = re.compile(spectrum_id_pattern)
-    except TypeError:
-        spectrum_id_regex = re.compile(r"(.*)")
+    # Get cached compiled regex for spectrum ID matching
+    spectrum_id_regex = get_compiled_regex(spectrum_id_pattern)
 
     # Organize PSMs by spectrum ID
-    psms_by_specid = _organize_psms_by_spectrum_id(enumerated_psm_list)
+    psms_by_specid = organize_psms_by_spectrum_id(enumerated_psm_list)
 
     # Process each spectrum
     for spectrum in read_spectrum_file(spec_file):
