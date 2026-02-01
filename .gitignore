@@ -164,3 +164,7 @@ cython_debug/
 .qodo
 .apptainer-cache/
 .apptainer-tmp/
+
+
+#Ignore cursor AI rules
+.cursor/rules/codacy.mdc

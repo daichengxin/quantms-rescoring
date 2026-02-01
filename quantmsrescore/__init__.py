@@ -79,7 +79,9 @@ def calculate_optimal_parallelism(
     return n_processes, threads_per_process
 
 
-def configure_threading(n_threads: Optional[int] = None, verbose: bool = False) -> None:
+def configure_threading(
+    n_threads: Optional[int] = None, verbose: bool = False, disable_gpu: bool = False
+) -> None:
     """
     Configure thread counts for all numerical/ML libraries.
 
@@ -94,6 +96,10 @@ def configure_threading(n_threads: Optional[int] = None, verbose: bool = False) 
         Set higher only if you're sure about available resources.
     verbose : bool, optional
         If True, log the thread configuration.
+    disable_gpu : bool, optional
+        If True, disable GPU/CUDA by setting CUDA_VISIBLE_DEVICES="".
+        This prevents CUDA initialization errors on nodes without GPU support.
+        Default is False.
 
     Notes
     -----
@@ -106,6 +112,10 @@ def configure_threading(n_threads: Optional[int] = None, verbose: bool = False) 
         n_threads = _DEFAULT_THREADS_PER_PROCESS
 
     n_threads_str = str(n_threads)
+
+    # Disable GPU BEFORE any TensorFlow/CUDA imports to prevent init errors
+    if disable_gpu:
+        os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
     # OpenMP (used by many scientific libraries)
     os.environ["OMP_NUM_THREADS"] = n_threads_str
@@ -132,11 +142,12 @@ def configure_threading(n_threads: Optional[int] = None, verbose: bool = False) 
     # Disable TensorFlow GPU memory pre-allocation (helps with shared nodes)
     os.environ.setdefault("TF_FORCE_GPU_ALLOW_GROWTH", "true")
 
-    # Reduce TensorFlow verbosity
-    os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
+    # Reduce TensorFlow verbosity to suppress CUDA errors
+    os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "3")
 
     if verbose:
-        print(f"[quantms-rescoring] Thread configuration: {n_threads} thread(s) per process")
+        gpu_status = "disabled" if disable_gpu else "enabled"
+        print(f"[quantms-rescoring] Thread configuration: {n_threads} thread(s) per process, GPU {gpu_status}")
 
 
 def configure_torch_threads(n_threads: Optional[int] = None) -> None:
@@ -202,17 +213,18 @@ def get_safe_process_count(requested: int, memory_per_process_gb: float = 4.0) -
 # Opt-in thread configuration via environment variable
 # =============================================================================
 # Set QUANTMS_HPC_MODE=1 to automatically apply HPC-safe thread limits at import.
-# This ensures that subsequent imports of numpy, torch, etc. use limited threads.
+# This ensures that subsequent imports of numpy, torch, etc. use limited threads
+# and disables GPU to prevent CUDA initialization errors on CPU-only nodes.
 #
 # For explicit control (recommended), call configure_threading() directly:
 #   from quantmsrescore import configure_threading, configure_torch_threads
-#   configure_threading(n_threads=1)
+#   configure_threading(n_threads=1, disable_gpu=True)
 #   configure_torch_threads(n_threads=1)
 #
 # Note: The CLI commands (ms2rescore, transfer_learning) always apply thread
 # limits regardless of this setting.
 if os.environ.get("QUANTMS_HPC_MODE", "").lower() in ("1", "true", "yes"):
-    configure_threading(n_threads=_DEFAULT_THREADS_PER_PROCESS)
+    configure_threading(n_threads=_DEFAULT_THREADS_PER_PROCESS, disable_gpu=True)
 
 
 # =============================================================================
