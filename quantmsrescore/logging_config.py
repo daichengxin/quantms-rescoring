@@ -184,3 +184,46 @@ def get_logger(name: Optional[str] = None) -> logging.Logger:
         A logger with the specified name.
     """
     return logging.getLogger(name)
+
+
+def configure_worker_process() -> None:
+    """
+    Configure logging and warning filters for worker processes.
+
+    This function should be passed as the `initializer` argument when creating
+    a multiprocessing Pool. It ensures that warning filters are properly applied
+    in spawned worker processes, which don't inherit the parent's filter state.
+
+    This prevents warning spam (e.g., CUDA errors, pyopenms warnings) from being
+    repeated for each worker process.
+    """
+    import os
+
+    # Suppress pyopenms warnings
+    warnings.filterwarnings("ignore", message=".*OPENMS_DATA_PATH.*", category=UserWarning)
+    warnings.filterwarnings("ignore", message=".*OPENMS_DATA_PATH environment variable already exists.*")
+
+    # Suppress CUDA/TensorFlow warnings that appear during model loading
+    warnings.filterwarnings("ignore", message=".*failed call to cuInit.*")
+    warnings.filterwarnings("ignore", message=".*CUDA error.*")
+    warnings.filterwarnings("ignore", message=".*Unable to register cuDNN.*")
+    warnings.filterwarnings("ignore", message=".*Unable to register cuBLAS.*")
+    warnings.filterwarnings("ignore", message=".*computation placer already registered.*")
+
+    # Suppress module-level warnings from noisy libraries
+    for module in ["ms2pip", "xgboost", "tensorflow", "deeplc", "ms2rescore"]:
+        warnings.filterwarnings("ignore", module=module)
+
+    # Suppress ms2pip specific warnings
+    warnings.filterwarnings("ignore", message=".*Could not add the following atom.*")
+    warnings.filterwarnings("ignore", message=".*Could not add the following value.*")
+    warnings.filterwarnings("ignore", message=".*Skipping the following.*")
+
+    # Disable TensorFlow GPU in worker to prevent CUDA init errors
+    os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")
+    os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "3")
+
+    # Ensure thread limits are respected in workers
+    os.environ.setdefault("OMP_NUM_THREADS", "1")
+    os.environ.setdefault("MKL_NUM_THREADS", "1")
+    os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
