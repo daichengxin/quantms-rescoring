@@ -38,6 +38,21 @@ now = datetime.now(timezone.utc)
 # run identifier
 run_identifier = f"quantms-rescoring_{now.strftime('%Y-%m-%d_%H:%M:%S')}"
 
+# Escape hatch for a multi-engine merge containing an engine the consensus
+# registry does not know. Off by default: the legacy fallback is a known-invalid
+# representation, so it must be an explicit, deliberate choice.
+ALLOW_LEGACY_MERGE_ENV = "QUANTMSRESCORE_ALLOW_LEGACY_MULTI_ENGINE"
+
+
+class UnsupportedEngineMergeError(ValueError):
+    """Raised when a multi-engine merge contains an unregistered search engine.
+
+    Failing here is deliberate: the only alternative path collapses the feature
+    table and has produced zero proteins at 1% protein FDR in production, so a
+    misspelled or newly added engine label must stop the run rather than quietly
+    degrade its statistics.
+    """
+
 
 class ScoreStats:
     """Statistics about score occurrence in peptide hits."""
@@ -101,9 +116,9 @@ class ParquetRescoringReader(ParquetReader):
         self.min_comet_xcorr = np.inf
         self.min_sage_hyperscore = np.inf
         self.merge_search_engines = []  # Comet > MSGF > Sage
-        # True once the two-engine (comet + msgf) consensus feature union has
-        # been built for this run; downstream writers (annotator,
-        # psm_feature_clean) must then not re-impute / collapse the features.
+        # True once the multi-engine consensus feature union has actually been
+        # built for this run; downstream writers (annotator, psm_feature_clean)
+        # must then not re-impute / collapse the features.
         self.consensus_features_applied = False
 
         self._psms: Optional[PSMList] = None
@@ -453,27 +468,43 @@ class ParquetRescoringReader(ParquetReader):
                 psm_metavalues = row["psm_metavalues"].tolist()
                 self.get_default_scores(search_params, psm_metavalues, record)
                 if prov_key not in merged_psms:
+                    # Substituting the dominant engine's score type MUST also
+                    # carry that type's direction. A Sage row arrives as
+                    # score_type="hyperscore" with higher_score_better=true; if
+                    # only score_type is rewritten to the lower-is-better
+                    # "expect"/"SpecEValue", the row claims a lower-is-better
+                    # score with a higher-is-better flag, and everything
+                    # downstream that trusts row metadata to sort or compute
+                    # q-values inverts for those PSMs.
                     if len(set(self.merge_search_engines)) > 1:
                         if "Comet" in self.merge_search_engines and search_params["search_engine"] != "Comet":
                             psm.score = np.inf
                             record["score"] = np.inf
                             record["score_type"] = "expect"
+                            record["higher_score_better"] = False
                         elif "MS-GF+" in self.merge_search_engines and "Comet" not in self.merge_search_engines and search_params["search_engine"] != "MS-GF+":
                             psm.score = np.inf
                             record["score"] = np.inf
                             record["score_type"] = "SpecEValue"
+                            record["higher_score_better"] = False
                     merged_psms[prov_key] = copy.copy(psm)
                     record["psm_metavalues"] = psm_metavalues
                     merged_records[prov_key] = copy.copy(record)
                 else:
+                    # Same rule as above: whenever the stored score is replaced
+                    # by another engine's, its DIRECTION has to travel with it.
                     if search_params["search_engine"] == "Comet":
                         merged_psms[prov_key].score = psm.score
                         merged_records[prov_key]["score"] = psm.score
                         merged_records[prov_key]["score_type"] = row["score_type"]
+                        merged_records[prov_key]["higher_score_better"] = self._safe_get(
+                            row, ["higher_score_better"], False)
                     elif "Comet" not in self.merge_search_engines and search_params["search_engine"] == "MS-GF+":
                         merged_psms[prov_key].score = psm.score
                         merged_records[prov_key]["score"] = psm.score
                         merged_records[prov_key]["score_type"] = row["score_type"]
+                        merged_records[prov_key]["higher_score_better"] = self._safe_get(
+                            row, ["higher_score_better"], False)
 
                     merged_records[prov_key]["psm_metavalues"] = self.merge_dedup_metavalues(
                         merged_records[prov_key]["psm_metavalues"],
@@ -493,20 +524,52 @@ class ParquetRescoringReader(ParquetReader):
         # imputation + engine-source indicators) so BOTH the ms2features-off path
         # (psm_feature_clean -> this reader) and the ms2features-on path
         # (annotator) produce an engine-aware, non-collapsed representation.
-        # The curated feature orientations only cover Comet and MS-GF+, so any
-        # other engine combination keeps the primary-score fill implemented in
-        # ``fill_search_scores``.
-        if self._is_comet_msgf_merge():
-            self._apply_consensus_features()
-            self.consensus_features_applied = True
+        # Any merge whose engines are all in the consensus registry gets the union
+        # treatment; a combination containing an unregistered engine keeps the
+        # primary-score fill implemented in ``fill_search_scores``.
+        #
+        # The flag must reflect whether the transform actually ran: it is what
+        # tells ``psm_clean`` to skip ``fill_search_scores`` AND to skip writing
+        # extra_features. Setting it unconditionally would, for an empty PSM
+        # frame, suppress both and emit no extra_features at all.
+        if self._is_supported_consensus_merge():
+            self.consensus_features_applied = self._apply_consensus_features()
+        elif len(self.parquet_dirs) > 1:
+            unknown = sorted(set(self.merge_search_engines) - consensus_features.supported_engines())
+            message = (
+                f"Multi-engine merge with unsupported search engine(s): "
+                f"{', '.join(unknown) or '<none>'}. The only fallback is the legacy "
+                f"primary-score fill, which collapses the Percolator feature table to the "
+                f"raw scores and imputes the missing engine with a single global constant; "
+                f"that representation is known to make protein-level FDR unreachable and "
+                f"has returned zero proteins from EPIFANY in production. "
+                f"Supported engines: {', '.join(sorted(consensus_features.supported_engines()))}. "
+                f"Set {ALLOW_LEGACY_MERGE_ENV}=1 to proceed anyway."
+            )
+            # Fail before the expensive downstream analysis rather than emitting
+            # output from a representation we know to be invalid. A misspelled or
+            # newly added engine label should be loud, not silently degrading.
+            if os.environ.get(ALLOW_LEGACY_MERGE_ENV, "").strip().lower() not in ("1", "true", "yes"):
+                raise UnsupportedEngineMergeError(message)
+            logger.warning("%s Proceeding because %s is set.", message, ALLOW_LEGACY_MERGE_ENV)
 
         self._log_spectrum_statistics()
 
-    def _is_comet_msgf_merge(self) -> bool:
-        """True for a merged run whose engines are exactly Comet + MS-GF+."""
-        return len(self.parquet_dirs) > 1 and set(self.merge_search_engines) == {"Comet", "MS-GF+"}
+    def _is_supported_consensus_merge(self) -> bool:
+        """True for a merged run whose engines are ALL in the consensus registry.
 
-    def _apply_consensus_features(self) -> None:
+        Deliberately a subset test rather than equality: any registered
+        combination (comet+msgf, comet+sage, msgf+sage, comet+msgf+sage) gets
+        the union feature treatment. An unregistered engine disables the path
+        entirely, because we would otherwise impute only the known engines'
+        features and leave the unknown engine's features missing on every other
+        engine's PSMs -- exactly the defect this module exists to prevent.
+        """
+        return len(self.parquet_dirs) > 1 and consensus_features.is_supported_engine_set(
+            self.merge_search_engines
+        )
+
+    def _apply_consensus_features(self) -> bool:
         """Add the union feature set + worst-case imputation + engine indicators
         to every merged PSM and record it in ``extra_features``.
 
@@ -518,46 +581,195 @@ class ParquetRescoringReader(ParquetReader):
         path never writes an infinite score.
         """
         if self._psms_df is None or self._psms_df.empty:
-            return
+            return False
         metavalue_col = self._psms_df["psm_metavalues"]
+
+        engines = list(self.merge_search_engines)
+        orientation = consensus_features.union_feature_orientation(engines)
 
         # Pass 1: worst-case per feature from real (pre-imputation) values.
         worst: Dict[str, float] = {}
         for mvs in metavalue_col:
-            consensus_features.update_worst_case(mvs, worst)
+            consensus_features.update_worst_case(mvs, worst, orientation)
 
-        comet_expect_fallback = (
-            self.max_comet_expectation_value
-            if np.isfinite(self.max_comet_expectation_value)
-            else worst.get("MS:1002257", 0.0)
-        )
+        score_fallback = self._sentinel_score_fallback(engines, worst)
 
         # Pass 2: impute missing-engine features + indicators; fix inf score.
         new_metavalues = []
         scores = self._psms_df["score"].tolist() if "score" in self._psms_df else None
         fixed_scores = []
         for idx, mvs in enumerate(metavalue_col):
-            comet_present, msgf_present = consensus_features.detect_engine_sources(mvs)
+            presence = consensus_features.detect_engines(mvs, engine_labels=engines)
             mvs = consensus_features.build_consensus_features(
-                mvs, worst, comet_present=comet_present, msgf_present=msgf_present
+                mvs, worst, orientation=orientation, presence=presence
             )
             new_metavalues.append(mvs)
             if scores is not None:
                 s = scores[idx]
-                fixed_scores.append(comet_expect_fallback if (s is None or not np.isfinite(s)) else s)
+                fixed_scores.append(score_fallback if (s is None or not np.isfinite(s)) else s)
         self._psms_df["psm_metavalues"] = new_metavalues
         if scores is not None:
             self._psms_df["score"] = fixed_scores
+            self._repair_psmlist_scores(score_fallback)
 
-        self._set_extra_features(consensus_features.union_feature_names())
+        # Advertise ONLY the features that actually got an imputation constant.
+        # A registry entry the data never provided (renamed metavalue key, or a
+        # primary score that lives in the `score` column rather than in
+        # psm_metavalues, as Comet's MS:1002257 does) cannot be written onto
+        # missing-engine PSMs, so declaring it would hand Percolator a name that
+        # is absent from some PSMs -- the defect this whole path exists to stop.
+        dropped = consensus_features.unconstrained_features(worst, orientation)
+        if dropped:
+            logger.warning(
+                "Consensus features declared by the registry but never observed in the "
+                "data, so they are NOT advertised to Percolator: %s. Check that these "
+                "metavalue names match what the engine emits.",
+                ", ".join(sorted(dropped)),
+            )
+
+        guaranteed = consensus_features.union_feature_names(
+            orientation, engine_labels=engines, worst=worst
+        )
+        # Any pre-existing extra_features entry came from the PRIORITY engine's
+        # search params and is only kept if it is genuinely present on EVERY
+        # merged PSM. Comet advertises MS:1002252/MS:1002255 aliases and MS-GF+
+        # advertises MS:1002053 that its own PSMs do not carry; unioning those
+        # in would re-introduce engine-specific and outright absent names into
+        # the very table this path exists to make complete.
+        # "Present on every PSM" includes the psms.parquet COLUMNS, not just the
+        # metavalues. Sage advertises a feature literally named `score`
+        # (verified on a real SageAdapter idparquet: extra_features =
+        # "score,SAGE:ln(-poisson),..."), which refers to the score column and
+        # is defined on every row once the inf sentinel has been repaired above.
+        # Intersecting against metavalues alone would silently discard it.
+        universal = self._names_on_every_psm(new_metavalues) | set(self._psms_df.columns)
+        inherited = self._existing_extra_features() & universal
+        self._replace_extra_features(guaranteed | inherited)
+        return True
+
+    @staticmethod
+    def _names_on_every_psm(all_metavalues) -> set:
+        """Metavalue names present on every PSM (intersection across rows)."""
+        common: Optional[set] = None
+        for mvs in all_metavalues:
+            names = {m.get("name") for m in mvs if isinstance(m, dict)}
+            common = names if common is None else (common & names)
+            if not common:
+                break
+        return common or set()
+
+    def _existing_extra_features(self) -> set:
+        sp_metavalues = consensus_features.as_metavalue_list(
+            self.search_params.get("sp_metavalues")
+        )
+        for mv in sp_metavalues:
+            if isinstance(mv, dict) and mv.get("name") == "extra_features" and mv.get("value"):
+                return {n for n in str(mv["value"]).split(",") if n}
+        return set()
+
+    def _replace_extra_features(self, feature_names) -> None:
+        """Set ``extra_features`` to exactly ``feature_names``.
+
+        Unlike :meth:`_set_extra_features` this does NOT union with whatever was
+        already there, because in consensus mode the inherited list is the
+        priority engine's and is not guaranteed across the merged PSMs.
+        """
+        dropped = self._existing_extra_features() - set(feature_names)
+        if dropped:
+            logger.warning(
+                "Dropping inherited extra_features not present on every merged PSM: %s",
+                ", ".join(sorted(dropped)),
+            )
+        sp_metavalues = consensus_features.as_metavalue_list(
+            self.search_params.get("sp_metavalues")
+        )
+        value = ",".join(sorted(feature_names))
+        for mv in sp_metavalues:
+            if isinstance(mv, dict) and mv.get("name") == "extra_features":
+                mv["value"] = value
+                break
+        else:
+            sp_metavalues.append(
+                {"name": "extra_features", "value": value, "value_type": "string"}
+            )
+        self.search_params["sp_metavalues"] = sp_metavalues
+
+    def _repair_psmlist_scores(self, score_fallback: float) -> None:
+        """Mirror the sentinel repair from ``_psms_df`` onto the ``PSMList``.
+
+        The merger writes the ``inf`` sentinel to BOTH ``record["score"]`` (which
+        becomes ``_psms_df``) and ``psm.score`` (which becomes ``self._psms``),
+        but only the DataFrame was repaired. ``reader.psms`` is what the
+        annotator consumes -- ``_get_top_batch_psms`` sorts calibration
+        candidates by ``psm.score`` -- so leaving ``inf`` there means the two
+        views of the same PSM disagree, and for a higher-is-better score type
+        the sentinel PSMs sort to the FRONT of the calibration set.
+        """
+        if self._psms is None:
+            return
+        for psm in self._psms.psm_list:
+            score = getattr(psm, "score", None)
+            if score is None or not np.isfinite(score):
+                psm.score = score_fallback
+
+    def _sentinel_score_fallback(self, engines, worst) -> float:
+        """Finite replacement for the ``score == inf`` sentinel on PSMs that the
+        score-owning engine did not identify.
+
+        ``score`` carries whichever engine's primary score the merger chose, in
+        the documented precedence Comet > MS-GF+ > Sage, so the fallback follows
+        the same order and uses that engine's worst observed primary. Falls back
+        to the accumulated per-feature worst when the reader-level statistic was
+        never populated (no PSM from that engine).
+
+        The last resort is derived from the finite scores actually present
+        rather than a constant: the score types in play (Comet ``expect``,
+        MS-GF+ ``SpecEValue``) are lower-is-better, so a literal ``0.0`` would
+        hand a PERFECT score to exactly the PSMs the score-owning engine never
+        identified -- the inverse of this module's worst-case intent.
+        """
+        candidates = (
+            ("Comet", self.max_comet_expectation_value, "MS:1002257"),
+            ("MS-GF+", self.max_msgf_EValue, "MS:1002052"),
+            ("Sage", self.min_sage_hyperscore, "ln(hyperscore)"),
+        )
+        for label, stat, feature in candidates:
+            if label not in engines:
+                continue
+            if stat is not None and np.isfinite(stat):
+                return stat
+            if feature in worst:
+                return worst[feature]
+        return self._worst_observed_score()
+
+    def _worst_observed_score(self) -> float:
+        """Direction-correct worst of the finite scores present in ``_psms_df``.
+
+        Lower-is-better score types take the maximum, higher-is-better the
+        minimum. Returns 0.0 only when no finite score exists at all, i.e. every
+        PSM carries the sentinel, in which case the run is degenerate anyway.
+        """
+        if self._psms_df is None or "score" not in self._psms_df:
+            return 0.0
+        # Coerce first: the score column can be object-dtype (e.g. a null score
+        # arrives as Python None), and np.isfinite raises on object arrays even
+        # without a None present. pd.to_numeric(errors="coerce") turns anything
+        # non-numeric into NaN, which dropna() then removes.
+        scores = pd.to_numeric(self._psms_df["score"], errors="coerce")
+        finite = scores[np.isfinite(scores)]
+        if finite.empty:
+            logger.warning(
+                "No finite PSM score available to replace the merge sentinel; "
+                "falling back to 0.0. Every PSM appears to carry the sentinel."
+            )
+            return 0.0
+        return float(finite.min() if self.high_score_better else finite.max())
 
     def _set_extra_features(self, feature_names) -> None:
         """Union ``feature_names`` into the ``extra_features`` search parameter."""
-        sp_metavalues = self.search_params.get("sp_metavalues", [])
-        if sp_metavalues is None:
-            sp_metavalues = []
-        elif not isinstance(sp_metavalues, list):
-            sp_metavalues = sp_metavalues.tolist()
+        sp_metavalues = consensus_features.as_metavalue_list(
+            self.search_params.get("sp_metavalues")
+        )
 
         existing: set = set()
         for mv in sp_metavalues:
@@ -579,24 +791,42 @@ class ParquetRescoringReader(ParquetReader):
             )
         self.search_params["sp_metavalues"] = sp_metavalues
 
+    @staticmethod
+    def _as_float(value):
+        """Best-effort float, or None. ``get_meta_features`` returns None when a
+        PSM lacks the requested metavalue, and ``float(None)`` raises; a single
+        such PSM must not kill the whole run."""
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+
     def get_default_scores(self, search_params, psm_metavalues, record):
+        """Accumulate the per-engine worst primary score across PSMs.
+
+        A PSM whose primary score is missing (e.g. a Comet PSM without
+        ``MS:1002252`` xcorr, seen with ms2rescore-annotated phospho/ETD data)
+        simply does not contribute to the min/max rather than crashing. If EVERY
+        PSM of an engine lacks the value the seed (inf / -inf) is left untouched,
+        which :meth:`_sentinel_score_fallback` already handles.
+        """
         if "MS-GF+" in search_params["search_engine"]:
-            msgf_RawScore = float(self.get_meta_features(psm_metavalues, "MS:1002049"))
-            msgf_EValue = float(record["score"])
-            if msgf_RawScore < self.min_msgf_RawScore:
+            msgf_RawScore = self._as_float(self.get_meta_features(psm_metavalues, "MS:1002049"))
+            msgf_EValue = self._as_float(record["score"])
+            if msgf_RawScore is not None and msgf_RawScore < self.min_msgf_RawScore:
                 self.min_msgf_RawScore = msgf_RawScore
-            if msgf_EValue > self.max_msgf_EValue:
+            if msgf_EValue is not None and msgf_EValue > self.max_msgf_EValue:
                 self.max_msgf_EValue = msgf_EValue
         elif "Sage" in search_params["search_engine"]:
-            sage_hyperscore = float(record["score"])
-            if sage_hyperscore < self.min_sage_hyperscore:
+            sage_hyperscore = self._as_float(record["score"])
+            if sage_hyperscore is not None and sage_hyperscore < self.min_sage_hyperscore:
                 self.min_sage_hyperscore = sage_hyperscore
         else:
-            comet_xcorr = float(self.get_meta_features(psm_metavalues, "MS:1002252"))
-            comet_expectation_value = float(record["score"])
-            if comet_xcorr < self.min_comet_xcorr:
+            comet_xcorr = self._as_float(self.get_meta_features(psm_metavalues, "MS:1002252"))
+            comet_expectation_value = self._as_float(record["score"])
+            if comet_xcorr is not None and comet_xcorr < self.min_comet_xcorr:
                 self.min_comet_xcorr = comet_xcorr
-            if comet_expectation_value > self.max_comet_expectation_value:
+            if comet_expectation_value is not None and comet_expectation_value > self.max_comet_expectation_value:
                 self.max_comet_expectation_value = comet_expectation_value
 
     @staticmethod
